@@ -1,18 +1,33 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { SQLiteProvider } from 'expo-sqlite';
+import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { Colors } from '@/constants/theme';
+import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 
-SplashScreen.preventAutoHideAsync();
+export default function RootLayout() {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const baseTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...baseTheme,
+    colors: { ...baseTheme.colors, primary: colors.tint, background: colors.background },
+  };
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <SQLiteProvider
+      databaseName={DATABASE_NAME}
+      onInit={migrateDbIfNeeded}
+      options={{ enableChangeListener: true }}>
+      <ThemeProvider value={navigationTheme}>
+        <StatusBar style="auto" />
+        <Stack screenOptions={{ headerTintColor: colors.tint }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="edit-profile" options={{ title: 'Edit profile', presentation: 'modal' }} />
+          <Stack.Screen name="new-goal" options={{ title: 'New goal', presentation: 'modal' }} />
+        </Stack>
+      </ThemeProvider>
+    </SQLiteProvider>
   );
 }

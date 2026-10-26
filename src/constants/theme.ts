@@ -1,26 +1,34 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://unistyl.es/), etc.
+ * Colors used in the app, defined for light and dark mode.
+ * `tint` is the teal accent used for selected tabs, buttons, progress and highlights.
  */
-
-import '@/global.css';
 
 import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#0B1A19',
+    textSecondary: '#5B6B69',
+    background: '#FFFFFF',
+    backgroundElement: '#F1F5F4',
+    backgroundSelected: '#E0EBE9',
+    border: '#D9E3E1',
+    tint: '#0F8F82',
+    tintSoft: '#D5F0EC',
+    onTint: '#FFFFFF',
+    danger: '#C62828',
   },
   dark: {
-    text: '#ffffff',
+    text: '#F2F7F6',
+    textSecondary: '#A3B3B1',
     background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    backgroundElement: '#161C1B',
+    backgroundSelected: '#232C2B',
+    border: '#2C3735',
+    tint: '#2CC5B4',
+    tintSoft: '#123A36',
+    onTint: '#00201D',
+    danger: '#EF5350',
   },
 } as const;
 
@@ -30,8 +38,6 @@ export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
     /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
     /** iOS `UIFontDescriptorSystemDesignMonospaced` */
@@ -39,15 +45,8 @@ export const Fonts = Platform.select({
   },
   default: {
     sans: 'normal',
-    serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
   },
 });
 
@@ -61,5 +60,11 @@ export const Spacing = {
   six: 64,
 } as const;
 
+/** Native tabs draw over screen content, so scrollable screens pad their bottom by this much. */
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+
+export const Radius = {
+  small: 8,
+  medium: 12,
+  large: 20,
+} as const;
