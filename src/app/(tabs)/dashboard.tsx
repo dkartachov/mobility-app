@@ -50,7 +50,7 @@ export default function DashboardScreen() {
       <View style={styles.statRow}>
         <Card style={styles.statCard}>
           <ThemedText type="small" themeColor="textSecondary">
-            Total time
+            Mobility time
           </ThemedText>
           <ThemedText type="stat">{formatDuration(stats.totalSeconds)}</ThemedText>
         </Card>
