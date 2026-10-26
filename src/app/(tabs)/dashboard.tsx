@@ -35,7 +35,7 @@ export default function DashboardScreen() {
       <Card style={styles.streakCard}>
         <Icon
           name={{ ios: 'flame.fill', android: 'local_fire_department' }}
-          color={stats.currentStreak > 0 ? 'tint' : 'textSecondary'}
+          color={stats.currentStreak > 0 ? 'streak' : 'textSecondary'}
           size={40}
         />
         <View style={styles.streakText}>

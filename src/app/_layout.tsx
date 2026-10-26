@@ -1,18 +1,29 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 
+import { StackHeader } from '@/components/stack-header';
 import { Colors } from '@/constants/theme';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
+import { applySavedThemePreference, useColorScheme } from '@/lib/theme-preference';
+
+applySavedThemePreference();
 
 export default function RootLayout() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const baseTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
+
   const navigationTheme = {
     ...baseTheme,
-    colors: { ...baseTheme.colors, primary: colors.tint, background: colors.background },
+    colors: {
+      ...baseTheme.colors,
+      primary: colors.tint,
+      background: colors.background,
+      card: colors.background,
+      text: colors.text,
+      border: colors.border,
+    },
   };
 
   return (
@@ -22,7 +33,7 @@ export default function RootLayout() {
       options={{ enableChangeListener: true }}>
       <ThemeProvider value={navigationTheme}>
         <StatusBar style="auto" />
-        <Stack screenOptions={{ headerTintColor: colors.tint }}>
+        <Stack screenOptions={{ header: (props) => <StackHeader {...props} /> }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="daily" options={{ title: 'Daily' }} />
           <Stack.Screen name="workout" options={{ title: '' }} />

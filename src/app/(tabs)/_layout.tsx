@@ -14,6 +14,8 @@ export default function TabLayout() {
       tintColor={theme.tint}
       backgroundColor={theme.background}
       indicatorColor={theme.tintSoft}
+      // Android press ripple; the default is a harsh near-white flash. `26` is ~15% alpha.
+      rippleColor={`${theme.tint}26`}
       labelStyle={{ selected: { color: theme.tint } }}>
       <NativeTabs.Trigger name="dashboard">
         <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>

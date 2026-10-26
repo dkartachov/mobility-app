@@ -1,6 +1,7 @@
 /**
  * Colors used in the app, defined for light and dark mode.
  * `tint` is the teal accent used for selected tabs, buttons, progress and highlights.
+ * `streak` is a warm amber reserved for the streak flame, so streaks stand apart from the teal UI.
  */
 
 import { Platform } from 'react-native';
@@ -9,25 +10,27 @@ export const Colors = {
   light: {
     text: '#0B1A19',
     textSecondary: '#5B6B69',
-    background: '#FFFFFF',
-    backgroundElement: '#F1F5F4',
-    backgroundSelected: '#E0EBE9',
-    border: '#D9E3E1',
+    background: '#F5F8F7',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#E3EEEC',
+    border: '#DCE6E4',
     tint: '#0F8F82',
     tintSoft: '#D5F0EC',
     onTint: '#FFFFFF',
+    streak: '#C97A12',
     danger: '#C62828',
   },
   dark: {
     text: '#F2F7F6',
     textSecondary: '#A3B3B1',
-    background: '#000000',
-    backgroundElement: '#161C1B',
-    backgroundSelected: '#232C2B',
-    border: '#2C3735',
+    background: '#0E1514',
+    backgroundElement: '#18211F',
+    backgroundSelected: '#22302D',
+    border: '#2B3A37',
     tint: '#2CC5B4',
     tintSoft: '#123A36',
     onTint: '#00201D',
+    streak: '#F2A33A',
     danger: '#EF5350',
   },
 } as const;
