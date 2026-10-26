@@ -24,8 +24,11 @@ export default function RootLayout() {
         <StatusBar style="auto" />
         <Stack screenOptions={{ headerTintColor: colors.tint }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="daily" options={{ title: 'Daily' }} />
+          <Stack.Screen name="workout" options={{ title: '' }} />
           <Stack.Screen name="library" options={{ title: 'Library' }} />
           <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="edit-profile" options={{ title: 'Edit profile', presentation: 'modal' }} />
           <Stack.Screen name="new-goal" options={{ title: 'New goal', presentation: 'modal' }} />
         </Stack>

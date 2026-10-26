@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { GoalCard } from '@/components/goal-card';
+import { Icon } from '@/components/icon';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -35,7 +36,18 @@ export default function ProfileScreen() {
   };
 
   return (
-    <Screen title="Profile">
+    <Screen
+      title="Profile"
+      headerAction={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+          hitSlop={Spacing.three}
+          onPress={() => router.push('/settings')}
+          style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
+          <Icon name={{ ios: 'gearshape', android: 'settings' }} size={24} color="textSecondary" />
+        </Pressable>
+      }>
       <Card style={styles.profileCard}>
         <Avatar photoFile={profile.photoFile} initials={initials} />
         <View style={styles.profileText}>
@@ -75,5 +87,11 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: Spacing.three,
+  },
+  settingsButton: {
+    paddingTop: Spacing.one,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

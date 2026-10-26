@@ -29,6 +29,12 @@ export async function logSession(
   );
 }
 
+export async function deleteAllSessions(db: SQLiteDatabase) {
+  // The WHERE clause is deliberate: a bare `DELETE FROM` uses SQLite's truncate optimization,
+  // which skips the change hook, so `useDbQuery` screens would never refresh.
+  await db.runAsync('DELETE FROM sessions WHERE id IS NOT NULL');
+}
+
 /**
  * A day counts towards a streak if it has at least one session. The current streak stays
  * alive through today if yesterday was trained, so it only resets after a full missed day.
