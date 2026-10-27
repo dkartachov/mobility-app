@@ -136,7 +136,7 @@ function Intro({ onStart }: { onStart: () => void }) {
         </Card>
         <Card>
           <ThemedText type="smallBold">You&apos;ll need</ThemedText>
-          <ThemedText>A clear wall, some floor space, a chair or box and a table.</ThemedText>
+          <ThemedText>A clear wall, some floor space and a table.</ThemedText>
         </Card>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>

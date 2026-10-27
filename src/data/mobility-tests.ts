@@ -1,10 +1,11 @@
 /**
  * Flexibility tests that make up a mobility test. Picked from common physio and climbing
- * screens (knee-to-wall, sit-and-reach, back scratch, Draper's high step…), weighted towards
- * what climbing needs: high steps, turnout, overhead reach and forearm flexibility.
+ * screens, weighted towards what climbing needs (high steps, turnout, overhead reach,
+ * forearms), and chosen so each one can be measured alone with a tape measure or the phone
+ * held against the body.
  *
- * Order is the order they're tested in, grouped so you move from standing to sitting to
- * lying down with as few setup changes as possible.
+ * Order is the order they're tested in, grouped so you move from kneeling and standing to
+ * sitting to lying down with as few setup changes as possible.
  */
 
 export type BodyPart = 'ankles' | 'hamstrings' | 'hips' | 'shoulders' | 'upperBack' | 'wrists';
@@ -42,22 +43,13 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     measurement: 'Distance from big toe to wall',
   },
   {
-    id: 'high-step',
-    name: 'High step',
-    bodyPart: 'hips',
-    twoSided: true,
+    id: 'forward-fold',
+    name: 'Forward fold',
+    bodyPart: 'hamstrings',
+    twoSided: false,
     instructions:
-      'Stand facing a wall with your toes about 25 cm away. Keep the standing leg straight and your hips square and close to the wall, then lift the other foot as high as you can and place it flat on the wall.',
-    measurement: 'Height of the foot off the floor',
-  },
-  {
-    id: 'back-scratch',
-    name: 'Back scratch',
-    bodyPart: 'shoulders',
-    twoSided: true,
-    instructions:
-      'Reach this arm over the shoulder and down your back, and the other arm up behind your back from below. Walk the fingers towards each other without forcing it.',
-    measurement: 'Gap or overlap between the middle fingers',
+      'Stand with feet together and knees straight. Let your arms hang and slowly fold forward from the hips, reaching towards the floor. Hold the lowest point for 2 seconds without bouncing.',
+    measurement: 'Fingertip distance to the floor',
   },
   {
     id: 'wrist-extension',
@@ -69,24 +61,6 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     measurement: 'Angle between forearm and table',
   },
   {
-    id: 'hip-internal-rotation',
-    name: 'Hip internal rotation',
-    bodyPart: 'hips',
-    twoSided: true,
-    instructions:
-      'Sit tall on a chair or box with hips and knees at 90°. Keeping the thigh still and the knee in line with the hip, swing the foot out to the side as far as you can.',
-    measurement: 'Angle of the shin from vertical',
-  },
-  {
-    id: 'sit-and-reach',
-    name: 'Sit and reach',
-    bodyPart: 'hamstrings',
-    twoSided: false,
-    instructions:
-      'Sit on the floor with your legs straight and soles flat against a wall or box. Keeping the knees straight, stack your hands and reach forward slowly. Hold the furthest point for 2 seconds.',
-    measurement: 'Fingertip reach past the toes',
-  },
-  {
     id: 'straddle',
     name: 'Straddle',
     bodyPart: 'hips',
@@ -94,6 +68,33 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     instructions:
       'Sit with your back against a wall and legs straight. Slide your legs apart as wide as you can with the knees pointing up at the ceiling.',
     measurement: 'Distance between the heels',
+  },
+  {
+    id: 'butterfly',
+    name: 'Butterfly',
+    bodyPart: 'hips',
+    twoSided: true,
+    instructions:
+      'Sit with your back against a wall, soles of the feet together and heels pulled in as close as you can. Relax and let both knees drop towards the floor without pushing them down.',
+    measurement: 'Distance from this knee to the floor',
+  },
+  {
+    id: 'thoracic-rotation',
+    name: 'Thoracic rotation',
+    bodyPart: 'upperBack',
+    twoSided: true,
+    instructions:
+      'Kneel and sit back on your heels with your back straight. Hold the phone flat against your chest with both hands and rotate your upper body to this side as far as you can, keeping your hips still.',
+    measurement: 'Rotation angle of the upper back',
+  },
+  {
+    id: 'knee-to-chest',
+    name: 'Knee to chest',
+    bodyPart: 'hips',
+    twoSided: true,
+    instructions:
+      'Lie on your back with both legs straight. Keep the other leg flat on the floor and pull this knee towards your chest as far as you can without the straight leg lifting.',
+    measurement: 'Angle of the thigh from the floor',
   },
   {
     id: 'shoulder-flexion',
@@ -105,13 +106,13 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     measurement: 'Distance from wrists to the floor',
   },
   {
-    id: 'thoracic-rotation',
-    name: 'Thoracic rotation',
-    bodyPart: 'upperBack',
+    id: 'shoulder-rotation',
+    name: 'Shoulder rotation',
+    bodyPart: 'shoulders',
     twoSided: true,
     instructions:
-      'Kneel on all fours and sit back towards your heels. Put this hand behind your head and rotate that elbow up towards the ceiling as far as you can, keeping the other hand planted.',
-    measurement: 'Rotation angle of the upper back',
+      'Lie on your back with this upper arm out to the side at shoulder height and the elbow bent to 90°, fingers pointing at the ceiling. Keeping the upper arm on the floor, let the forearm rotate back towards the floor beside your head.',
+    measurement: 'Angle of the forearm from vertical',
   },
 ];
 
