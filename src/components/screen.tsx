@@ -24,6 +24,8 @@ export function Screen({ title, subtitle, headerAction, children }: ScreenProps)
     <ScrollView
       style={{ backgroundColor: theme.background }}
       contentInsetAdjustmentBehavior="never"
+      showsVerticalScrollIndicator={false}
+      alwaysBounceVertical={false}
       contentContainerStyle={[
         styles.content,
         {

@@ -2,7 +2,15 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { Alert, StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import { addDevSession, addDevStreak, jumpToNextMilestone, resetAllData } from '@/db/dev';
+import {
+  addDevMobilityTest,
+  addDevSession,
+  addDevStreak,
+  clearDevMobilityTests,
+  jumpToNextMilestone,
+  makeDevTestDue,
+  resetAllData,
+} from '@/db/dev';
 import { useStats } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDuration } from '@/lib/dates';
@@ -23,7 +31,7 @@ export function DevTools() {
   const nextHours = stats ? milestoneProgress(stats.totalSeconds).nextHours : null;
 
   const confirmReset = () => {
-    Alert.alert('Reset all data?', 'Deletes sessions and goals and clears your profile.', [
+    Alert.alert('Reset all data?', 'Deletes sessions, goals and flexibility tests and clears your profile.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Reset', style: 'destructive', onPress: () => resetAllData(db) },
     ]);
@@ -62,7 +70,10 @@ export function DevTools() {
           disabled={nextHours === null}
           onPress={() => jumpToNextMilestone(db, 2 * 60)}
         />
-        <Button title="Add 7-day streak" variant="secondary" onPress={() => addDevStreak(db, 7)} />
+        <Button title="Extend streak by 7 days" variant="secondary" onPress={() => addDevStreak(db, 7)} />
+        <Button title="Log flexibility test today" variant="secondary" onPress={() => addDevMobilityTest(db)} />
+        <Button title="Make today test day" variant="secondary" onPress={() => makeDevTestDue(db)} />
+        <Button title="Clear flexibility tests" variant="secondary" onPress={() => clearDevMobilityTests(db)} />
         <Button title="Reset all data" variant="destructive" onPress={confirmReset} />
       </Card>
     </View>

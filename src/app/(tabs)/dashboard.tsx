@@ -9,6 +9,7 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useGoals } from '@/db/goals';
+import { useTestSchedule } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
 import { useStats } from '@/db/sessions';
 import { formatDuration } from '@/lib/dates';
@@ -21,6 +22,7 @@ export default function DashboardScreen() {
   const stats = useStats();
   const goals = useGoals();
   const profile = useProfile();
+  const testSchedule = useTestSchedule();
   const activeGoals = goals?.filter((goal) => goal.status === 'active') ?? [];
 
   if (!stats) return null;
@@ -30,6 +32,14 @@ export default function DashboardScreen() {
     : stats.currentStreak > 0
       ? 'Train today to keep your streak going.'
       : 'Complete a session to start a streak.';
+
+  const testHint = !testSchedule
+    ? undefined
+    : !testSchedule.lastTestDate
+      ? 'Take your first flexibility test to get a score.'
+      : testSchedule.isDue
+        ? "It's test day! Tap to retake your flexibility test."
+        : `Next test in ${days(testSchedule.daysUntilNext)}`;
 
   return (
     <Screen title="Dashboard" subtitle={profile?.firstName ? `Hi, ${profile.firstName}` : undefined}>
@@ -70,17 +80,25 @@ export default function DashboardScreen() {
         </Card>
       </View>
 
-      <Card>
-        <ThemedText type="small" themeColor="textSecondary">
-          Mobility score
-        </ThemedText>
-        <ThemedText type="stat" themeColor="textSecondary">
-          —
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Coming soon
-        </ThemedText>
-      </Card>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Mobility score. ${testHint ?? ''}`}
+        onPress={() => router.push('/mobility-score')}
+        style={({ pressed }) => pressed && styles.pressed}>
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary">
+            Mobility score
+          </ThemedText>
+          <ThemedText type="stat" themeColor="textSecondary">
+            —
+          </ThemedText>
+          {testHint && (
+            <ThemedText type="small" themeColor={testSchedule?.isDue ? 'tint' : 'textSecondary'}>
+              {testHint}
+            </ThemedText>
+          )}
+        </Card>
+      </Pressable>
 
       <View style={styles.section}>
         <ThemedText type="subtitle">Active goals</ThemedText>

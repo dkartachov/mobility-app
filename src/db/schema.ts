@@ -35,6 +35,14 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX sessions_local_date ON sessions (local_date);
   `,
+  `
+  CREATE TABLE mobility_tests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    taken_at TEXT NOT NULL,
+    local_date TEXT NOT NULL
+  );
+  CREATE INDEX mobility_tests_local_date ON mobility_tests (local_date);
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
