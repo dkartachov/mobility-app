@@ -12,11 +12,13 @@ type ScreenProps = {
   subtitle?: string;
   /** Shown to the right of the title, e.g. an icon button. */
   headerAction?: ReactNode;
+  /** Space between the header and each child. */
+  gap?: number;
   children: ReactNode;
 };
 
 /** Scrollable tab screen with a large in-content title. */
-export function Screen({ title, subtitle, headerAction, children }: ScreenProps) {
+export function Screen({ title, subtitle, headerAction, gap = Spacing.four, children }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -27,8 +29,8 @@ export function Screen({ title, subtitle, headerAction, children }: ScreenProps)
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical={false}
       contentContainerStyle={[
-        styles.content,
         {
+          gap,
           paddingTop: insets.top + Spacing.three,
           paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
           paddingLeft: insets.left + Spacing.three,
@@ -50,9 +52,6 @@ export function Screen({ title, subtitle, headerAction, children }: ScreenProps)
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: Spacing.four,
-  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

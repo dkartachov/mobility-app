@@ -1,4 +1,5 @@
 import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useReducer, useState, type ComponentProps } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
@@ -14,6 +15,7 @@ import { TimerBar } from '@/components/timer-bar';
 import { Spacing } from '@/constants/theme';
 import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkoutCues, type WorkoutCue } from '@/hooks/use-workout-cues';
 import { formatDuration } from '@/lib/dates';
 import { getFastWorkouts } from '@/lib/dev-settings';
 import { milestoneReached } from '@/lib/milestones';
@@ -37,6 +39,8 @@ type PlayerState = {
   paused: boolean;
   /** Bumped whenever a countdown (re)starts, so the timer bar knows to restart its fill. */
   countdown: number;
+  /** The latest sound cue. Only set by the timer itself, so skipping around stays quiet. */
+  cue?: { type: WorkoutCue };
 };
 
 type PlayerAction =
@@ -48,6 +52,9 @@ type PlayerAction =
 
 const TICK_MS = 250;
 
+/** When the "10 seconds" cue is spoken. */
+const WARNING_MS = 10_000;
+
 function createReducer(steps: WorkoutStep[], bufferMs: number) {
   function startStep(state: PlayerState, index: number): PlayerState {
     return { ...state, index, phase: 'buffer', remainingMs: bufferMs, countdown: state.countdown + 1 };
@@ -58,7 +65,11 @@ function createReducer(steps: WorkoutStep[], bufferMs: number) {
       case 'tick': {
         if (state.paused || state.phase === 'finished') return state;
         const remainingMs = state.remainingMs - action.deltaMs;
-        if (remainingMs > 0) return { ...state, remainingMs };
+        if (remainingMs > 0) {
+          const crossedWarning =
+            state.phase === 'active' && state.remainingMs > WARNING_MS && remainingMs <= WARNING_MS;
+          return { ...state, remainingMs, cue: crossedWarning ? { type: 'tenSeconds' } : state.cue };
+        }
 
         if (state.phase === 'buffer') {
           return {
@@ -68,8 +79,12 @@ function createReducer(steps: WorkoutStep[], bufferMs: number) {
             countdown: state.countdown + 1,
           };
         }
-        if (state.index < steps.length - 1) return startStep(state, state.index + 1);
-        return { ...state, phase: 'finished', remainingMs: 0 };
+        const next = steps[state.index + 1];
+        if (next) {
+          // Finishing the first side isn't the end of the exercise, so it gets the voice cue instead of the ding.
+          return { ...startStep(state, state.index + 1), cue: { type: next.side === 2 ? 'switchSides' : 'done' } };
+        }
+        return { ...state, phase: 'finished', remainingMs: 0, cue: { type: 'done' } };
       }
       case 'pause':
         return { ...state, paused: true };
@@ -132,6 +147,9 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
   const [completing, setCompleting] = useState(false);
   const [result, setResult] = useState<{ fromSeconds: number; toSeconds: number }>();
   const [cancelled, setCancelled] = useState(false);
+  useWorkoutCues(state.cue);
+  // A locked screen would background the app, pausing the cues mid-workout.
+  useKeepAwake();
 
   // Leaving mid-workout loses it, so confirm first and then go all the way back to the start screen.
   usePreventRemove(!result && !cancelled, () => {
