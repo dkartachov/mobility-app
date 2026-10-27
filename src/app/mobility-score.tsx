@@ -1,4 +1,5 @@
-import { Alert, ScrollView, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -30,11 +31,6 @@ export default function MobilityScoreScreen() {
   const insets = useSafeAreaInsets();
   const schedule = useTestSchedule();
 
-  const startTest = () => {
-    // The test flow itself comes later.
-    Alert.alert('Coming soon', 'The flexibility test is not built yet.');
-  };
-
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
@@ -61,7 +57,8 @@ export default function MobilityScoreScreen() {
               Next test
             </ThemedText>
             <ThemedText themeColor={schedule.isDue ? 'tint' : 'text'}>{nextTestLabel(schedule)}</ThemedText>
-            <Button title={schedule.lastTestDate ? 'Retake test' : 'Take first test'} onPress={startTest} />
+            <Button title={schedule.lastTestDate ? 'Retake test' : 'Take first test'} onPress={() => router.push('/mobility-test')}
+            />
           </Card>
         )}
       </ScrollView>

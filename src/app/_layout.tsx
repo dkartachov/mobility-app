@@ -40,6 +40,7 @@ export default function RootLayout() {
           <Stack.Screen name="library" options={{ title: 'Library' }} />
           <Stack.Screen name="mobility-time" options={{ title: 'Mobility time' }} />
           <Stack.Screen name="mobility-score" options={{ title: 'Mobility score' }} />
+          <Stack.Screen name="mobility-test" options={{ title: '' }} />
           <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="edit-profile" options={{ title: 'Edit profile', presentation: 'modal' }} />

@@ -43,6 +43,16 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX mobility_tests_local_date ON mobility_tests (local_date);
   `,
+  `
+  CREATE TABLE mobility_test_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mobility_test_id INTEGER NOT NULL REFERENCES mobility_tests (id) ON DELETE CASCADE,
+    exercise_id TEXT NOT NULL,
+    side TEXT,
+    value REAL NOT NULL
+  );
+  CREATE INDEX mobility_test_results_test ON mobility_test_results (mobility_test_id);
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {

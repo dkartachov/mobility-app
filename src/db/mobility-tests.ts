@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import type { Side } from '@/data/mobility-tests';
 import { addDays, daysBetween, toDateKey, todayKey, type DateKey } from '@/lib/dates';
 
 import { useDbQuery } from './use-db-query';
@@ -17,12 +18,30 @@ export type TestSchedule = {
   isDue: boolean;
 };
 
-export async function logMobilityTest(db: SQLiteDatabase, takenAt: Date) {
-  await db.runAsync(
-    'INSERT INTO mobility_tests (taken_at, local_date) VALUES (?, ?)',
-    takenAt.toISOString(),
-    toDateKey(takenAt)
-  );
+export type Measurement = {
+  exerciseId: string;
+  side: Side | null;
+  /** Raw slider position for now (0–1); real units come later. */
+  value: number;
+};
+
+export async function logMobilityTest(db: SQLiteDatabase, takenAt: Date, measurements: Measurement[] = []) {
+  await db.withTransactionAsync(async () => {
+    const { lastInsertRowId } = await db.runAsync(
+      'INSERT INTO mobility_tests (taken_at, local_date) VALUES (?, ?)',
+      takenAt.toISOString(),
+      toDateKey(takenAt)
+    );
+    for (const { exerciseId, side, value } of measurements) {
+      await db.runAsync(
+        'INSERT INTO mobility_test_results (mobility_test_id, exercise_id, side, value) VALUES (?, ?, ?, ?)',
+        lastInsertRowId,
+        exerciseId,
+        side,
+        value
+      );
+    }
+  });
 }
 
 async function getTestSchedule(db: SQLiteDatabase): Promise<TestSchedule> {
