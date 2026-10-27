@@ -1,9 +1,14 @@
+import type { ImageSource } from 'expo-image';
+
 export type Exercise = {
   id: string;
   name: string;
   /** Quick summary of the muscles and areas of the body the exercise works. */
   stimulus: string;
   instructions: string[];
+  photo?: ImageSource;
+  /** Always held for 1 minute in generated workouts, never 2. */
+  oneMinuteOnly?: boolean;
 };
 
 const ALL_EXERCISES: Exercise[] = [
@@ -46,6 +51,8 @@ const ALL_EXERCISES: Exercise[] = [
       'Lift your hips up and back into an upside-down V',
       'Push the floor away, let your heels sink and hold',
     ],
+    photo: require('@/assets/images/exercises/downward-dog.jpg'),
+    oneMinuteOnly: true,
   },
   {
     id: 'the-sagittarius',

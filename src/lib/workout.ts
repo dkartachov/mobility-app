@@ -18,7 +18,8 @@ function pickRandom<T>(items: readonly T[]) {
 }
 
 /**
- * Fills `minutes` with random exercises, each 1 or 2 minutes long. The same exercise never
+ * Fills `minutes` with random exercises, each 1 or 2 minutes long (always 1 for exercises marked
+ * `oneMinuteOnly`). The same exercise never
  * appears twice in a row (unless the library only has one).
  */
 export function buildWorkout(minutes: number): WorkoutStep[] {
@@ -28,9 +29,10 @@ export function buildWorkout(minutes: number): WorkoutStep[] {
   while (remaining > 0) {
     const previous = steps.at(-1)?.exercise;
     const candidates = EXERCISES.length > 1 ? EXERCISES.filter((e) => e !== previous) : EXERCISES;
-    const length = remaining >= 2 && Math.random() < TWO_MINUTE_CHANCE ? 2 : 1;
+    const exercise = pickRandom(candidates);
+    const length = remaining >= 2 && !exercise.oneMinuteOnly && Math.random() < TWO_MINUTE_CHANCE ? 2 : 1;
 
-    steps.push({ exercise: pickRandom(candidates), durationSeconds: length * 60 });
+    steps.push({ exercise, durationSeconds: length * 60 });
     remaining -= length;
   }
 

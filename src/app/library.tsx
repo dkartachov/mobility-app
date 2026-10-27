@@ -58,7 +58,7 @@ function ExerciseTile({ exercise }: { exercise: Exercise }) {
       onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: exercise.id } })}
       style={({ pressed }) => pressed && styles.pressed}>
       <Card style={styles.tile}>
-        <ExercisePhoto style={styles.photo} />
+        <ExercisePhoto source={exercise.photo} style={styles.photo} />
         <ThemedText type="subtitle" style={styles.name}>
           {exercise.name}
         </ThemedText>

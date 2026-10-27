@@ -131,7 +131,7 @@ function WorkoutPlayer({ steps }: { steps: WorkoutStep[] }) {
 
   return (
     <ThemedView style={styles.screen}>
-      <ExerciseVideo />
+      <ExerciseVideo photo={step.exercise.photo} />
 
       <View style={[styles.body, { paddingBottom: insets.bottom + Spacing.three }]}>
         <View style={styles.info}>

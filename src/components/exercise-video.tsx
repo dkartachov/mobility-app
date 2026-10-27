@@ -1,13 +1,23 @@
+import { Image, type ImageSource } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
 /**
- * Placeholder for the exercise video. Once videos exist, swap this for an autoplaying,
- * looping `VideoView` from `expo-video`.
+ * Placeholder for the exercise video: the exercise's photo if it has one, otherwise a
+ * "coming soon" panel. Once videos exist, swap this for an autoplaying, looping `VideoView`
+ * from `expo-video`.
  */
-export function ExerciseVideo() {
+export function ExerciseVideo({ photo }: { photo?: ImageSource }) {
+  if (photo) {
+    return (
+      <View style={styles.video}>
+        <Image source={photo} style={StyleSheet.absoluteFill} contentFit="cover" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.video} accessibilityLabel="Exercise video, coming soon">
       <Icon name={{ ios: 'play.circle.fill', android: 'play_circle' }} size={48} color="onTint" />
