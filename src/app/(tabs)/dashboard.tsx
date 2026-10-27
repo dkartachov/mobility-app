@@ -1,9 +1,10 @@
-import { Link } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Link, router } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/card';
 import { GoalCard } from '@/components/goal-card';
 import { Icon } from '@/components/icon';
+import { MilestoneBar } from '@/components/milestone-bar';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -48,12 +49,19 @@ export default function DashboardScreen() {
       </Card>
 
       <View style={styles.statRow}>
-        <Card style={styles.statCard}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Mobility time
-          </ThemedText>
-          <ThemedText type="stat">{formatDuration(stats.totalSeconds)}</ThemedText>
-        </Card>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Mobility time, ${formatDuration(stats.totalSeconds)}`}
+          onPress={() => router.push('/mobility-time')}
+          style={({ pressed }) => [styles.statCard, pressed && styles.pressed]}>
+          <Card style={styles.statCardFill}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Mobility time
+            </ThemedText>
+            <ThemedText type="stat">{formatDuration(stats.totalSeconds)}</ThemedText>
+            <MilestoneBar totalSeconds={stats.totalSeconds} />
+          </Card>
+        </Pressable>
         <Card style={styles.statCard}>
           <ThemedText type="small" themeColor="textSecondary">
             Sessions
@@ -107,6 +115,12 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
+  },
+  statCardFill: {
+    flex: 1,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   section: {
     gap: Spacing.three,

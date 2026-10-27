@@ -38,6 +38,7 @@ export default function RootLayout() {
           <Stack.Screen name="daily" options={{ title: 'Daily' }} />
           <Stack.Screen name="workout" options={{ title: '' }} />
           <Stack.Screen name="library" options={{ title: 'Library' }} />
+          <Stack.Screen name="mobility-time" options={{ title: 'Mobility time' }} />
           <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="edit-profile" options={{ title: 'Edit profile', presentation: 'modal' }} />

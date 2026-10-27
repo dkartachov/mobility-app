@@ -1,18 +1,31 @@
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useReducer, useState, type ComponentProps } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExerciseVideo } from '@/components/exercise-video';
 import { Icon } from '@/components/icon';
-import { ProgressBar } from '@/components/progress-bar';
+import { MilestoneBar } from '@/components/milestone-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { TimerBar } from '@/components/timer-bar';
 import { Spacing } from '@/constants/theme';
-import { logSession } from '@/db/sessions';
+import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
-import { BUFFER_SECONDS, DAILY_MINUTES, buildWorkout, formatClock, type WorkoutStep } from '@/lib/workout';
+import { formatDuration } from '@/lib/dates';
+import { getFastWorkouts } from '@/lib/dev-settings';
+import { milestoneReached } from '@/lib/milestones';
+import {
+  BUFFER_SECONDS,
+  DAILY_MINUTES,
+  FAST_BUFFER_SECONDS,
+  FAST_STEP_SECONDS,
+  buildWorkout,
+  formatClock,
+  type WorkoutStep,
+} from '@/lib/workout';
 
 /** `buffer` is the get-ready countdown; `finished` only happens after the last exercise. */
 type Phase = 'buffer' | 'active' | 'finished';
@@ -22,8 +35,8 @@ type PlayerState = {
   phase: Phase;
   remainingMs: number;
   paused: boolean;
-  /** Time spent actually holding exercises (not buffers or pauses), logged as the session length. */
-  activeMs: number;
+  /** Bumped whenever a countdown (re)starts, so the timer bar knows to restart its fill. */
+  countdown: number;
 };
 
 type PlayerAction =
@@ -33,28 +46,30 @@ type PlayerAction =
   | { type: 'reset' }
   | { type: 'goTo'; index: number };
 
-const BUFFER_MS = BUFFER_SECONDS * 1000;
 const TICK_MS = 250;
 
-function startStep(state: PlayerState, index: number): PlayerState {
-  return { ...state, index, phase: 'buffer', remainingMs: BUFFER_MS };
-}
+function createReducer(steps: WorkoutStep[], bufferMs: number) {
+  function startStep(state: PlayerState, index: number): PlayerState {
+    return { ...state, index, phase: 'buffer', remainingMs: bufferMs, countdown: state.countdown + 1 };
+  }
 
-function createReducer(steps: WorkoutStep[]) {
   return function reducer(state: PlayerState, action: PlayerAction): PlayerState {
     switch (action.type) {
       case 'tick': {
         if (state.paused || state.phase === 'finished') return state;
-        const elapsed = Math.min(action.deltaMs, state.remainingMs);
-        const activeMs = state.phase === 'active' ? state.activeMs + elapsed : state.activeMs;
         const remainingMs = state.remainingMs - action.deltaMs;
-        if (remainingMs > 0) return { ...state, remainingMs, activeMs };
+        if (remainingMs > 0) return { ...state, remainingMs };
 
         if (state.phase === 'buffer') {
-          return { ...state, activeMs, phase: 'active', remainingMs: steps[state.index].durationSeconds * 1000 };
+          return {
+            ...state,
+            phase: 'active',
+            remainingMs: steps[state.index].durationSeconds * 1000,
+            countdown: state.countdown + 1,
+          };
         }
-        if (state.index < steps.length - 1) return startStep({ ...state, activeMs }, state.index + 1);
-        return { ...state, activeMs, phase: 'finished', remainingMs: 0 };
+        if (state.index < steps.length - 1) return startStep(state, state.index + 1);
+        return { ...state, phase: 'finished', remainingMs: 0 };
       }
       case 'pause':
         return { ...state, paused: true };
@@ -76,31 +91,61 @@ function parseMinutes(value: string | undefined) {
 export default function WorkoutScreen() {
   const { minutes } = useLocalSearchParams<{ minutes: string }>();
   const totalMinutes = parseMinutes(minutes);
-  const [steps] = useState(() => buildWorkout(totalMinutes));
+  // Read once: toggling fast mode mid-workout shouldn't change the running workout.
+  const [fast] = useState(getFastWorkouts);
+  const [steps] = useState(() => {
+    const built = buildWorkout(totalMinutes);
+    return fast ? built.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : built;
+  });
 
   return (
     <>
       <Stack.Screen options={{ title: `Daily · ${totalMinutes} min` }} />
-      <WorkoutPlayer steps={steps} />
+      <WorkoutPlayer
+        steps={steps}
+        bufferMs={(fast ? FAST_BUFFER_SECONDS : BUFFER_SECONDS) * 1000}
+        plannedSeconds={totalMinutes * 60}
+      />
     </>
   );
 }
 
-function WorkoutPlayer({ steps }: { steps: WorkoutStep[] }) {
+type WorkoutPlayerProps = {
+  steps: WorkoutStep[];
+  bufferMs: number;
+  /** Logged as the session length on completion, even if exercises were skipped. */
+  plannedSeconds: number;
+};
+
+function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const [startedAt] = useState(() => new Date());
-  const [reducer] = useState(() => createReducer(steps));
+  const [reducer] = useState(() => createReducer(steps, bufferMs));
   const [state, dispatch] = useReducer(reducer, {
     index: 0,
     phase: 'buffer',
-    remainingMs: BUFFER_MS,
+    remainingMs: bufferMs,
     paused: false,
-    activeMs: 0,
+    countdown: 0,
   });
   const [completing, setCompleting] = useState(false);
+  const [result, setResult] = useState<{ fromSeconds: number; toSeconds: number }>();
+  const [cancelled, setCancelled] = useState(false);
 
-  const running = !state.paused && state.phase !== 'finished';
+  // Leaving mid-workout loses it, so confirm first and then go all the way back to the start screen.
+  usePreventRemove(!result && !cancelled, () => {
+    Alert.alert('Cancel workout?', "This workout won't be saved.", [
+      { text: 'Keep going', style: 'cancel' },
+      { text: 'Cancel workout', style: 'destructive', onPress: () => setCancelled(true) },
+    ]);
+  });
+  // Runs after the re-render that lifts the prevention above, so this navigation isn't blocked.
+  useEffect(() => {
+    if (cancelled) router.dismissTo('/');
+  }, [cancelled]);
+
+  const running = !state.paused && state.phase !== 'finished' && !completing;
   useEffect(() => {
     if (!running) return;
     // Measure real elapsed time rather than trusting the interval, which drifts and stops in the background.
@@ -117,17 +162,19 @@ function WorkoutPlayer({ steps }: { steps: WorkoutStep[] }) {
   const next = steps[state.index + 1];
   const isLast = state.index === steps.length - 1;
   const finished = state.phase === 'finished';
-  const phaseTotalMs = state.phase === 'buffer' ? BUFFER_MS : step.durationSeconds * 1000;
+  const phaseTotalMs = state.phase === 'buffer' ? bufferMs : step.durationSeconds * 1000;
+  // A two-sided exercise spans two steps but counts as one exercise.
+  const exerciseCount = steps.filter((s) => s.side !== 2).length;
+  const exerciseNumber = steps.slice(0, state.index + 1).filter((s) => s.side !== 2).length;
 
   const complete = async () => {
     setCompleting(true);
-    await logSession(db, {
-      startedAt,
-      durationSeconds: Math.round(state.activeMs / 1000),
-      routineId: 'daily',
-    });
-    router.dismissTo('/');
+    const fromSeconds = await getTotalSeconds(db);
+    await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: 'daily' });
+    setResult({ fromSeconds, toSeconds: fromSeconds + plannedSeconds });
   };
+
+  if (result) return <WorkoutSummary {...result} />;
 
   return (
     <ThemedView style={styles.screen}>
@@ -136,7 +183,8 @@ function WorkoutPlayer({ steps }: { steps: WorkoutStep[] }) {
       <View style={[styles.body, { paddingBottom: insets.bottom + Spacing.three }]}>
         <View style={styles.info}>
           <ThemedText type="smallBold" themeColor="textSecondary">
-            Exercise {state.index + 1} of {steps.length}
+            Exercise {exerciseNumber} of {exerciseCount}
+            {step.side ? ` · Side ${step.side} of 2` : ''}
           </ThemedText>
           <ThemedText type="title" accessibilityRole="header">
             {step.exercise.name}
@@ -146,19 +194,32 @@ function WorkoutPlayer({ steps }: { steps: WorkoutStep[] }) {
 
         <View style={styles.timer} accessibilityLiveRegion="polite">
           <ThemedText type="smallBold" themeColor="tint">
-            {finished ? 'Workout complete' : state.paused ? 'Paused' : state.phase === 'buffer' ? 'Get ready' : 'Hold'}
+            {finished
+              ? 'Workout complete'
+              : state.paused
+                ? 'Paused'
+                : state.phase === 'buffer'
+                  ? step.side === 2
+                    ? 'Switch sides'
+                    : 'Get ready'
+                  : 'Hold'}
           </ThemedText>
           <ThemedText type="stat" style={styles.clock}>
             {formatClock(Math.ceil(state.remainingMs / 1000))}
           </ThemedText>
           <View style={styles.progress}>
-            <ProgressBar progress={finished ? 1 : 1 - state.remainingMs / phaseTotalMs} />
+            <TimerBar
+              totalMs={phaseTotalMs}
+              remainingMs={state.remainingMs}
+              running={running}
+              countdown={state.countdown}
+            />
           </View>
           <ThemedText type="small" themeColor="textSecondary">
             {finished
               ? 'Tap the checkmark to finish'
               : next
-                ? `Next: ${next.exercise.name} · ${formatClock(next.durationSeconds)}`
+                ? `Next: ${next.side === 2 ? 'other side' : next.exercise.name} · ${formatClock(next.durationSeconds)}`
                 : 'Last exercise'}
           </ThemedText>
         </View>
@@ -182,11 +243,12 @@ function WorkoutPlayer({ steps }: { steps: WorkoutStep[] }) {
             disabled={finished}
             onPress={() => dispatch({ type: state.paused ? 'resume' : 'pause' })}
           />
-          {finished ? (
+          {isLast ? (
             <ControlButton
               label="Complete workout"
               icon={{ ios: 'checkmark', android: 'check' }}
               primary
+              glow={finished}
               disabled={completing}
               onPress={complete}
             />
@@ -194,11 +256,61 @@ function WorkoutPlayer({ steps }: { steps: WorkoutStep[] }) {
             <ControlButton
               label="Next exercise"
               icon={{ ios: 'chevron.right', android: 'chevron_right' }}
-              disabled={isLast}
               onPress={() => dispatch({ type: 'goTo', index: state.index + 1 })}
             />
           )}
         </View>
+      </View>
+    </ThemedView>
+  );
+}
+
+/** Shown after completing: the milestone bar grows by the time just logged. */
+function WorkoutSummary({ fromSeconds, toSeconds }: { fromSeconds: number; toSeconds: number }) {
+  const insets = useSafeAreaInsets();
+  const [filled, setFilled] = useState(false);
+  const reached = milestoneReached(fromSeconds, toSeconds);
+
+  return (
+    <ThemedView style={[styles.summary, { paddingBottom: insets.bottom + Spacing.three }]}>
+      <View style={styles.summaryContent}>
+        <ThemedText type="title" accessibilityRole="header" style={styles.centered}>
+          Workout complete
+        </ThemedText>
+        <ThemedText type="subtitle" themeColor="tint" style={styles.centered}>
+          +{formatDuration(toSeconds - fromSeconds)}
+        </ThemedText>
+        <View style={styles.summaryBar}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Total mobility time · {formatDuration(toSeconds)}
+          </ThemedText>
+          <MilestoneBar
+            totalSeconds={toSeconds}
+            animateFromSeconds={fromSeconds}
+            durationMs={2000}
+            delayMs={300}
+            onAnimationEnd={() => setFilled(true)}
+          />
+        </View>
+        {filled && reached !== null && (
+          <Animated.View entering={FadeIn}>
+            <ThemedText type="smallBold" themeColor="tint" style={styles.centered}>
+              {reached}h milestone reached!
+            </ThemedText>
+          </Animated.View>
+        )}
+      </View>
+      <View style={styles.summaryDone}>
+        {filled && (
+          <Animated.View entering={ZoomIn}>
+            <ControlButton
+              label="Back to start"
+              icon={{ ios: 'checkmark', android: 'check' }}
+              primary
+              onPress={() => router.dismissTo('/')}
+            />
+          </Animated.View>
+        )}
       </View>
     </ThemedView>
   );
@@ -210,13 +322,17 @@ type ControlButtonProps = {
   onPress: () => void;
   primary?: boolean;
   disabled?: boolean;
+  /** Pulses a halo around the button to draw attention to it. */
+  glow?: boolean;
 };
 
-function ControlButton({ label, icon, onPress, primary, disabled }: ControlButtonProps) {
+function ControlButton({ label, icon, onPress, primary, disabled, glow }: ControlButtonProps) {
   const theme = useTheme();
 
   return (
-    <Pressable
+    <View>
+      {glow && <Animated.View style={[styles.glow, { backgroundColor: theme.tint }]} />}
+      <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
@@ -228,8 +344,9 @@ function ControlButton({ label, icon, onPress, primary, disabled }: ControlButto
         (pressed || disabled) && styles.dimmed,
         disabled && styles.disabled,
       ]}>
-      <Icon name={icon} size={24} color={primary ? 'onTint' : 'text'} />
-    </Pressable>
+        <Icon name={icon} size={24} color={primary ? 'onTint' : 'text'} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -273,5 +390,37 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.3,
+  },
+  glow: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 32,
+    animationName: {
+      from: { opacity: 0.6, transform: [{ scale: 1 }] },
+      to: { opacity: 0, transform: [{ scale: 1.7 }] },
+    },
+    animationDuration: '1.4s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-out',
+  },
+  summary: {
+    flex: 1,
+    padding: Spacing.three,
+    justifyContent: 'space-between',
+  },
+  summaryContent: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: Spacing.three,
+  },
+  summaryBar: {
+    gap: Spacing.two,
+    marginTop: Spacing.four,
+  },
+  summaryDone: {
+    height: 64,
+    alignItems: 'center',
+  },
+  centered: {
+    textAlign: 'center',
   },
 });

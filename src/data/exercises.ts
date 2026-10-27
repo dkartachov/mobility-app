@@ -9,6 +9,8 @@ export type Exercise = {
   photo?: ImageSource;
   /** Always held for 1 minute in generated workouts, never 2. */
   oneMinuteOnly?: boolean;
+  /** Done on each side in turn: 1 minute per side, 2 minutes in total. */
+  twoSided?: boolean;
 };
 
 const ALL_EXERCISES: Exercise[] = [
@@ -63,6 +65,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold your knee in place, and keep your opposite leg straight and in-line with your torso',
       'Relax your opposite arm, and place the back of your hand on the ground',
     ],
+    twoSided: true,
   },
   {
     id: 'half-kneeling-frog-stretch',
@@ -73,6 +76,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Rock your hips back until you feel it in the inner thigh',
       'Rock back and forth or hold, then switch sides',
     ],
+    twoSided: true,
   },
   {
     id: 'pec-stretch-on-the-ground',
@@ -83,6 +87,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Push with your other hand to roll toward the outstretched arm',
       'Hold, then switch arms',
     ],
+    twoSided: true,
   },
 ];
 

@@ -10,6 +10,8 @@ export type Stats = {
   currentStreak: number;
   longestStreak: number;
   trainedToday: boolean;
+  /** Day of the very first session, `null` before any. */
+  firstSessionDate: DateKey | null;
 };
 
 export async function logSession(
@@ -27,6 +29,11 @@ export async function logSession(
     durationSeconds,
     routineId
   );
+}
+
+export async function getTotalSeconds(db: SQLiteDatabase) {
+  const row = await db.getFirstAsync<{ total: number | null }>('SELECT SUM(duration_seconds) AS total FROM sessions');
+  return row?.total ?? 0;
 }
 
 export async function deleteAllSessions(db: SQLiteDatabase) {
@@ -76,6 +83,7 @@ async function getStats(db: SQLiteDatabase): Promise<Stats> {
     currentStreak: streaks.current,
     longestStreak: streaks.longest,
     trainedToday: streaks.trainedToday,
+    firstSessionDate: days[0]?.local_date ?? null,
   };
 }
 

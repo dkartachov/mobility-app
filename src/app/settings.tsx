@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
+import { DevTools } from '@/components/dev-tools';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -69,6 +70,8 @@ export default function SettingsScreen() {
             <Button title="Delete all sessions" variant="destructive" onPress={confirmDeleteSessions} />
           </Card>
         </View>
+
+        {__DEV__ && <DevTools />}
       </ScrollView>
     </ThemedView>
   );
