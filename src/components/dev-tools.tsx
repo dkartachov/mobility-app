@@ -4,6 +4,7 @@ import { Alert, StyleSheet, Switch, View } from 'react-native';
 import { Spacing } from '@/constants/theme';
 import {
   addDevMobilityTest,
+  addDevMobilityTestResults,
   addDevSession,
   addDevStreak,
   clearDevMobilityTests,
@@ -93,6 +94,11 @@ export function DevTools() {
         />
         <Button title="Extend streak by 7 days" variant="secondary" onPress={() => addDevStreak(db, 7)} />
         <Button title="Log flexibility test today" variant="secondary" onPress={() => addDevMobilityTest(db)} />
+        <Button
+          title="Make up test results"
+          variant="secondary"
+          onPress={() => addDevMobilityTestResults(db)}
+        />
         <Button title="Make today test day" variant="secondary" onPress={() => makeDevTestDue(db)} />
       </Card>
       <Card style={styles.card}>

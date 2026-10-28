@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { createTestDb } from '@/test-utils/sqlite';
 
-import { getTestSchedule, logMobilityTest, RETEST_INTERVAL_DAYS } from './mobility-tests';
+import { getMobilityScore, getTestSchedule, logMobilityTest, RETEST_INTERVAL_DAYS } from './mobility-tests';
 
 describe('mobility tests', () => {
   let db: SQLiteDatabase;
@@ -56,5 +56,20 @@ describe('mobility tests', () => {
     await expect(logMobilityTest(db, new Date(2026, 9, 1, 9), [bad])).rejects.toThrow();
 
     expect(await db.getAllAsync('SELECT * FROM mobility_tests')).toEqual([]);
+  });
+
+  it('has no score before a test with results', async () => {
+    expect(await getMobilityScore(db)).toBeNull();
+    await logMobilityTest(db, new Date(2026, 9, 1, 9));
+    expect(await getMobilityScore(db)).toBeNull();
+  });
+
+  it('scores the latest test with results', async () => {
+    await logMobilityTest(db, new Date(2026, 8, 1, 9), [{ exerciseId: 'straddle', side: null, value: 60, unit: 'deg' }]);
+    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'straddle', side: null, value: 150, unit: 'deg' }]);
+    // A later test without results, like the dev tools' "Log flexibility test today", doesn't count.
+    await logMobilityTest(db, new Date(2026, 9, 2, 9));
+
+    expect(await getMobilityScore(db)).toMatchObject({ areas: { hips: 100, ankles: null }, overall: 100 });
   });
 });

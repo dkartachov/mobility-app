@@ -1,14 +1,22 @@
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { ScoreBars } from '@/components/score-bars';
+import { ScoreRing } from '@/components/score-ring';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useTestSchedule, type TestSchedule } from '@/db/mobility-tests';
+import { SCORE_AREAS, type AreaScores } from '@/data/mobility-score';
+import { useMobilityScore, useTestSchedule, type TestSchedule } from '@/db/mobility-tests';
 import { daysBetween, formatDateKey, todayKey } from '@/lib/dates';
+
+/** Lets the screen finish sliding in before the score animates. */
+const ANIMATION_DELAY_MS = 300;
+
+const NO_SCORES = Object.fromEntries(SCORE_AREAS.map(({ id }) => [id, null])) as AreaScores;
 
 function days(n: number) {
   return `${n} ${n === 1 ? 'day' : 'days'}`;
@@ -30,20 +38,22 @@ function nextTestLabel(schedule: TestSchedule) {
 export default function MobilityScoreScreen() {
   const insets = useSafeAreaInsets();
   const schedule = useTestSchedule();
+  const score = useMobilityScore();
 
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
-        <Card>
-          <ThemedText type="small" themeColor="textSecondary">
-            Mobility score
-          </ThemedText>
-          <ThemedText type="stat" themeColor="textSecondary">
-            —
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Breakdown by body part coming soon
-          </ThemedText>
+        <Card style={styles.scoreCard}>
+          <ThemedText type="subtitle">Mobility score</ThemedText>
+          <View style={styles.ring}>
+            <ScoreRing score={score?.overall ?? null} label="Overall" delayMs={ANIMATION_DELAY_MS} />
+          </View>
+          <ScoreBars scores={score?.areas ?? NO_SCORES} delayMs={ANIMATION_DELAY_MS} />
+          {score === null && (
+            <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
+              Take a flexibility test to get your score.
+            </ThemedText>
+          )}
         </Card>
 
         {schedule && (
@@ -73,6 +83,15 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.three,
     gap: Spacing.four,
+  },
+  scoreCard: {
+    gap: Spacing.four,
+  },
+  ring: {
+    alignItems: 'center',
+  },
+  centered: {
+    textAlign: 'center',
   },
   testCard: {
     gap: Spacing.two,

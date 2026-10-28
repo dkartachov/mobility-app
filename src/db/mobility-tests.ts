@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { mobilityScore, type MobilityScore, type ScoredResult } from '@/data/mobility-score';
 import type { Side, Unit } from '@/data/mobility-tests';
 import { addDays, daysBetween, toDateKey, todayKey, type DateKey } from '@/lib/dates';
 
@@ -57,4 +58,21 @@ export async function getTestSchedule(db: SQLiteDatabase): Promise<TestSchedule>
 
 export function useTestSchedule() {
   return useDbQuery(getTestSchedule, ['mobility_tests']);
+}
+
+/** The score from the most recent test with results, `null` before there is one. */
+export async function getMobilityScore(db: SQLiteDatabase): Promise<MobilityScore | null> {
+  const results = await db.getAllAsync<ScoredResult>(
+    `SELECT exercise_id AS exerciseId, value, unit FROM mobility_test_results
+     WHERE mobility_test_id = (
+       SELECT t.id FROM mobility_tests t
+       WHERE EXISTS (SELECT 1 FROM mobility_test_results r WHERE r.mobility_test_id = t.id)
+       ORDER BY t.taken_at DESC, t.id DESC LIMIT 1
+     )`
+  );
+  return results.length ? mobilityScore(results) : null;
+}
+
+export function useMobilityScore() {
+  return useDbQuery(getMobilityScore, ['mobility_tests', 'mobility_test_results']);
 }

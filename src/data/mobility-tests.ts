@@ -1,14 +1,16 @@
 /**
  * Flexibility tests that make up a mobility test. Picked from common physio and climbing
- * screens, weighted towards what climbing needs (high steps, turnout, overhead reach,
- * forearms), and chosen so each one can be measured alone with a tape measure or the phone
- * held against the body.
+ * screens, weighted towards what climbing needs (high steps, turnout, overhead reach), and
+ * chosen so each one can be measured alone with a tape measure or the phone held against the
+ * body.
  *
  * Order is the order they're tested in, grouped so you move from kneeling and standing to
  * sitting to lying down with as few setup changes as possible.
  */
 
-export type BodyPart = 'ankles' | 'hamstrings' | 'hips' | 'shoulders' | 'upperBack' | 'wrists';
+import type { ScoreArea } from './mobility-score';
+
+export type BodyPart = 'ankles' | 'hamstrings' | 'hips' | 'shoulders' | 'upperBack';
 
 export const BODY_PART_LABELS: Record<BodyPart, string> = {
   ankles: 'Ankles',
@@ -16,7 +18,6 @@ export const BODY_PART_LABELS: Record<BodyPart, string> = {
   hips: 'Hips',
   shoulders: 'Shoulders',
   upperBack: 'Upper back',
-  wrists: 'Wrists & forearms',
 };
 
 export type Side = 'left' | 'right';
@@ -74,10 +75,22 @@ function byThreshold(value: number, thresholds: [upTo: number, label: string][])
 
 export type PhoneMethod = Extract<MeasurementMethod, { kind: 'tilt' | 'rotation' }>;
 
+/**
+ * How a result turns into a 0–100 score: linearly from `zeroAt` (scores 0) to `fullAt` (scores
+ * 100), clamped. `fullAt` is below `zeroAt` where smaller is better, like distances to the floor.
+ *
+ * Placeholder ranges, roughly from restricted to very mobile, until they're set from published
+ * norms.
+ */
+export type TestScoring = { zeroAt: number; fullAt: number };
+
 export type FlexibilityTest = {
   id: string;
   name: string;
   bodyPart: BodyPart;
+  /** The part of the mobility score this test counts towards. */
+  area: ScoreArea;
+  scoring: TestScoring;
   /** Tested once per side when true. */
   twoSided: boolean;
   instructions: string;
@@ -91,6 +104,8 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     id: 'knee-to-wall',
     name: 'Knee to wall',
     bodyPart: 'ankles',
+    area: 'ankles',
+    scoring: { zeroAt: 0, fullAt: 15 },
     twoSided: true,
     instructions:
       'Half-kneel facing a wall with the front foot pointing straight at it. Keeping the heel down, drive the knee forward to touch the wall. Slide the foot back until the knee can only just touch without the heel lifting.',
@@ -101,6 +116,8 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     id: 'forward-fold',
     name: 'Forward fold',
     bodyPart: 'hamstrings',
+    area: 'postChain',
+    scoring: { zeroAt: 30, fullAt: -20 },
     twoSided: false,
     instructions:
       'Stand with feet together and knees straight. Let your arms hang and slowly fold forward from the hips, reaching towards the floor. Hold the lowest point for 2 seconds without bouncing.',
@@ -124,19 +141,11 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     },
   },
   {
-    id: 'wrist-extension',
-    name: 'Wrist extension',
-    bodyPart: 'wrists',
-    twoSided: true,
-    instructions:
-      'Rest this forearm flat on a table, palm down, with the fingers relaxed or in a loose fist. Hold the phone flat on the back of the hand with your other hand. Keeping the forearm on the table, lift the hand up at the wrist as far as you can.',
-    measurement: 'Angle the hand lifts from flat',
-    method: { kind: 'tilt', startPosition: 'Hand resting flat on the table', startAngle: 0 },
-  },
-  {
     id: 'straddle',
     name: 'Straddle',
     bodyPart: 'hips',
+    area: 'hips',
+    scoring: { zeroAt: 60, fullAt: 150 },
     twoSided: false,
     instructions:
       'Sit with your back against a wall and legs straight. Slide your legs apart as wide as you can with the knees pointing up at the ceiling. Lay the phone flat, screen up, against the inside of your left thigh with its top pointing towards your foot. Keeping it flat, sweep it in an arc across to the inside of your right thigh, turning it so its top ends up pointing towards your right foot.',
@@ -148,6 +157,8 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     id: 'butterfly',
     name: 'Butterfly',
     bodyPart: 'hips',
+    area: 'hips',
+    scoring: { zeroAt: 35, fullAt: 0 },
     twoSided: true,
     instructions:
       'Sit with your back against a wall, soles of the feet together and heels pulled in as close as you can. Relax and let both knees drop towards the floor without pushing them down.',
@@ -171,6 +182,8 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     id: 'thoracic-rotation',
     name: 'Thoracic rotation',
     bodyPart: 'upperBack',
+    area: 'thorax',
+    scoring: { zeroAt: 20, fullAt: 70 },
     twoSided: true,
     instructions:
       'Kneel and sit back on your heels with your back straight. Hold the phone level with both hands, screen up and its bottom edge against your chest, and rotate your upper body to this side as far as you can, keeping your hips still.',
@@ -181,6 +194,8 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     id: 'knee-to-chest',
     name: 'Knee to chest',
     bodyPart: 'hips',
+    area: 'hips',
+    scoring: { zeroAt: 70, fullAt: 135 },
     twoSided: true,
     instructions:
       'Lie on your back with both legs straight. Hold the phone flat on top of this thigh, just above the knee. Keep the other leg flat on the floor and pull this knee towards your chest as far as you can without the straight leg lifting.',
@@ -191,6 +206,8 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     id: 'shoulder-flexion',
     name: 'Overhead reach',
     bodyPart: 'shoulders',
+    area: 'overhead',
+    scoring: { zeroAt: 120, fullAt: 180 },
     twoSided: false,
     instructions:
       'Lie on your back with knees bent and lower back pressed into the floor. Hold the phone between your palms with straight arms pointing at the ceiling. Keeping the arms straight, lower them overhead towards the floor without letting your back arch.',
@@ -201,6 +218,8 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     id: 'shoulder-rotation',
     name: 'Shoulder rotation',
     bodyPart: 'shoulders',
+    area: 'shoulders',
+    scoring: { zeroAt: 30, fullAt: 100 },
     twoSided: true,
     instructions:
       'Lie on your back with this upper arm out to the side at shoulder height and the elbow bent to 90°, fingers pointing at the ceiling. Hold the phone flat along this forearm with your other hand. Keeping the upper arm on the floor, let the forearm rotate back towards the floor beside your head.',

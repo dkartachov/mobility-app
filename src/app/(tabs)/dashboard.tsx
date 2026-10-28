@@ -6,10 +6,11 @@ import { GoalCard } from '@/components/goal-card';
 import { Icon } from '@/components/icon';
 import { MilestoneBar } from '@/components/milestone-bar';
 import { Screen } from '@/components/screen';
+import { ScoreRing } from '@/components/score-ring';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useGoals } from '@/db/goals';
-import { useTestSchedule } from '@/db/mobility-tests';
+import { useMobilityScore, useTestSchedule } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
 import { useStats } from '@/db/sessions';
 import { formatDuration } from '@/lib/dates';
@@ -23,6 +24,7 @@ export default function DashboardScreen() {
   const goals = useGoals();
   const profile = useProfile();
   const testSchedule = useTestSchedule();
+  const score = useMobilityScore();
   const activeGoals = goals?.filter((goal) => goal.status === 'active') ?? [];
 
   if (!stats) return null;
@@ -89,21 +91,21 @@ export default function DashboardScreen() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Mobility score. ${testHint ?? ''}`}
+        accessibilityLabel={`Mobility score${score?.overall == null ? '' : ` ${Math.round(score.overall)}`}. ${testHint ?? ''}`}
         onPress={() => router.push('/mobility-score')}
         style={({ pressed }) => pressed && styles.pressed}>
-        <Card>
-          <ThemedText type="small" themeColor="textSecondary">
-            Mobility score
-          </ThemedText>
-          <ThemedText type="stat" themeColor="textSecondary">
-            —
-          </ThemedText>
-          {testHint && (
-            <ThemedText type="small" themeColor={testSchedule?.isDue ? 'tint' : 'textSecondary'}>
-              {testHint}
+        <Card style={styles.scoreCard}>
+          <View style={styles.scoreText}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Mobility score
             </ThemedText>
-          )}
+            {testHint && (
+              <ThemedText type="small" themeColor={testSchedule?.isDue ? 'tint' : 'textSecondary'}>
+                {testHint}
+              </ThemedText>
+            )}
+          </View>
+          <ScoreRing score={score?.overall ?? null} size={88} thickness={8} />
         </Card>
       </Pressable>
 
@@ -129,6 +131,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+  },
+  scoreCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  scoreText: {
+    flex: 1,
+    gap: Spacing.half,
   },
   streakText: {
     flex: 1,

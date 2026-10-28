@@ -18,6 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.HIGH_SAMPLING_RATE_SENSORS"],
+      "blockedPermissions": ["android.permission.ACTIVITY_RECOGNITION"],
       "package": "com.hogos.mobilityapp"
     },
     "plugins": [
@@ -45,7 +47,7 @@
         {
           "microphonePermission": false,
           "recordAudioAndroid": false,
-          "enableBackgroundPlayback": false
+          "enableBackgroundPlayback": true
         }
       ],
       "expo-video",
@@ -60,6 +62,7 @@
         "expo-notifications",
         {
           "enableRemoteNotifications": false,
+          "icon": "./assets/images/notification-icon.png",
           "color": "#0F8F82"
         }
       ],

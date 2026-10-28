@@ -4,22 +4,33 @@ import { Platform } from 'react-native';
 
 import type { PhoneMethod } from '@/data/mobility-tests';
 
-// Rotation adds up gyroscope readings, so it needs a fairly fast rate to not miss turning between them.
-const UPDATE_INTERVAL_MS = 20;
+/**
+ * Rotation adds up gyroscope readings, so it needs a fairly fast rate to not miss turning between
+ * them. Android sends at most one reading per screen frame, and only once *more* than this has
+ * passed, so anything above 0 there skips frames (20 ms gives 30 Hz on a 60 Hz screen).
+ */
+const UPDATE_INTERVAL_MS = Platform.OS === 'android' ? 0 : 20;
 /** How long to hold the start position before it's zeroed. */
 const ZERO_HOLD_MS = 1500;
 /** How long to hold the end position before the result is saved. */
 const RESULT_HOLD_MS = 3000;
 /** Stillness shorter than this isn't shown as progress towards zeroing or saving. */
 const HOLD_SHOWN_AFTER_MS = 300;
-/** A hold restarts if the position drifts further than this from where it began. */
-const HOLD_TOLERANCE_DEG = 3;
+/**
+ * A hold restarts if the position drifts further than this from where it began. Loose enough for
+ * the tremble of a hold at the limit of a stretch; the saved result averages the hold anyway.
+ */
+const HOLD_TOLERANCE_DEG = 5;
 /** Must move at least this far from the start, so holding still at the start doesn't save 0°. */
 const MIN_MOVE_DEG = 10;
 /** Rotation gives up as unavailable if no gyroscope reading has arrived by then. */
 const GYRO_TIMEOUT_MS = 1000;
-/** Low-pass smoothing of the gravity direction, 0–1 (lower is smoother). */
-const GRAVITY_SMOOTHING = 0.25;
+/**
+ * Low-pass smoothing of the gravity direction: roughly how far back it averages, in ms. Set by
+ * time rather than per reading, since the reading rate varies by platform, screen and sensor
+ * permission. Long enough to calm hand tremble (8–12 Hz), short enough not to lag behind movement.
+ */
+const GRAVITY_SMOOTHING_MS = 200;
 
 export type PhoneMeasurementPhase = 'idle' | 'zeroing' | 'measuring' | 'done' | 'unavailable';
 
@@ -63,6 +74,8 @@ function rotationRateOf({ rotationRate: r }: DeviceMotionMeasurement): Vec | nul
 
 type Tracking = {
   gravity: Vec | null;
+  /** When `gravity` was last updated, in ms. */
+  gravityAt: number;
   /** Gravity direction at the start position (tilt) or `null` before zeroing. */
   zero: Vec | null;
   /** Turning around the vertical axis since zeroing, in degrees, signed (rotation). */
@@ -73,11 +86,17 @@ type Tracking = {
   holdGravity: Vec | null;
   holdYaw: number;
   holdMoved: number;
+  /** Totals over the current hold, averaged when it completes: gravity while zeroing, the measured angle after. */
+  holdGravitySum: Vec;
+  holdMovedSum: number;
+  holdCount: number;
   startedAt: number;
   /** Whether any gyroscope reading has arrived yet. */
   hasGyro: boolean;
   /** Sensor timestamp of the last gyroscope reading, in seconds. */
   lastGyroAt: number | null;
+  /** Turning speed around the vertical axis at the last gyroscope reading, in deg/s. */
+  lastYawRate: number | null;
 };
 
 type Callbacks = { onZeroed: () => void; onResult: (angle: number) => void };
@@ -117,7 +136,10 @@ export function usePhoneMeasurement(method: PhoneMethod, callbacks: Callbacks) {
     stop();
     const thisRun = run.current;
     const available = await DeviceMotion.isAvailableAsync();
-    const { granted } = await DeviceMotion.requestPermissionsAsync();
+    // On Android this asks for physical activity recognition, which reading the sensors doesn't
+    // need, so refusing it shouldn't block measuring. Only iOS gates motion behind a permission.
+    const { granted } =
+      Platform.OS === 'ios' ? await DeviceMotion.requestPermissionsAsync() : { granted: true };
     // Cancelled, unmounted or started again while waiting.
     if (thisRun !== run.current) return;
     if (!available || !granted) {
@@ -129,15 +151,20 @@ export function usePhoneMeasurement(method: PhoneMethod, callbacks: Callbacks) {
     const startedAt = Date.now();
     const t: Tracking = {
       gravity: null,
+      gravityAt: startedAt,
       zero: null,
       yaw: 0,
       stillSince: null,
       holdGravity: null,
       holdYaw: 0,
       holdMoved: 0,
+      holdGravitySum: [0, 0, 0],
+      holdMovedSum: 0,
+      holdCount: 0,
       startedAt,
       hasGyro: false,
       lastGyroAt: null,
+      lastYawRate: null,
     };
     let phaseNow: 'zeroing' | 'measuring' = 'zeroing';
     setPhase('zeroing');
@@ -168,15 +195,18 @@ export function usePhoneMeasurement(method: PhoneMethod, callbacks: Callbacks) {
       // Rotation needs both readings from the same sample to integrate it.
       if (!raw || (method.kind === 'rotation' && !rate)) return;
       const previous = t.gravity;
-      t.gravity = previous
-        ? (previous.map((v, i) => v + GRAVITY_SMOOTHING * (raw[i] - v)) as Vec)
-        : raw;
+      const smoothing = 1 - Math.exp(-(now - t.gravityAt) / GRAVITY_SMOOTHING_MS);
+      t.gravity = previous ? (previous.map((v, i) => v + smoothing * (raw[i] - v)) as Vec) : raw;
+      t.gravityAt = now;
 
       if (method.kind === 'rotation' && rate) {
         // Rate around the vertical axis. Its sign depends on the platform's axis conventions,
         // so only the size of the total is used. Tracked while zeroing too, to tell if the body
-        // is still turning; it's reset to 0 at the start position.
-        t.yaw += (dot(rate, t.gravity) / length(t.gravity)) * gyroDt;
+        // is still turning; it's reset to 0 at the start position. Averaging it with the previous
+        // reading follows speeding up and slowing down more closely than either reading alone.
+        const yawRate = dot(rate, t.gravity) / length(t.gravity);
+        t.yaw += ((yawRate + (t.lastYawRate ?? yawRate)) / 2) * gyroDt;
+        t.lastYawRate = yawRate;
       }
 
       /**
@@ -193,6 +223,9 @@ export function usePhoneMeasurement(method: PhoneMethod, callbacks: Callbacks) {
         }
         if (t.stillSince === null || drift > HOLD_TOLERANCE_DEG) {
           markStart();
+          t.holdGravitySum = [0, 0, 0];
+          t.holdMovedSum = 0;
+          t.holdCount = 0;
           t.stillSince = now;
         }
         return now - t.stillSince;
@@ -212,9 +245,12 @@ export function usePhoneMeasurement(method: PhoneMethod, callbacks: Callbacks) {
           t.holdGravity = gravity;
           t.holdYaw = yaw;
         });
+        t.holdGravitySum = t.holdGravitySum.map((v, i) => v + gravity[i]) as Vec;
+        t.holdCount++;
         showHold(stillFor, ZERO_HOLD_MS);
         if (stillFor < ZERO_HOLD_MS) return;
-        t.zero = t.gravity;
+        // The whole hold's average direction, so a wobble at the last moment doesn't shift it.
+        t.zero = t.holdGravitySum;
         t.yaw = 0;
         t.stillSince = null;
         phaseNow = 'measuring';
@@ -232,13 +268,18 @@ export function usePhoneMeasurement(method: PhoneMethod, callbacks: Callbacks) {
       const stillFor = holdFor(moved >= MIN_MOVE_DEG, Math.abs(moved - t.holdMoved), () => {
         t.holdMoved = moved;
       });
+      t.holdMovedSum += moved;
+      t.holdCount++;
       showHold(stillFor, RESULT_HOLD_MS);
 
       if (stillFor >= RESULT_HOLD_MS) {
+        // The whole hold's average, since the reading can drift within the hold's tolerance.
+        const result = Math.round(startAngle + t.holdMovedSum / t.holdCount);
         stop();
+        setAngle(result);
         setPhase('done');
         setHoldProgress(0);
-        callbacksRef.current.onResult(reading);
+        callbacksRef.current.onResult(result);
       }
     });
   }, [method, stop]);

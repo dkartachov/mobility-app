@@ -4,6 +4,7 @@
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { METHOD_UNITS, TEST_STEPS } from '@/data/mobility-tests';
 import { addDays, todayKey } from '@/lib/dates';
 import { milestoneProgress } from '@/lib/milestones';
 
@@ -45,6 +46,27 @@ export async function addDevMobilityTest(db: SQLiteDatabase, daysAgo = 0) {
   const takenAt = new Date();
   takenAt.setDate(takenAt.getDate() - daysAgo);
   await logMobilityTest(db, takenAt);
+}
+
+/**
+ * Logs a flexibility test today with made-up results, spread across each test's whole scoring
+ * range so the score areas come out in a variety of colors. It becomes the latest test, so the
+ * score shows it instead of any earlier results.
+ */
+export async function addDevMobilityTestResults(db: SQLiteDatabase) {
+  await logMobilityTest(
+    db,
+    new Date(),
+    TEST_STEPS.map(({ test, side }) => {
+      const { zeroAt, fullAt } = test.scoring;
+      return {
+        exerciseId: test.id,
+        side,
+        value: Math.round(zeroAt + Math.random() * (fullAt - zeroAt)),
+        unit: METHOD_UNITS[test.method.kind],
+      };
+    })
+  );
 }
 
 /**
