@@ -52,27 +52,20 @@ export type BodyMeasurements = {
   fingerLength: number | null;
   /** Tip of the thumb to the tip of the little finger, spread wide. */
   handSpan: number | null;
-  /** Standing, the bony point at the front of the hip to the floor. */
-  legLength: number | null;
 };
 
 export const BODY_MEASUREMENT_LABELS: Record<keyof BodyMeasurements, string> = {
   handLength: 'Hand length',
   fingerLength: 'Finger length',
   handSpan: 'Hand span',
-  legLength: 'Leg length',
 };
 
-/**
- * Average adult sizes, used for any measurement that hasn't been entered. No leg default: it
- * varies too much, and the straddle angle hint would be far off.
- */
+/** Average adult sizes, used for any measurement that hasn't been entered. */
 export const DEFAULT_BODY = {
   handLength: 18,
   fingerLength: 8,
   handSpan: 20,
-  legLength: null,
-} satisfies Record<keyof BodyMeasurements, number | null>;
+} satisfies Record<keyof BodyMeasurements, number>;
 
 /** The label of the first `[upTo, label]` pair that `value` is at or below. Pairs go in ascending order. */
 function byThreshold(value: number, thresholds: [upTo: number, label: string][]) {
@@ -146,20 +139,10 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     bodyPart: 'hips',
     twoSided: false,
     instructions:
-      'Sit with your back against a wall and legs straight. Slide your legs apart as wide as you can with the knees pointing up at the ceiling.',
-    measurement: 'Distance between the heels',
-    method: {
-      kind: 'distance',
-      min: 50,
-      max: 200,
-      // The heels and hips make a triangle with the legs as its sides, which gives the angle
-      // between the legs. Approximate, since it ignores the width of the hips.
-      hint: (value, { legLength }) => {
-        if (!legLength) return undefined;
-        const angle = 2 * Math.asin(Math.min(1, value / (2 * legLength))) * (180 / Math.PI);
-        return angle >= 170 ? 'Full side split' : `About ${Math.round(angle / 5) * 5}° between the legs`;
-      },
-    },
+      'Sit with your back against a wall and legs straight. Slide your legs apart as wide as you can with the knees pointing up at the ceiling. Lay the phone flat, screen up, against the inside of your left thigh with its top pointing towards your foot. Keeping it flat, sweep it in an arc across to the inside of your right thigh, turning it so its top ends up pointing towards your right foot.',
+    measurement: 'Angle between the legs',
+    // Turning the phone from along one leg to along the other turns it by the angle between them.
+    method: { kind: 'rotation', startPosition: 'Phone flat against the inside of your left thigh' },
   },
   {
     id: 'butterfly',

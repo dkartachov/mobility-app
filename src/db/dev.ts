@@ -76,6 +76,6 @@ export async function resetAllData(db: SQLiteDatabase) {
     DELETE FROM mobility_tests WHERE id IS NOT NULL;
     DELETE FROM goals WHERE id IS NOT NULL;
     UPDATE profile SET first_name = '', last_name = '', date_of_birth = NULL, gender = NULL, photo_file = NULL,
-      hand_length_cm = NULL, finger_length_cm = NULL, hand_span_cm = NULL, leg_length_cm = NULL;
+      hand_length_cm = NULL, finger_length_cm = NULL, hand_span_cm = NULL;
   `);
 }

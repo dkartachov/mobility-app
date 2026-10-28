@@ -204,6 +204,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
         <View style={styles.info}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             Exercise {exerciseNumber} of {exerciseCount}
+            {step.exercise.active ? ' · Active' : ' · Passive'}
             {step.side ? ` · Side ${step.side} of 2` : ''}
           </ThemedText>
           <ThemedText type="title" accessibilityRole="header">
@@ -222,7 +223,9 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
                   ? step.side === 2
                     ? 'Switch sides'
                     : 'Get ready'
-                  : 'Hold'}
+                  : step.exercise.active
+                    ? 'Move'
+                    : 'Hold'}
           </ThemedText>
           <ThemedText type="stat" style={styles.clock}>
             {formatClock(Math.ceil(state.remainingMs / 1000))}

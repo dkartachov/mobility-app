@@ -23,7 +23,7 @@ import { ProgressBar } from './progress-bar';
 import { ThemedText } from './themed-text';
 
 /** Until the profile loads, hints fall back to average sizes. */
-const NO_BODY: BodyMeasurements = { handLength: null, fingerLength: null, handSpan: null, legLength: null };
+const NO_BODY: BodyMeasurements = { handLength: null, fingerLength: null, handSpan: null };
 
 type MeasurementProps = {
   test: FlexibilityTest;

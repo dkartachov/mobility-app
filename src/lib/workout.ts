@@ -26,21 +26,29 @@ function pickRandom<T>(items: readonly T[]) {
 
 /**
  * Fills `minutes` with random exercises, each 1 or 2 minutes long (always 1 for exercises marked
- * `oneMinuteOnly`). Two-sided exercises always take 2 minutes: 1 minute per side. The same
- * exercise never appears twice in a row (unless the library only has one).
+ * `oneMinuteOnly`). Two-sided exercises always take 2 minutes: 1 minute per side. No exercise
+ * repeats until the whole library has been used, and the same exercise never appears twice in a
+ * row (unless the library only has one).
  */
 export function buildWorkout(minutes: number): WorkoutStep[] {
   const steps: WorkoutStep[] = [];
+  let unused = [...EXERCISES];
   let remaining = minutes;
 
   while (remaining > 0) {
     const previous = steps.at(-1)?.exercise;
-    let candidates = EXERCISES.length > 1 ? EXERCISES.filter((e) => e !== previous) : EXERCISES;
+    if (unused.length === 0) unused = [...EXERCISES];
+    const notPrevious = (pool: Exercise[]) => (pool.length > 1 ? pool.filter((e) => e !== previous) : pool);
+    let candidates = notPrevious(unused);
     if (remaining < 2) {
+      // Prefer an unused one-minute exercise, then a reused one, rather than overshooting the time.
       const oneMinute = candidates.filter((e) => !e.twoSided);
+      const anyOneMinute = notPrevious(EXERCISES).filter((e) => !e.twoSided);
       if (oneMinute.length > 0) candidates = oneMinute;
+      else if (anyOneMinute.length > 0) candidates = anyOneMinute;
     }
     const exercise = pickRandom(candidates);
+    unused = unused.filter((e) => e !== exercise);
 
     if (exercise.twoSided) {
       steps.push({ exercise, durationSeconds: 60, side: 1 }, { exercise, durationSeconds: 60, side: 2 });

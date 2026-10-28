@@ -194,7 +194,6 @@ const HOW_TO_MEASURE: Record<keyof BodyMeasurements, string> = {
   handLength: 'Wrist crease to the tip of your middle finger.',
   fingerLength: 'Base to tip of your middle finger, on the palm side.',
   handSpan: 'Thumb tip to little finger tip, with the hand spread wide.',
-  legLength: 'Standing, from the bony point at the front of your hip to the floor. Adds an angle hint to the straddle.',
 };
 
 const BODY_FIELDS = (Object.keys(HOW_TO_MEASURE) as (keyof BodyMeasurements)[]).map((key) => ({
@@ -202,7 +201,7 @@ const BODY_FIELDS = (Object.keys(HOW_TO_MEASURE) as (keyof BodyMeasurements)[]).
   label: BODY_MEASUREMENT_LABELS[key],
   howTo: HOW_TO_MEASURE[key],
   // The default shows through when empty.
-  placeholder: DEFAULT_BODY[key]?.toString() ?? 'Not set',
+  placeholder: DEFAULT_BODY[key].toString(),
 }));
 
 function CentimetreField({

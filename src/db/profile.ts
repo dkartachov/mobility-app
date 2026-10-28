@@ -34,7 +34,6 @@ type ProfileRow = {
   hand_length_cm: number | null;
   finger_length_cm: number | null;
   hand_span_cm: number | null;
-  leg_length_cm: number | null;
 };
 
 async function getProfile(db: SQLiteDatabase): Promise<Profile> {
@@ -49,7 +48,6 @@ async function getProfile(db: SQLiteDatabase): Promise<Profile> {
       handLength: row?.hand_length_cm ?? null,
       fingerLength: row?.finger_length_cm ?? null,
       handSpan: row?.hand_span_cm ?? null,
-      legLength: row?.leg_length_cm ?? null,
     },
   };
 }
@@ -58,7 +56,7 @@ export async function updateProfile(db: SQLiteDatabase, profile: Profile) {
   await db.runAsync(
     `UPDATE profile
      SET first_name = ?, last_name = ?, date_of_birth = ?, gender = ?, photo_file = ?,
-       hand_length_cm = ?, finger_length_cm = ?, hand_span_cm = ?, leg_length_cm = ?
+       hand_length_cm = ?, finger_length_cm = ?, hand_span_cm = ?
      WHERE id = 1`,
     profile.firstName.trim(),
     profile.lastName.trim(),
@@ -67,8 +65,7 @@ export async function updateProfile(db: SQLiteDatabase, profile: Profile) {
     profile.photoFile,
     profile.body.handLength,
     profile.body.fingerLength,
-    profile.body.handSpan,
-    profile.body.legLength
+    profile.body.handSpan
   );
 }
 

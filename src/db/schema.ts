@@ -64,6 +64,10 @@ const MIGRATIONS: string[] = [
   ALTER TABLE profile ADD COLUMN hand_span_cm REAL;
   ALTER TABLE profile ADD COLUMN leg_length_cm REAL;
   `,
+  // Leg length was only used by the straddle, which is now measured with the phone.
+  `
+  ALTER TABLE profile DROP COLUMN leg_length_cm;
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
