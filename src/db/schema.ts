@@ -53,6 +53,17 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX mobility_test_results_test ON mobility_test_results (mobility_test_id);
   `,
+  // Results saved before this were raw 0–1 slider positions.
+  `
+  ALTER TABLE mobility_test_results ADD COLUMN unit TEXT NOT NULL DEFAULT 'slider';
+  `,
+  // Optional body measurements in cm, for more accurate flexibility test hints.
+  `
+  ALTER TABLE profile ADD COLUMN hand_length_cm REAL;
+  ALTER TABLE profile ADD COLUMN finger_length_cm REAL;
+  ALTER TABLE profile ADD COLUMN hand_span_cm REAL;
+  ALTER TABLE profile ADD COLUMN leg_length_cm REAL;
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {

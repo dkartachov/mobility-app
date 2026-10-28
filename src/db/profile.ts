@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import type { BodyMeasurements } from '@/data/mobility-tests';
 import type { DateKey } from '@/lib/dates';
 
 import { useDbQuery } from './use-db-query';
@@ -21,6 +22,7 @@ export type Profile = {
   gender: Gender | null;
   /** File name inside the app's profile photo directory, see `lib/profile-photo.ts`. */
   photoFile: string | null;
+  body: BodyMeasurements;
 };
 
 type ProfileRow = {
@@ -29,6 +31,10 @@ type ProfileRow = {
   date_of_birth: string | null;
   gender: Gender | null;
   photo_file: string | null;
+  hand_length_cm: number | null;
+  finger_length_cm: number | null;
+  hand_span_cm: number | null;
+  leg_length_cm: number | null;
 };
 
 async function getProfile(db: SQLiteDatabase): Promise<Profile> {
@@ -39,19 +45,30 @@ async function getProfile(db: SQLiteDatabase): Promise<Profile> {
     dateOfBirth: row?.date_of_birth ?? null,
     gender: row?.gender ?? null,
     photoFile: row?.photo_file ?? null,
+    body: {
+      handLength: row?.hand_length_cm ?? null,
+      fingerLength: row?.finger_length_cm ?? null,
+      handSpan: row?.hand_span_cm ?? null,
+      legLength: row?.leg_length_cm ?? null,
+    },
   };
 }
 
 export async function updateProfile(db: SQLiteDatabase, profile: Profile) {
   await db.runAsync(
     `UPDATE profile
-     SET first_name = ?, last_name = ?, date_of_birth = ?, gender = ?, photo_file = ?
+     SET first_name = ?, last_name = ?, date_of_birth = ?, gender = ?, photo_file = ?,
+       hand_length_cm = ?, finger_length_cm = ?, hand_span_cm = ?, leg_length_cm = ?
      WHERE id = 1`,
     profile.firstName.trim(),
     profile.lastName.trim(),
     profile.dateOfBirth,
     profile.gender,
-    profile.photoFile
+    profile.photoFile,
+    profile.body.handLength,
+    profile.body.fingerLength,
+    profile.body.handSpan,
+    profile.body.legLength
   );
 }
 

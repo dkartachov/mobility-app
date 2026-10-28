@@ -1,4 +1,4 @@
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { Alert, StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
@@ -7,6 +7,7 @@ import {
   addDevSession,
   addDevStreak,
   clearDevMobilityTests,
+  clearDevSessions,
   jumpToNextMilestone,
   makeDevTestDue,
   resetAllData,
@@ -14,7 +15,12 @@ import {
 import { useStats } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDuration } from '@/lib/dates';
-import { setFastWorkouts, useFastWorkouts } from '@/lib/dev-settings';
+import {
+  setFastWorkouts,
+  setSkipTestMeasurements,
+  useFastWorkouts,
+  useSkipTestMeasurements,
+} from '@/lib/dev-settings';
 import { milestoneProgress } from '@/lib/milestones';
 import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
 
@@ -28,12 +34,13 @@ export function DevTools() {
   const theme = useTheme();
   const stats = useStats();
   const fastWorkouts = useFastWorkouts();
+  const skipTestMeasurements = useSkipTestMeasurements();
   const nextHours = stats ? milestoneProgress(stats.totalSeconds).nextHours : null;
 
-  const confirmReset = () => {
-    Alert.alert('Reset all data?', 'Deletes sessions, goals and flexibility tests and clears your profile.', [
+  const confirm = (title: string, message: string, action: (db: SQLiteDatabase) => Promise<void>) => {
+    Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => resetAllData(db) },
+      { text: 'Delete', style: 'destructive', onPress: () => action(db) },
     ]);
   };
 
@@ -62,6 +69,20 @@ export function DevTools() {
             accessibilityLabel="Fast workouts"
           />
         </View>
+        <View style={styles.switchRow}>
+          <View style={styles.switchText}>
+            <ThemedText>Skip test measurements</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Next works in flexibility tests without measuring. Skipped measurements save as 0.
+            </ThemedText>
+          </View>
+          <Switch
+            value={skipTestMeasurements}
+            onValueChange={setSkipTestMeasurements}
+            trackColor={{ true: theme.tint, false: theme.backgroundSelected }}
+            accessibilityLabel="Skip test measurements"
+          />
+        </View>
         <Button title="Add 10 min session" variant="secondary" onPress={() => addDevSession(db, 10 * 60)} />
         <Button title="Add 1 h session" variant="secondary" onPress={() => addDevSession(db, 3600)} />
         <Button
@@ -73,8 +94,38 @@ export function DevTools() {
         <Button title="Extend streak by 7 days" variant="secondary" onPress={() => addDevStreak(db, 7)} />
         <Button title="Log flexibility test today" variant="secondary" onPress={() => addDevMobilityTest(db)} />
         <Button title="Make today test day" variant="secondary" onPress={() => makeDevTestDue(db)} />
-        <Button title="Clear flexibility tests" variant="secondary" onPress={() => clearDevMobilityTests(db)} />
-        <Button title="Reset all data" variant="destructive" onPress={confirmReset} />
+      </Card>
+      <Card style={styles.card}>
+        <ThemedText type="smallBold">Clear data</ThemedText>
+        <Button
+          title="Clear flexibility tests"
+          variant="destructive"
+          onPress={() =>
+            confirm(
+              'Clear flexibility tests?',
+              'Deletes every flexibility test and its results, so a test is due right away.',
+              clearDevMobilityTests
+            )
+          }
+        />
+        <Button
+          title="Clear sessions"
+          variant="destructive"
+          onPress={() =>
+            confirm('Clear sessions?', 'Deletes every logged session, including streaks and milestones.', clearDevSessions)
+          }
+        />
+        <Button
+          title="Reset all data"
+          variant="destructive"
+          onPress={() =>
+            confirm(
+              'Reset all data?',
+              'Deletes sessions, goals and flexibility tests and clears your profile.',
+              resetAllData
+            )
+          }
+        />
       </Card>
     </View>
   );

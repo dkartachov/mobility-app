@@ -1,4 +1,3 @@
-import { Slider } from '@expo/ui/community/slider';
 import { Stack, router, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
@@ -9,23 +8,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { ProgressBar } from '@/components/progress-bar';
+import { TestMeasurement } from '@/components/test-measurement';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import {
+  BODY_MEASUREMENT_LABELS,
   BODY_PART_LABELS,
+  DEFAULT_BODY,
   FLEXIBILITY_TESTS,
+  METHOD_UNITS,
   SIDE_LABELS,
   TEST_STEPS,
   type BodyPart,
 } from '@/data/mobility-tests';
 import { logMobilityTest } from '@/db/mobility-tests';
+import { useProfile } from '@/db/profile';
 import { useTheme } from '@/hooks/use-theme';
+import { useSkipTestMeasurements } from '@/lib/dev-settings';
 
 /** Placeholder until the score is actually calculated. */
 const CALCULATING_MS = 2000;
-
-const SLIDER_START = 0.5;
 
 const TIPS = [
   'Test at the same time of day, ideally before climbing or training rather than after.',
@@ -36,6 +39,8 @@ const TIPS = [
   'Measure the same way each time so results are comparable.',
 ];
 
+const BODY_MEASUREMENT_KEYS = Object.keys(BODY_MEASUREMENT_LABELS) as (keyof typeof BODY_MEASUREMENT_LABELS)[];
+
 const BODY_PARTS = [...new Set(FLEXIBILITY_TESTS.map((test) => test.bodyPart))] as BodyPart[];
 
 type Phase = 'intro' | 'measuring' | 'calculating' | 'results';
@@ -44,8 +49,9 @@ export default function MobilityTestScreen() {
   const db = useSQLiteContext();
   const [phase, setPhase] = useState<Phase>('intro');
   const [index, setIndex] = useState(0);
-  const [values, setValues] = useState(() => TEST_STEPS.map(() => SLIDER_START));
+  const [values, setValues] = useState<(number | null)[]>(() => TEST_STEPS.map(() => null));
   const [leaving, setLeaving] = useState<'cancel' | 'done'>();
+  const skipMeasurements = useSkipTestMeasurements();
 
   // Mid-test, leaving loses the measurements; on the results screen it means "done".
   usePreventRemove(phase !== 'intro' && !leaving, () => {
@@ -75,13 +81,26 @@ export default function MobilityTestScreen() {
     await logMobilityTest(
       db,
       new Date(),
-      TEST_STEPS.map(({ test, side }, i) => ({ exerciseId: test.id, side, value: values[i] }))
+      // Every step has a value by now: Next stays disabled until it does, unless the dev switch
+      // to skip measurements is on, which saves skipped ones as 0.
+      TEST_STEPS.flatMap(({ test, side }, i) => {
+        const value = values[i] ?? (skipMeasurements ? 0 : null);
+        return value === null ? [] : [{ exerciseId: test.id, side, value, unit: METHOD_UNITS[test.method.kind] }];
+      })
     ).catch(console.error);
   };
 
   const next = () => {
-    if (index < TEST_STEPS.length - 1) setIndex(index + 1);
-    else finish();
+    if (index === TEST_STEPS.length - 1) {
+      finish();
+      return;
+    }
+    // A slider's second side starts where the first side left off. Phone tests always start fresh.
+    const nextStep = TEST_STEPS[index + 1];
+    if (nextStep.test === TEST_STEPS[index].test && nextStep.test.method.kind === 'distance') {
+      setValues((prev) => prev.map((v, i) => (i === index + 1 && v === null ? prev[index] : v)));
+    }
+    setIndex(index + 1);
   };
 
   const fullScreen = phase === 'calculating' || phase === 'results';
@@ -104,6 +123,7 @@ export default function MobilityTestScreen() {
           onChange={(value) => setValues((prev) => prev.map((v, i) => (i === index ? value : v)))}
           onBack={index > 0 ? () => setIndex(index - 1) : undefined}
           onNext={next}
+          canSkip={skipMeasurements}
         />
       )}
       {phase === 'calculating' && <Calculating />}
@@ -114,6 +134,7 @@ export default function MobilityTestScreen() {
 
 function Intro({ onStart }: { onStart: () => void }) {
   const insets = useSafeAreaInsets();
+  const profile = useProfile();
 
   return (
     <ThemedView style={styles.screen}>
@@ -136,7 +157,36 @@ function Intro({ onStart }: { onStart: () => void }) {
         </Card>
         <Card>
           <ThemedText type="smallBold">You&apos;ll need</ThemedText>
-          <ThemedText>A clear wall, some floor space and a table.</ThemedText>
+          <ThemedText>A clear wall, some floor space, a table and a tape measure.</ThemedText>
+        </Card>
+        <Card>
+          <ThemedText type="smallBold">Your body measurements</ThemedText>
+          <ThemedText themeColor="textSecondary">
+            Used to make the hints during the test match your body. Anything you haven&apos;t entered uses an
+            average size.
+          </ThemedText>
+          {profile &&
+            BODY_MEASUREMENT_KEYS.map((key) => {
+              const own = profile.body[key];
+              const fallback = DEFAULT_BODY[key];
+              return (
+                <View key={key} style={styles.partRow}>
+                  <ThemedText>{BODY_MEASUREMENT_LABELS[key]}</ThemedText>
+                  {own !== null ? (
+                    <ThemedText>{own} cm</ThemedText>
+                  ) : (
+                    <ThemedText themeColor="textSecondary">
+                      {fallback === null ? 'Not set' : `${fallback} cm (default)`}
+                    </ThemedText>
+                  )}
+                </View>
+              );
+            })}
+          <Button
+            title="Update measurements"
+            variant="secondary"
+            onPress={() => router.push('/edit-profile?section=body')}
+          />
         </Card>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
@@ -148,15 +198,16 @@ function Intro({ onStart }: { onStart: () => void }) {
 
 type MeasureProps = {
   index: number;
-  value: number;
-  onChange: (value: number) => void;
+  value: number | null;
+  onChange: (value: number | null) => void;
   onBack?: () => void;
   onNext: () => void;
+  /** Dev switch: Next works without a measurement. */
+  canSkip: boolean;
 };
 
-function Measure({ index, value, onChange, onBack, onNext }: MeasureProps) {
+function Measure({ index, value, onChange, onBack, onNext, canSkip }: MeasureProps) {
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
   const { test, side } = TEST_STEPS[index];
   const last = index === TEST_STEPS.length - 1;
 
@@ -165,7 +216,7 @@ function Measure({ index, value, onChange, onBack, onNext }: MeasureProps) {
       <View style={styles.progress}>
         <ProgressBar progress={(index + 1) / TEST_STEPS.length} />
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.heading}>
           <ThemedText type="small" themeColor="textSecondary">
             {BODY_PART_LABELS[test.bodyPart]}
@@ -180,20 +231,7 @@ function Measure({ index, value, onChange, onBack, onNext }: MeasureProps) {
           )}
         </View>
         <ThemedText>{test.instructions}</ThemedText>
-        <Card>
-          <ThemedText type="small" themeColor="textSecondary">
-            {test.measurement}
-          </ThemedText>
-          <Slider
-            value={value}
-            onValueChange={onChange}
-            minimumTrackTintColor={theme.tint}
-            maximumTrackTintColor={theme.backgroundSelected}
-            thumbTintColor={theme.tint}
-            accessibilityLabel={test.measurement}
-            style={styles.slider}
-          />
-        </Card>
+        <TestMeasurement test={test} value={value} onChange={onChange} />
       </ScrollView>
       <View style={[styles.footer, styles.footerRow, { paddingBottom: insets.bottom + Spacing.three }]}>
         {onBack && (
@@ -202,7 +240,7 @@ function Measure({ index, value, onChange, onBack, onNext }: MeasureProps) {
           </View>
         )}
         <View style={styles.footerButton}>
-          <Button title={last ? 'Finish' : 'Next'} onPress={onNext} />
+          <Button title={last ? 'Finish' : 'Next'} onPress={onNext} disabled={value === null && !canSkip} />
         </View>
       </View>
     </ThemedView>
@@ -279,9 +317,6 @@ const styles = StyleSheet.create({
   },
   tipText: {
     flex: 1,
-  },
-  slider: {
-    marginVertical: Spacing.two,
   },
   footer: {
     paddingHorizontal: Spacing.three,

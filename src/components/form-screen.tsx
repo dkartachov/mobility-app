@@ -1,17 +1,18 @@
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import type { ReactNode, Ref } from 'react';
+import { ScrollView, StyleSheet, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Scrollable container for modal forms (shown under the Stack header). */
-export function FormScreen({ children }: { children: ReactNode }) {
+export function FormScreen({ children, ref }: { children: ReactNode; ref?: Ref<ScrollViewInstance> }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
     <ScrollView
+      ref={ref}
       style={{ backgroundColor: theme.background }}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets

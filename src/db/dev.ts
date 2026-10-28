@@ -59,9 +59,13 @@ export async function makeDevTestDue(db: SQLiteDatabase) {
   await addDevMobilityTest(db, RETEST_INTERVAL_DAYS);
 }
 
-/** Removes every flexibility test, back to "no test taken yet". */
+/** Removes every flexibility test and its results, back to "no test taken yet". */
 export async function clearDevMobilityTests(db: SQLiteDatabase) {
   await db.runAsync('DELETE FROM mobility_tests WHERE id IS NOT NULL');
+}
+
+export async function clearDevSessions(db: SQLiteDatabase) {
+  await db.runAsync('DELETE FROM sessions WHERE id IS NOT NULL');
 }
 
 /** Wipes sessions, goals, flexibility tests and profile details, back to a fresh install. */
@@ -71,6 +75,7 @@ export async function resetAllData(db: SQLiteDatabase) {
     DELETE FROM sessions WHERE id IS NOT NULL;
     DELETE FROM mobility_tests WHERE id IS NOT NULL;
     DELETE FROM goals WHERE id IS NOT NULL;
-    UPDATE profile SET first_name = '', last_name = '', date_of_birth = NULL, gender = NULL, photo_file = NULL;
+    UPDATE profile SET first_name = '', last_name = '', date_of_birth = NULL, gender = NULL, photo_file = NULL,
+      hand_length_cm = NULL, finger_length_cm = NULL, hand_span_cm = NULL, leg_length_cm = NULL;
   `);
 }
