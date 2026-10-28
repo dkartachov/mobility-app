@@ -28,7 +28,7 @@ type GoalRow = {
   progress_seconds: number;
 };
 
-async function getGoals(db: SQLiteDatabase): Promise<Goal[]> {
+export async function getGoals(db: SQLiteDatabase): Promise<Goal[]> {
   const rows = await db.getAllAsync<GoalRow>(
     `SELECT g.id, g.title, g.target_minutes, g.start_date,
        COALESCE((

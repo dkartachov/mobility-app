@@ -65,7 +65,7 @@ export function computeStreaks(sortedDays: DateKey[], today: DateKey) {
   return { current, longest, trainedToday: days.has(today) };
 }
 
-async function getStats(db: SQLiteDatabase): Promise<Stats> {
+export async function getStats(db: SQLiteDatabase): Promise<Stats> {
   const totals = await db.getFirstAsync<{ total: number | null; count: number }>(
     'SELECT SUM(duration_seconds) AS total, COUNT(*) AS count FROM sessions'
   );
