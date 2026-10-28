@@ -45,7 +45,7 @@ export async function logMobilityTest(db: SQLiteDatabase, takenAt: Date, measure
   });
 }
 
-async function getTestSchedule(db: SQLiteDatabase): Promise<TestSchedule> {
+export async function getTestSchedule(db: SQLiteDatabase): Promise<TestSchedule> {
   const row = await db.getFirstAsync<{ last: string | null }>('SELECT MAX(local_date) AS last FROM mobility_tests');
   const lastTestDate = row?.last ?? null;
   if (!lastTestDate) return { lastTestDate: null, nextTestDate: null, daysUntilNext: 0, isDue: true };

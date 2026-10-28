@@ -36,7 +36,7 @@ type ProfileRow = {
   hand_span_cm: number | null;
 };
 
-async function getProfile(db: SQLiteDatabase): Promise<Profile> {
+export async function getProfile(db: SQLiteDatabase): Promise<Profile> {
   const row = await db.getFirstAsync<ProfileRow>('SELECT * FROM profile WHERE id = 1');
   return {
     firstName: row?.first_name ?? '',

@@ -3,7 +3,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useReducer, useState, type ComponentProps } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
+import Animated, { css, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExerciseVideo } from '@/components/exercise-video';
@@ -354,7 +354,7 @@ function ControlButton({ label, icon, onPress, primary, disabled, glow }: Contro
 
   return (
     <View>
-      {glow && <Animated.View style={[styles.glow, { backgroundColor: theme.tint }]} />}
+      {glow && <Animated.View style={[cssStyles.glow, { backgroundColor: theme.tint }]} />}
       <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -414,17 +414,6 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.3,
   },
-  glow: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: 32,
-    animationName: {
-      from: { opacity: 0.6, transform: [{ scale: 1 }] },
-      to: { opacity: 0, transform: [{ scale: 1.7 }] },
-    },
-    animationDuration: '1.4s',
-    animationIterationCount: 'infinite',
-    animationTimingFunction: 'ease-out',
-  },
   summary: {
     flex: 1,
     padding: Spacing.three,
@@ -445,5 +434,20 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
+  },
+});
+
+/** Reanimated CSS animations, which React Native's `StyleSheet.create` doesn't type. */
+const cssStyles = css.create({
+  glow: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 32,
+    animationName: {
+      from: { opacity: 0.6, transform: [{ scale: 1 }] },
+      to: { opacity: 0, transform: [{ scale: 1.7 }] },
+    },
+    animationDuration: '1.4s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-out',
   },
 });
