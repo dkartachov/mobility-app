@@ -33,13 +33,12 @@ export default function DashboardScreen() {
       ? 'Train today to keep your streak going.'
       : 'Complete a session to start a streak.';
 
-  // Kept short: the score card shares its row with the sessions card.
   const testHint = !testSchedule
     ? undefined
     : !testSchedule.lastTestDate
-      ? 'Take your first test'
+      ? 'Take your first flexibility test to get a score.'
       : testSchedule.isDue
-        ? 'Test day! Tap to retake'
+        ? "It's test day! Tap to retake your flexibility test."
         : `Next test in ${days(testSchedule.daysUntilNext)}`;
 
   return (
@@ -62,40 +61,20 @@ export default function DashboardScreen() {
         </View>
       </Card>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Mobility time, ${formatDuration(stats.totalSeconds)}`}
-        onPress={() => router.push('/mobility-time')}
-        style={({ pressed }) => pressed && styles.pressed}>
-        <Card>
-          <ThemedText type="small" themeColor="textSecondary">
-            Mobility time
-          </ThemedText>
-          <ThemedText type="stat" numberOfLines={1} adjustsFontSizeToFit>
-            {formatDuration(stats.totalSeconds)}
-          </ThemedText>
-          <MilestoneBar totalSeconds={stats.totalSeconds} />
-        </Card>
-      </Pressable>
-
       <View style={styles.statRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Mobility score. ${testHint ?? ''}`}
-          onPress={() => router.push('/mobility-score')}
-          style={({ pressed }) => [styles.scoreCard, pressed && styles.pressed]}>
+          accessibilityLabel={`Mobility time, ${formatDuration(stats.totalSeconds)}`}
+          onPress={() => router.push('/mobility-time')}
+          style={({ pressed }) => [styles.timeCard, pressed && styles.pressed]}>
           <Card style={styles.fill}>
             <ThemedText type="small" themeColor="textSecondary">
-              Mobility score
+              Mobility time
             </ThemedText>
-            <ThemedText type="stat" themeColor="textSecondary">
-              —
+            <ThemedText type="stat" numberOfLines={1} adjustsFontSizeToFit>
+              {formatDuration(stats.totalSeconds)}
             </ThemedText>
-            {testHint && (
-              <ThemedText type="small" themeColor={testSchedule?.isDue ? 'tint' : 'textSecondary'}>
-                {testHint}
-              </ThemedText>
-            )}
+            <MilestoneBar totalSeconds={stats.totalSeconds} />
           </Card>
         </Pressable>
         <Card style={styles.sessionsCard}>
@@ -107,6 +86,26 @@ export default function DashboardScreen() {
           </ThemedText>
         </Card>
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Mobility score. ${testHint ?? ''}`}
+        onPress={() => router.push('/mobility-score')}
+        style={({ pressed }) => pressed && styles.pressed}>
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary">
+            Mobility score
+          </ThemedText>
+          <ThemedText type="stat" themeColor="textSecondary">
+            —
+          </ThemedText>
+          {testHint && (
+            <ThemedText type="small" themeColor={testSchedule?.isDue ? 'tint' : 'textSecondary'}>
+              {testHint}
+            </ThemedText>
+          )}
+        </Card>
+      </Pressable>
 
       <View style={styles.section}>
         <ThemedText type="subtitle">Active goals</ThemedText>
@@ -139,7 +138,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.three,
   },
-  scoreCard: {
+  timeCard: {
     flex: 2,
   },
   sessionsCard: {

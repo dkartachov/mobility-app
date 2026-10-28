@@ -66,8 +66,10 @@ function createReducer(steps: WorkoutStep[], bufferMs: number) {
         if (state.paused || state.phase === 'finished') return state;
         const remainingMs = state.remainingMs - action.deltaMs;
         if (remainingMs > 0) {
+          // Holds too short for a real 10 s warning (dev fast mode) get it halfway, so the cue can still be heard.
+          const warningMs = Math.min(WARNING_MS, (steps[state.index].durationSeconds * 1000) / 2);
           const crossedWarning =
-            state.phase === 'active' && state.remainingMs > WARNING_MS && remainingMs <= WARNING_MS;
+            state.phase === 'active' && state.remainingMs > warningMs && remainingMs <= warningMs;
           return { ...state, remainingMs, cue: crossedWarning ? { type: 'tenSeconds' } : state.cue };
         }
 
