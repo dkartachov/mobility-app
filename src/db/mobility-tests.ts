@@ -76,7 +76,7 @@ export async function getMobilityScore(db: SQLiteDatabase): Promise<ScoreWithBas
   const scoreOf = async (testId: number) =>
     mobilityScore(
       await db.getAllAsync<ScoredResult>(
-        'SELECT exercise_id AS exerciseId, value, unit FROM mobility_test_results WHERE mobility_test_id = ?',
+        'SELECT exercise_id AS exerciseId, side, value, unit FROM mobility_test_results WHERE mobility_test_id = ?',
         testId
       )
     );

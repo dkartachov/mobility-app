@@ -12,15 +12,14 @@ import { TestMeasurement } from '@/components/test-measurement';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { SCORE_AREAS } from '@/data/mobility-score';
 import {
   BODY_MEASUREMENT_LABELS,
-  BODY_PART_LABELS,
   DEFAULT_BODY,
   FLEXIBILITY_TESTS,
   METHOD_UNITS,
   SIDE_LABELS,
   TEST_STEPS,
-  type BodyPart,
 } from '@/data/mobility-tests';
 import { logMobilityTest } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
@@ -41,7 +40,7 @@ const TIPS = [
 
 const BODY_MEASUREMENT_KEYS = Object.keys(BODY_MEASUREMENT_LABELS) as (keyof typeof BODY_MEASUREMENT_LABELS)[];
 
-const BODY_PARTS = [...new Set(FLEXIBILITY_TESTS.map((test) => test.bodyPart))] as BodyPart[];
+const AREA_LABELS = Object.fromEntries(SCORE_AREAS.map(({ id, label }) => [id, label]));
 
 type Phase = 'intro' | 'measuring' | 'calculating' | 'results';
 
@@ -144,7 +143,7 @@ function Intro({ onStart }: { onStart: () => void }) {
         </ThemedText>
         <ThemedText themeColor="textSecondary">
           {FLEXIBILITY_TESTS.length} tests, {TEST_STEPS.length} measurements in total. Two-sided tests are done
-          left, then right. It takes about 15 minutes.
+          left, then right. It takes about 20 minutes.
         </ThemedText>
         <Card>
           <ThemedText type="smallBold">For accurate results</ThemedText>
@@ -219,7 +218,7 @@ function Measure({ index, value, onChange, onBack, onNext, canSkip }: MeasurePro
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.heading}>
           <ThemedText type="small" themeColor="textSecondary">
-            {BODY_PART_LABELS[test.bodyPart]}
+            {AREA_LABELS[test.area]}
           </ThemedText>
           <ThemedText type="title" accessibilityRole="header">
             {test.name}
@@ -276,10 +275,10 @@ function Results({ onDone }: { onDone: () => void }) {
           </ThemedText>
         </Animated.View>
         <Card>
-          <ThemedText type="smallBold">Improvement by body part</ThemedText>
-          {BODY_PARTS.map((part) => (
-            <View key={part} style={styles.partRow}>
-              <ThemedText>{BODY_PART_LABELS[part]}</ThemedText>
+          <ThemedText type="smallBold">Improvement by area</ThemedText>
+          {SCORE_AREAS.map(({ id, label }) => (
+            <View key={id} style={styles.partRow}>
+              <ThemedText>{label}</ThemedText>
               <ThemedText themeColor="textSecondary">—</ThemedText>
             </View>
           ))}

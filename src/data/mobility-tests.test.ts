@@ -62,20 +62,3 @@ describe('forward fold hint', () => {
     expect(hint(-20, body)).toBe('Palms flat on the floor');
   });
 });
-
-describe('butterfly hint', () => {
-  const hint = hintFor('butterfly');
-
-  it('describes knee height with landmarks', () => {
-    expect(hint(0, NO_BODY)).toBe('Knee on the floor');
-    expect(hint(2, NO_BODY)).toBe('Knee on the floor');
-    expect(hint(12, NO_BODY)).toBe('About a fist high');
-    expect(hint(DEFAULT_BODY.handSpan + 5, NO_BODY)).toBe('About a hand-span high');
-    expect(hint(DEFAULT_BODY.handSpan + 6, NO_BODY)).toBe('Higher than a hand-span');
-  });
-
-  it("uses the person's own hand span", () => {
-    expect(hint(28, NO_BODY)).toBe('Higher than a hand-span');
-    expect(hint(28, { ...NO_BODY, handSpan: 23 })).toBe('About a hand-span high');
-  });
-});

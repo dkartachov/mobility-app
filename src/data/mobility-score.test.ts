@@ -27,12 +27,13 @@ describe('scoreResult', () => {
 describe('mobilityScore', () => {
   it('averages sides, then tests within an area, then areas', () => {
     const score = mobilityScore([
-      // Ankles: sides 0 and 15 cm average to 7.5 cm, half the range.
-      { exerciseId: 'knee-to-wall', value: 0, unit: 'cm' },
-      { exerciseId: 'knee-to-wall', value: 15, unit: 'cm' },
-      // Hips: straddle at full, butterfly at zero.
-      { exerciseId: 'straddle', value: 150, unit: 'deg' },
-      { exerciseId: 'butterfly', value: 35, unit: 'cm' },
+      // Ankles: left at zero, right at full.
+      { exerciseId: 'ankle-lunge', side: 'left', value: 25, unit: 'deg' },
+      { exerciseId: 'ankle-lunge', side: 'right', value: 50, unit: 'deg' },
+      // Hips: straddle at full, knee to chest at zero on both sides.
+      { exerciseId: 'straddle', side: null, value: 150, unit: 'deg' },
+      { exerciseId: 'knee-to-chest', side: 'left', value: 70, unit: 'deg' },
+      { exerciseId: 'knee-to-chest', side: 'right', value: 70, unit: 'deg' },
     ]);
     expect(score.areas.ankles).toBe(50);
     expect(score.areas.hips).toBe(50);
@@ -40,8 +41,27 @@ describe('mobilityScore', () => {
     expect(score.overall).toBe(50);
   });
 
+  it('scores each test and each of its sides', () => {
+    const score = mobilityScore([
+      { exerciseId: 'ankle-lunge', side: 'left', value: 25, unit: 'deg' },
+      { exerciseId: 'ankle-lunge', side: 'right', value: 50, unit: 'deg' },
+      { exerciseId: 'straddle', side: null, value: 105, unit: 'deg' },
+    ]);
+    expect(score.tests['ankle-lunge']).toEqual({ score: 50, sides: { left: 0, right: 100 } });
+    expect(score.tests.straddle).toEqual({ score: 50, sides: {} });
+    expect(score.tests['knee-to-chest']).toBeUndefined();
+  });
+
+  it('scores each side before averaging, so one side past full scores no more than 100', () => {
+    const score = mobilityScore([
+      { exerciseId: 'ankle-lunge', side: 'left', value: 75, unit: 'deg' },
+      { exerciseId: 'ankle-lunge', side: 'right', value: 25, unit: 'deg' },
+    ]);
+    expect(score.tests['ankle-lunge']?.score).toBe(50);
+  });
+
   it('leaves out results in a unit the test no longer uses', () => {
-    const score = mobilityScore([{ exerciseId: 'knee-to-wall', value: 0.5, unit: 'slider' as 'cm' }]);
+    const score = mobilityScore([{ exerciseId: 'ankle-lunge', side: 'left', value: 10, unit: 'cm' }]);
     expect(score.areas.ankles).toBeNull();
     expect(score.overall).toBeNull();
   });
@@ -66,7 +86,11 @@ it('formats changes with a sign', () => {
   expect(formatScoreChange(0)).toBe('0%');
 });
 
-it('has a test for every score area', () => {
+it('has a test for every score area, each testing a different movement', () => {
+  for (const { id } of SCORE_AREAS) {
+    const movements = FLEXIBILITY_TESTS.filter((t) => t.area === id).map((t) => t.movement);
+    expect(new Set(movements).size).toBe(movements.length);
+  }
   for (const { id } of SCORE_AREAS) expect(FLEXIBILITY_TESTS.some((t) => t.area === id)).toBe(true);
 });
 

@@ -10,16 +10,6 @@
 
 import type { ScoreArea } from './mobility-score';
 
-export type BodyPart = 'ankles' | 'hamstrings' | 'hips' | 'shoulders' | 'upperBack';
-
-export const BODY_PART_LABELS: Record<BodyPart, string> = {
-  ankles: 'Ankles',
-  hamstrings: 'Hamstrings',
-  hips: 'Hips',
-  shoulders: 'Shoulders',
-  upperBack: 'Upper back',
-};
-
 export type Side = 'left' | 'right';
 
 /**
@@ -87,9 +77,10 @@ export type TestScoring = { zeroAt: number; fullAt: number };
 export type FlexibilityTest = {
   id: string;
   name: string;
-  bodyPart: BodyPart;
   /** The part of the mobility score this test counts towards. */
   area: ScoreArea;
+  /** What it tests within its area, for the score breakdown. */
+  movement: string;
   scoring: TestScoring;
   /** Tested once per side when true. */
   twoSided: boolean;
@@ -101,22 +92,35 @@ export type FlexibilityTest = {
 
 export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
   {
-    id: 'knee-to-wall',
-    name: 'Knee to wall',
-    bodyPart: 'ankles',
+    id: 'ankle-lunge',
+    name: 'Ankle lunge',
     area: 'ankles',
-    scoring: { zeroAt: 0, fullAt: 15 },
+    movement: 'Dorsiflexion',
+    scoring: { zeroAt: 25, fullAt: 50 },
     twoSided: true,
     instructions:
-      'Half-kneel facing a wall with the front foot pointing straight at it. Keeping the heel down, drive the knee forward to touch the wall. Slide the foot back until the knee can only just touch without the heel lifting.',
-    measurement: 'Distance from big toe to wall',
-    method: { kind: 'distance', min: 0, max: 20 },
+      'Half-kneel facing a wall with this foot in front, pointing straight at the wall, and a hand on the wall for balance. Hold the phone flat against the front of this shin, just below the knee. Start with the shin upright, then keeping the heel down, drive the knee forward over the toes as far as you can.',
+    measurement: 'Angle of the shin from vertical',
+    // An angle rather than a knee-to-wall distance, so it doesn't depend on the length of the foot and shin.
+    method: { kind: 'tilt', startPosition: 'Shin upright, knee over the ankle', startAngle: 0 },
+  },
+  {
+    id: 'thoracic-rotation',
+    name: 'Thoracic rotation',
+    area: 'thorax',
+    movement: 'Rotation',
+    scoring: { zeroAt: 20, fullAt: 70 },
+    twoSided: true,
+    instructions:
+      'Kneel and sit back on your heels, leaning slightly forward over your knees to keep your lower back from turning. Cross your arms over your chest and hold the phone flat against your breastbone. Rotate your upper body to this side as far as you can, keeping your hips still.',
+    measurement: 'Rotation angle of the upper back',
+    method: { kind: 'rotation', startPosition: 'Chest facing straight ahead' },
   },
   {
     id: 'forward-fold',
     name: 'Forward fold',
-    bodyPart: 'hamstrings',
     area: 'postChain',
+    movement: 'Forward fold',
     scoring: { zeroAt: 30, fullAt: -20 },
     twoSided: false,
     instructions:
@@ -141,10 +145,22 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     },
   },
   {
+    id: 'overhead-squat',
+    name: 'Overhead squat',
+    area: 'overhead',
+    movement: 'Overhead squat',
+    scoring: { zeroAt: 30, fullAt: 0 },
+    twoSided: false,
+    instructions:
+      'Stand facing a wall with feet shoulder-width apart and arms straight overhead. Squat until your thighs are level with the floor and stand back up, without your hands, head or knees touching the wall. Move your feet closer and try again until you find the closest you can still do it from.',
+    measurement: 'Distance from your toes to the wall',
+    method: { kind: 'distance', min: 0, max: 50 },
+  },
+  {
     id: 'straddle',
     name: 'Straddle',
-    bodyPart: 'hips',
     area: 'hips',
+    movement: 'Abduction',
     scoring: { zeroAt: 60, fullAt: 150 },
     twoSided: false,
     instructions:
@@ -154,47 +170,34 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     method: { kind: 'rotation', startPosition: 'Phone flat against the inside of your left thigh' },
   },
   {
-    id: 'butterfly',
-    name: 'Butterfly',
-    bodyPart: 'hips',
+    id: 'hip-external-rotation',
+    name: 'Hip external rotation',
     area: 'hips',
-    scoring: { zeroAt: 35, fullAt: 0 },
+    movement: 'External rotation',
+    scoring: { zeroAt: 15, fullAt: 60 },
     twoSided: true,
     instructions:
-      'Sit with your back against a wall, soles of the feet together and heels pulled in as close as you can. Relax and let both knees drop towards the floor without pushing them down.',
-    measurement: 'Distance from this knee to the floor',
-    method: {
-      kind: 'distance',
-      min: 0,
-      max: 40,
-      hint: (value, body) => {
-        const span = body.handSpan ?? DEFAULT_BODY.handSpan;
-        return byThreshold(value, [
-          [2, 'Knee on the floor'],
-          [12, 'About a fist high'],
-          [span + 5, 'About a hand-span high'],
-          [Infinity, 'Higher than a hand-span'],
-        ]);
-      },
-    },
+      'Sit tall on the edge of a table with your thighs supported and feet hanging free, and tuck the other foot back under the table. Hold the phone lightly along the front of this shin. Keeping the thigh still and both sit bones on the table, swing this foot inwards, towards the other leg, as far as it goes.',
+    measurement: 'Angle of the shin from vertical',
+    method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
   },
   {
-    id: 'thoracic-rotation',
-    name: 'Thoracic rotation',
-    bodyPart: 'upperBack',
-    area: 'thorax',
-    scoring: { zeroAt: 20, fullAt: 70 },
+    id: 'hip-internal-rotation',
+    name: 'Hip internal rotation',
+    area: 'hips',
+    movement: 'Internal rotation',
+    scoring: { zeroAt: 10, fullAt: 50 },
     twoSided: true,
     instructions:
-      'Kneel and sit back on your heels with your back straight. Hold the phone level with both hands, screen up and its bottom edge against your chest, and rotate your upper body to this side as far as you can, keeping your hips still.',
-    measurement: 'Rotation angle of the upper back',
-    method: { kind: 'rotation', startPosition: 'Chest facing straight ahead' },
+      'Sit tall on the edge of a table with your thighs supported and feet hanging free. Hold the phone lightly along the front of this shin. Keeping the thigh still and both sit bones on the table, swing this foot outwards, away from the other leg, as far as it goes.',
+    measurement: 'Angle of the shin from vertical',
+    method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
   },
   {
     id: 'knee-to-chest',
     name: 'Knee to chest',
-    bodyPart: 'hips',
     area: 'hips',
+    movement: 'Flexion',
     scoring: { zeroAt: 70, fullAt: 135 },
     twoSided: true,
     instructions:
@@ -203,26 +206,38 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
   },
   {
-    id: 'shoulder-flexion',
+    id: 'overhead-reach',
     name: 'Overhead reach',
-    bodyPart: 'shoulders',
     area: 'overhead',
+    movement: 'Flexion',
     scoring: { zeroAt: 120, fullAt: 180 },
-    twoSided: false,
+    twoSided: true,
     instructions:
-      'Lie on your back with knees bent and lower back pressed into the floor. Hold the phone between your palms with straight arms pointing at the ceiling. Keeping the arms straight, lower them overhead towards the floor without letting your back arch.',
-    measurement: 'Shoulder angle, with arms by your sides as 0°',
-    method: { kind: 'tilt', startPosition: 'Arms straight, pointing at the ceiling', startAngle: 90 },
+      'Lie on your back with knees bent and lower back pressed into the floor. Hold the phone in this hand with the arm and wrist straight, pointing at the ceiling. Keeping the arm straight, lower it overhead towards the floor without letting your back arch, your ribs flare or your body bend to the side.',
+    measurement: 'Shoulder angle, with the arm by your side as 0°',
+    method: { kind: 'tilt', startPosition: 'Arm straight, pointing at the ceiling', startAngle: 90 },
   },
   {
-    id: 'shoulder-rotation',
-    name: 'Shoulder rotation',
-    bodyPart: 'shoulders',
+    id: 'shoulder-external-rotation',
+    name: 'Shoulder external rotation',
     area: 'shoulders',
+    movement: 'External rotation',
     scoring: { zeroAt: 30, fullAt: 100 },
     twoSided: true,
     instructions:
       'Lie on your back with this upper arm out to the side at shoulder height and the elbow bent to 90°, fingers pointing at the ceiling. Hold the phone flat along this forearm with your other hand. Keeping the upper arm on the floor, let the forearm rotate back towards the floor beside your head.',
+    measurement: 'Angle of the forearm from vertical',
+    method: { kind: 'tilt', startPosition: 'Forearm pointing at the ceiling', startAngle: 0 },
+  },
+  {
+    id: 'shoulder-internal-rotation',
+    name: 'Shoulder internal rotation',
+    area: 'shoulders',
+    movement: 'Internal rotation',
+    scoring: { zeroAt: 20, fullAt: 70 },
+    twoSided: true,
+    instructions:
+      'Lie on your back with this upper arm out to the side at shoulder height and the elbow bent to 90°, fingers pointing at the ceiling. Hold the phone flat along this forearm with your other hand. Keeping the upper arm on the floor and the front of the shoulder from lifting, let the forearm rotate forward towards the floor beside your hip.',
     measurement: 'Angle of the forearm from vertical',
     method: { kind: 'tilt', startPosition: 'Forearm pointing at the ceiling', startAngle: 0 },
   },

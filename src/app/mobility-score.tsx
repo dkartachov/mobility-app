@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Card } from '@/components/card';
 import { Icon } from '@/components/icon';
 import { ScoreBars } from '@/components/score-bars';
+import { ScoreBreakdown } from '@/components/score-breakdown';
 import { ScoreRing } from '@/components/score-ring';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -69,6 +70,15 @@ export default function MobilityScoreScreen() {
             </Pressable>
           </Card>
         )}
+
+        {score && (
+          <View style={styles.breakdown}>
+            <ThemedText type="subtitle" accessibilityRole="header">
+              Breakdown
+            </ThemedText>
+            <ScoreBreakdown score={score} />
+          </View>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -84,6 +94,9 @@ const styles = StyleSheet.create({
   },
   ring: {
     alignItems: 'center',
+    gap: Spacing.three,
+  },
+  breakdown: {
     gap: Spacing.three,
   },
   testCard: {

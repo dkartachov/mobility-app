@@ -39,14 +39,14 @@ describe('mobility tests', () => {
   it('saves every measurement with the test', async () => {
     await logMobilityTest(db, new Date(2026, 9, 1, 9), [
       { exerciseId: 'straddle', side: null, value: 110, unit: 'deg' },
-      { exerciseId: 'butterfly', side: 'left', value: 8.5, unit: 'cm' },
+      { exerciseId: 'ankle-lunge', side: 'left', value: 38.5, unit: 'deg' },
     ]);
 
     expect(
       await db.getAllAsync('SELECT mobility_test_id, exercise_id, side, value, unit FROM mobility_test_results ORDER BY id')
     ).toEqual([
       { mobility_test_id: 1, exercise_id: 'straddle', side: null, value: 110, unit: 'deg' },
-      { mobility_test_id: 1, exercise_id: 'butterfly', side: 'left', value: 8.5, unit: 'cm' },
+      { mobility_test_id: 1, exercise_id: 'ankle-lunge', side: 'left', value: 38.5, unit: 'deg' },
     ]);
   });
 
