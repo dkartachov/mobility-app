@@ -4,9 +4,12 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
 import { Field, TextField } from '@/components/field';
 import { FormScreen } from '@/components/form-screen';
+import { IconBadge } from '@/components/icon-badge';
+import { PageHeader } from '@/components/page-header';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { createGoal, GOAL_PERIOD_DAYS } from '@/db/goals';
@@ -37,10 +40,11 @@ export default function NewGoalScreen() {
 
   return (
     <FormScreen>
-      <ThemedText type="title" accessibilityRole="header">
-        New goal
-      </ThemedText>
-      <ThemedText>How many hours do you want to train in the next {GOAL_PERIOD_DAYS} days?</ThemedText>
+      <PageHeader
+        eyebrow={`${GOAL_PERIOD_DAYS}-day goal`}
+        title="New goal"
+        subtitle={`How many hours do you want to train in the next ${GOAL_PERIOD_DAYS} days?`}
+      />
 
       <View accessibilityRole="radiogroup" style={styles.chips}>
         {PRESET_HOURS.map((preset) => (
@@ -57,11 +61,21 @@ export default function NewGoalScreen() {
         <TextField value={hoursText} onChangeText={setHoursText} keyboardType="decimal-pad" maxLength={5} />
       </Field>
 
-      <ThemedText type="small" themeColor={isValid || !hoursText ? 'textSecondary' : 'danger'}>
-        {isValid
-          ? `About ${minutesPerDay} min per day. Runs from today until ${formatDateKey(endDate)}.`
-          : `Enter a number of hours between 0 and ${MAX_HOURS}.`}
-      </ThemedText>
+      {isValid ? (
+        <Card style={styles.plan}>
+          <IconBadge name={{ ios: 'calendar.badge.clock', android: 'event_available' }} size={44} />
+          <View style={styles.planText}>
+            <ThemedText type="subtitle">About {minutesPerDay} min a day</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Runs from today until {formatDateKey(endDate)}.
+            </ThemedText>
+          </View>
+        </Card>
+      ) : (
+        <ThemedText type="small" themeColor={hoursText ? 'danger' : 'textSecondary'}>
+          Enter a number of hours between 0 and {MAX_HOURS}.
+        </ThemedText>
+      )}
 
       <Button title="Create goal" onPress={save} disabled={!isValid} loading={saving} />
     </FormScreen>
@@ -73,5 +87,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+  },
+  plan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  planText: {
+    flex: 1,
+    gap: Spacing.half,
   },
 });

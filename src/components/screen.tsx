@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-import { ThemedText } from './themed-text';
+import { PageHeader } from './page-header';
 
 type ScreenProps = {
   title: string;
   subtitle?: string;
+  /** Small uppercase line above the title, e.g. today's date. */
+  eyebrow?: string;
   /** Shown to the right of the title, e.g. an icon button. */
   headerAction?: ReactNode;
   /** Space between the header and each child. */
@@ -18,7 +20,7 @@ type ScreenProps = {
 };
 
 /** Scrollable tab screen with a large in-content title. */
-export function Screen({ title, subtitle, headerAction, gap = Spacing.four, children }: ScreenProps) {
+export function Screen({ title, subtitle, eyebrow, headerAction, gap = Spacing.four, children }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -31,34 +33,16 @@ export function Screen({ title, subtitle, headerAction, gap = Spacing.four, chil
       contentContainerStyle={[
         {
           gap,
-          paddingTop: insets.top + Spacing.three,
+          // Lets children with `flex` share the leftover height when the content is shorter than the screen.
+          flexGrow: 1,
+          paddingTop: insets.top + Spacing.four,
           paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
-          paddingLeft: insets.left + Spacing.three,
-          paddingRight: insets.right + Spacing.three,
+          paddingLeft: insets.left + Spacing.three + Spacing.one,
+          paddingRight: insets.right + Spacing.three + Spacing.one,
         },
       ]}>
-      <View style={styles.headerRow}>
-        <View style={styles.header}>
-          <ThemedText type="title" accessibilityRole="header">
-            {title}
-          </ThemedText>
-          {subtitle && <ThemedText themeColor="textSecondary">{subtitle}</ThemedText>}
-        </View>
-        {headerAction}
-      </View>
+      <PageHeader title={title} subtitle={subtitle} eyebrow={eyebrow} action={headerAction} />
       {children}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.three,
-  },
-  header: {
-    flex: 1,
-    gap: Spacing.one,
-  },
-});

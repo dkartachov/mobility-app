@@ -6,6 +6,7 @@ import { daysBetween, formatDateKey, formatDuration, todayKey } from '@/lib/date
 
 import { Card } from './card';
 import { Icon } from './icon';
+import { IconBadge } from './icon-badge';
 import { ProgressBar } from './progress-bar';
 import { ThemedText } from './themed-text';
 
@@ -19,22 +20,34 @@ type GoalCardProps = {
 export function GoalCard({ goal, onDelete }: GoalCardProps) {
   const targetSeconds = goal.targetMinutes * 60;
   const daysLeft = daysBetween(todayKey(), goal.endDate) + 1;
+  const percent = Math.min(100, Math.round((goal.progressSeconds / targetSeconds) * 100));
 
   return (
-    <Card>
+    <Card style={styles.card}>
       <View style={styles.header}>
+        <IconBadge
+          name={
+            goal.status === 'completed'
+              ? { ios: 'trophy.fill', android: 'emoji_events' }
+              : { ios: 'flag.fill', android: 'flag' }
+          }
+          color={goal.status === 'expired' ? 'textSecondary' : 'tint'}
+          background={goal.status === 'expired' ? 'backgroundSelected' : 'tintSoft'}
+          size={32}
+        />
         <View style={styles.title}>
-          <Icon
-            name={
-              goal.status === 'completed'
-                ? { ios: 'trophy.fill', android: 'emoji_events' }
-                : { ios: 'flag.fill', android: 'flag' }
-            }
-            color="tint"
-            size={18}
-          />
-          <ThemedText type="smallBold">{goal.title}</ThemedText>
+          <ThemedText type="smallBold" numberOfLines={2}>
+            {goal.title}
+          </ThemedText>
+          <ThemedText type="small" themeColor={goal.status === 'completed' ? 'tint' : 'textSecondary'}>
+            {goal.status === 'active'
+              ? `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`
+              : `${STATUS_LABEL[goal.status]} · ${formatDateKey(goal.endDate)}`}
+          </ThemedText>
         </View>
+        <ThemedText type="smallBold" themeColor={goal.status === 'expired' ? 'textSecondary' : 'tint'}>
+          {percent}%
+        </ThemedText>
         {onDelete && (
           <Pressable
             onPress={onDelete}
@@ -48,35 +61,23 @@ export function GoalCard({ goal, onDelete }: GoalCardProps) {
 
       <ProgressBar progress={goal.progressSeconds / targetSeconds} />
 
-      <View style={styles.footer}>
-        <ThemedText type="small" themeColor="textSecondary">
-          {formatDuration(goal.progressSeconds)} of {formatDuration(targetSeconds)}
-        </ThemedText>
-        <ThemedText type="small" themeColor={goal.status === 'completed' ? 'tint' : 'textSecondary'}>
-          {goal.status === 'active'
-            ? `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`
-            : `${STATUS_LABEL[goal.status]} · ${formatDateKey(goal.endDate)}`}
-        </ThemedText>
-      </View>
+      <ThemedText type="small" themeColor="textSecondary">
+        {formatDuration(goal.progressSeconds)} of {formatDuration(targetSeconds)}
+      </ThemedText>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
+  card: {
+    gap: Spacing.three,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.three,
   },
   title: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
+    flex: 1,
   },
 });

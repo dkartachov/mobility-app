@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { createTestDb } from '@/test-utils/sqlite';
 
-import { computeStreaks, deleteAllSessions, getStats, getTotalSeconds, logSession } from './sessions';
+import { computeStreaks, deleteAllSessions, getRecentDays, getStats, getTotalSeconds, logSession } from './sessions';
 
 describe('computeStreaks', () => {
   const today = '2026-10-28';
@@ -78,6 +78,24 @@ describe('session queries', () => {
       firstSessionDate: '2026-10-26',
     });
     expect(await getTotalSeconds(db)).toBe(2280);
+  });
+
+  it('lists the last seven days with whether each was trained', async () => {
+    await logSession(db, { startedAt: new Date(2026, 9, 21, 9), durationSeconds: 600 });
+    await logSession(db, { startedAt: new Date(2026, 9, 22, 9), durationSeconds: 600 });
+    await logSession(db, { startedAt: new Date(2026, 9, 26, 9), durationSeconds: 600 });
+    await logSession(db, { startedAt: new Date(2026, 9, 28, 8), durationSeconds: 600 });
+    await logSession(db, { startedAt: new Date(2026, 9, 28, 18), durationSeconds: 300 });
+
+    expect(await getRecentDays(db)).toEqual([
+      { date: '2026-10-22', trained: true },
+      { date: '2026-10-23', trained: false },
+      { date: '2026-10-24', trained: false },
+      { date: '2026-10-25', trained: false },
+      { date: '2026-10-26', trained: true },
+      { date: '2026-10-27', trained: false },
+      { date: '2026-10-28', trained: true },
+    ]);
   });
 
   it('deletes all sessions', async () => {

@@ -18,6 +18,7 @@ export const Colors = {
     tintSoft: '#D5F0EC',
     onTint: '#FFFFFF',
     streak: '#C97A12',
+    streakSoft: '#FCEFD9',
     danger: '#C62828',
   },
   dark: {
@@ -31,6 +32,7 @@ export const Colors = {
     tintSoft: '#0F423C',
     onTint: '#00201D',
     streak: '#F2A33A',
+    streakSoft: '#3A2A12',
     danger: '#EF5350',
   },
 } as const;
@@ -70,4 +72,20 @@ export const Radius = {
   small: 8,
   medium: 12,
   large: 20,
+  xl: 28,
+  full: 999,
+} as const;
+
+/**
+ * Card elevation. Light mode lifts cards off the background with a soft shadow; dark mode
+ * shadows barely show, so cards there get a hairline border instead.
+ */
+export const Elevation = {
+  light: {
+    boxShadow: '0 1px 2px rgba(11, 26, 25, 0.04), 0 6px 20px rgba(11, 26, 25, 0.06)',
+  },
+  dark: {
+    borderWidth: 1,
+    borderColor: '#1E3B38',
+  },
 } as const;

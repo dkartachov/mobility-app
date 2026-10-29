@@ -1,17 +1,21 @@
 import { Stack, router, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { Icon } from '@/components/icon';
+import { IconBadge } from '@/components/icon-badge';
+import { PageHeader } from '@/components/page-header';
 import { ProgressBar } from '@/components/progress-bar';
+import { ScoreRing } from '@/components/score-ring';
 import { TestMeasurement } from '@/components/test-measurement';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { SCORE_AREAS } from '@/data/mobility-score';
 import {
   BODY_MEASUREMENT_LABELS,
@@ -138,28 +142,26 @@ function Intro({ onStart }: { onStart: () => void }) {
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ThemedText type="title" accessibilityRole="header">
-          Flexibility test
-        </ThemedText>
-        <ThemedText themeColor="textSecondary">
-          {FLEXIBILITY_TESTS.length} tests, {TEST_STEPS.length} measurements in total. Two-sided tests are done
-          left, then right. It takes about 20 minutes.
-        </ThemedText>
-        <Card>
-          <ThemedText type="smallBold">For accurate results</ThemedText>
+        <PageHeader
+          eyebrow="About 20 minutes"
+          title="Flexibility test"
+          subtitle={`${FLEXIBILITY_TESTS.length} tests, ${TEST_STEPS.length} measurements in total. Two-sided tests are done left, then right.`}
+        />
+        <Card style={styles.introCard}>
+          <CardTitle icon={{ ios: 'lightbulb.fill', android: 'lightbulb' }} title="For accurate results" />
           {TIPS.map((tip) => (
             <View key={tip} style={styles.tip}>
-              <ThemedText themeColor="tint">•</ThemedText>
+              <Icon name={{ ios: 'checkmark.circle.fill', android: 'check_circle' }} color="tint" size={18} />
               <ThemedText style={styles.tipText}>{tip}</ThemedText>
             </View>
           ))}
         </Card>
-        <Card>
-          <ThemedText type="smallBold">You&apos;ll need</ThemedText>
+        <Card style={styles.introCard}>
+          <CardTitle icon={{ ios: 'shippingbox.fill', android: 'inventory_2' }} title="You'll need" />
           <ThemedText>A clear wall, some floor space, a table and a tape measure.</ThemedText>
         </Card>
-        <Card>
-          <ThemedText type="smallBold">Your body measurements</ThemedText>
+        <Card style={styles.introCard}>
+          <CardTitle icon={{ ios: 'ruler.fill', android: 'straighten' }} title="Your body measurements" />
           <ThemedText themeColor="textSecondary">
             Used to make the hints during the test match your body. Anything you haven&apos;t entered uses an
             average size.
@@ -217,17 +219,8 @@ function Measure({ index, value, onChange, onBack, onNext, canSkip }: MeasurePro
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.heading}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {AREA_LABELS[test.area]}
-          </ThemedText>
-          <ThemedText type="title" accessibilityRole="header">
-            {test.name}
-          </ThemedText>
-          {side && (
-            <ThemedText type="subtitle" themeColor="tint">
-              {SIDE_LABELS[side]}
-            </ThemedText>
-          )}
+          <PageHeader eyebrow={AREA_LABELS[test.area]} title={test.name} />
+          {side && <SidePill label={SIDE_LABELS[side]} />}
         </View>
         <ThemedText>{test.instructions}</ThemedText>
         <TestMeasurement test={test} value={value} onChange={onChange} />
@@ -251,9 +244,33 @@ function Calculating() {
 
   return (
     <ThemedView style={[styles.screen, styles.centeredScreen]}>
-      <ActivityIndicator size="large" color={theme.tint} />
+      <View style={[styles.spinner, { backgroundColor: theme.tintSoft }]}>
+        <ActivityIndicator size="large" color={theme.tint} />
+      </View>
       <ThemedText type="subtitle">Calculating mobility score…</ThemedText>
     </ThemedView>
+  );
+}
+
+function CardTitle({ icon, title }: { icon: ComponentProps<typeof IconBadge>['name']; title: string }) {
+  return (
+    <View style={styles.cardTitle}>
+      <IconBadge name={icon} size={32} />
+      <ThemedText type="smallBold">{title}</ThemedText>
+    </View>
+  );
+}
+
+function SidePill({ label }: { label: string }) {
+  const theme = useTheme();
+
+  return (
+    <View style={[styles.sidePill, { backgroundColor: theme.tintSoft }]}>
+      <Icon name={{ ios: 'arrow.left.and.right', android: 'swap_horiz' }} color="tint" size={16} />
+      <ThemedText type="smallBold" themeColor="tint">
+        {label}
+      </ThemedText>
+    </View>
   );
 }
 
@@ -264,18 +281,16 @@ function Results({ onDone }: { onDone: () => void }) {
     <ThemedView style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Animated.View entering={FadeIn} style={styles.resultsHeader}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Mobility score
+          <ThemedText type="eyebrow" themeColor="tint">
+            Test complete
           </ThemedText>
-          <ThemedText type="stat" themeColor="textSecondary" style={styles.score}>
-            —
-          </ThemedText>
+          <ScoreRing score={null} label="Mobility score" size={180} thickness={14} />
           <ThemedText type="small" themeColor="textSecondary">
             Scoring coming soon. Your measurements are saved.
           </ThemedText>
         </Animated.View>
-        <Card>
-          <ThemedText type="smallBold">Improvement by area</ThemedText>
+        <Card style={styles.introCard}>
+          <CardTitle icon={{ ios: 'chart.bar.fill', android: 'bar_chart' }} title="Improvement by area" />
           {SCORE_AREAS.map(({ id, label }) => (
             <View key={id} style={styles.partRow}>
               <ThemedText>{label}</ThemedText>
@@ -308,11 +323,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   heading: {
-    gap: Spacing.half,
+    gap: Spacing.two,
+  },
+  introCard: {
+    gap: Spacing.three,
+  },
+  cardTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two + Spacing.one,
+  },
+  sidePill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one + Spacing.half,
+    borderRadius: Radius.full,
+  },
+  spinner: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tip: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    alignItems: 'flex-start',
+    gap: Spacing.two + Spacing.one,
+    paddingTop: Spacing.half,
   },
   tipText: {
     flex: 1,
@@ -332,10 +373,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     paddingVertical: Spacing.four,
-  },
-  score: {
-    fontSize: 64,
-    lineHeight: 72,
   },
   partRow: {
     flexDirection: 'row',

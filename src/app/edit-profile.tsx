@@ -17,6 +17,8 @@ import { Chip } from '@/components/chip';
 import { DateField } from '@/components/date-field';
 import { Field, TextField } from '@/components/field';
 import { FormScreen } from '@/components/form-screen';
+import { IconBadge } from '@/components/icon-badge';
+import { PageHeader } from '@/components/page-header';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { BODY_MEASUREMENT_LABELS, DEFAULT_BODY, type BodyMeasurements } from '@/data/mobility-tests';
@@ -105,11 +107,11 @@ function ProfileForm({ initial }: { initial: Profile }) {
 
   return (
     <FormScreen ref={scrollRef}>
-      <ThemedText type="title" accessibilityRole="header">
-        Edit profile
-      </ThemedText>
+      <PageHeader title="Edit profile" />
       <View style={styles.photo}>
-        <Avatar photoFile={form.photoFile} initials={initials} size={112} />
+        <View style={[styles.avatarRing, { borderColor: theme.tint }]}>
+          <Avatar photoFile={form.photoFile} initials={initials} size={112} />
+        </View>
         <View style={styles.photoButtons}>
           <Button title={form.photoFile ? 'Change photo' : 'Add photo'} variant="secondary" onPress={changePhoto} />
           {form.photoFile && (
@@ -166,7 +168,10 @@ function ProfileForm({ initial }: { initial: Profile }) {
 
       <Animated.View style={[styles.bodySection, highlightStyle]} onLayout={scrollToBodySection}>
         <View style={styles.sectionHeader}>
-          <ThemedText type="subtitle">Body measurements</ThemedText>
+          <View style={styles.sectionTitle}>
+            <IconBadge name={{ ios: 'ruler.fill', android: 'straighten' }} size={32} />
+            <ThemedText type="subtitle">Body measurements</ThemedText>
+          </View>
           <ThemedText themeColor="textSecondary">
             Optional, in cm. Used to make the hints in flexibility tests match your body. Empty fields use
             average sizes.
@@ -246,6 +251,16 @@ const styles = StyleSheet.create({
   photo: {
     alignItems: 'center',
     gap: Spacing.three,
+  },
+  avatarRing: {
+    padding: Spacing.one,
+    borderRadius: Radius.full,
+    borderWidth: 2,
+  },
+  sectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two + Spacing.one,
   },
   photoButtons: {
     flexDirection: 'row',

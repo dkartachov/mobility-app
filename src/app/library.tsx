@@ -1,14 +1,16 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/card';
 import { ExercisePhoto } from '@/components/exercise-photo';
 import { TextField } from '@/components/field';
 import { Icon } from '@/components/icon';
+import { PageHeader } from '@/components/page-header';
+import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { EXERCISES, searchExercises, type Exercise } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -29,21 +31,26 @@ export default function LibraryScreen() {
       keyboardDismissMode="on-drag"
       ListHeaderComponent={
         <View style={styles.header}>
-          <ThemedText type="title" accessibilityRole="header" style={styles.title}>
-            Library
-          </ThemedText>
-          <TextField
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search exercises"
-            autoCorrect={false}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-            accessibilityLabel="Search exercises"
+          <PageHeader
+            eyebrow={query.trim() ? `${results.length} of ${total}` : total}
+            eyebrowColor="textSecondary"
+            title="Library"
           />
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            {query.trim() ? `${results.length} of ${total}` : total}
-          </ThemedText>
+          <View>
+            <TextField
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search exercises"
+              autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+              accessibilityLabel="Search exercises"
+              style={styles.search}
+            />
+            <View style={styles.searchIcon} pointerEvents="none">
+              <Icon name={{ ios: 'magnifyingglass', android: 'search' }} color="textSecondary" size={18} />
+            </View>
+          </View>
         </View>
       }
       ListEmptyComponent={
@@ -55,19 +62,34 @@ export default function LibraryScreen() {
 }
 
 function ExerciseTile({ exercise }: { exercise: Exercise }) {
+  const theme = useTheme();
+  const tags = [exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides'].filter(
+    (tag): tag is string => Boolean(tag)
+  );
+
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
-      onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: exercise.id } })}
-      style={({ pressed }) => pressed && styles.pressed}>
+      onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: exercise.id } })}>
       <Card style={styles.tile}>
         <ExercisePhoto source={exercise.photo} style={styles.photo} />
-        <ThemedText type="subtitle" style={styles.name}>
-          {exercise.name}
-        </ThemedText>
+        <View style={styles.text}>
+          <ThemedText type="subtitle" numberOfLines={2}>
+            {exercise.name}
+          </ThemedText>
+          <View style={styles.tags}>
+            {tags.map((tag) => (
+              <View key={tag} style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
+                <ThemedText type="eyebrow" themeColor="textSecondary" style={styles.tagText}>
+                  {tag}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        </View>
         <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={16} />
       </Card>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -77,10 +99,17 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   header: {
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
-  title: {
-    marginBottom: Spacing.two,
+  search: {
+    paddingLeft: Spacing.five + Spacing.one,
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: Spacing.three,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
   tile: {
     flexDirection: 'row',
@@ -90,13 +119,26 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.three,
   },
   photo: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
+    borderRadius: Radius.medium + 2,
   },
-  name: {
+  text: {
     flex: 1,
+    gap: Spacing.one + Spacing.half,
   },
-  pressed: {
-    opacity: 0.6,
+  tags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one + Spacing.half,
+  },
+  tag: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+    borderRadius: Radius.full,
+  },
+  tagText: {
+    fontSize: 10,
+    lineHeight: 14,
   },
 });

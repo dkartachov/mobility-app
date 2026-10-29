@@ -2,23 +2,28 @@ import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-rout
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useReducer, useState, type ComponentProps } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { css, FadeIn, ZoomIn } from 'react-native-reanimated';
+import { Alert, StyleSheet, View } from 'react-native';
+import Animated, { css, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
 import { ExerciseVideo } from '@/components/exercise-video';
 import { Icon } from '@/components/icon';
+import { IconBadge } from '@/components/icon-badge';
 import { MilestoneBar } from '@/components/milestone-bar';
+import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimerBar } from '@/components/timer-bar';
-import { Spacing } from '@/constants/theme';
+import { Elevation, Radius, Spacing } from '@/constants/theme';
 import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkoutCues, type WorkoutCue } from '@/hooks/use-workout-cues';
 import { formatDuration } from '@/lib/dates';
 import { getFastWorkouts } from '@/lib/dev-settings';
 import { milestoneReached } from '@/lib/milestones';
+import { useColorScheme } from '@/lib/theme-preference';
 import {
   BUFFER_SECONDS,
   DAILY_MINUTES,
@@ -179,7 +184,6 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
   }, [running]);
 
   const step = steps[state.index];
-  const next = steps[state.index + 1];
   const isLast = state.index === steps.length - 1;
   const finished = state.phase === 'finished';
   const phaseTotalMs = state.phase === 'buffer' ? bufferMs : step.durationSeconds * 1000;
@@ -202,11 +206,12 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
 
       <View style={[styles.body, { paddingBottom: insets.bottom + Spacing.three }]}>
         <View style={styles.info}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            Exercise {exerciseNumber} of {exerciseCount}
-            {step.exercise.active ? ' · Active' : ' · Passive'}
-            {step.side ? ` · Side ${step.side} of 2` : ''}
-          </ThemedText>
+          <WorkoutProgress count={exerciseCount} current={exerciseNumber} finished={finished} />
+          <View style={styles.tags}>
+            <Tag label={`Exercise ${exerciseNumber} of ${exerciseCount}`} />
+            <Tag label={step.exercise.active ? 'Active' : 'Passive'} />
+            {step.side && <Tag label={`Side ${step.side} of 2`} highlighted />}
+          </View>
           <ThemedText type="title" accessibilityRole="header">
             {step.exercise.name}
           </ThemedText>
@@ -214,8 +219,9 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
         </View>
 
         <View style={styles.timer} accessibilityLiveRegion="polite">
-          <ThemedText type="smallBold" themeColor="tint">
-            {finished
+          <Tag
+            highlighted
+            label={finished
               ? 'Workout complete'
               : state.paused
                 ? 'Paused'
@@ -226,7 +232,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
                   : step.exercise.active
                     ? 'Move'
                     : 'Hold'}
-          </ThemedText>
+          />
           <ThemedText type="stat" style={styles.clock}>
             {formatClock(Math.ceil(state.remainingMs / 1000))}
           </ThemedText>
@@ -238,13 +244,6 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
               countdown={state.countdown}
             />
           </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            {finished
-              ? 'Tap the checkmark to finish'
-              : next
-                ? `Next: ${next.side === 2 ? 'other side' : next.exercise.name} · ${formatClock(next.durationSeconds)}`
-                : 'Last exercise'}
-          </ThemedText>
         </View>
 
         <View style={styles.controls}>
@@ -297,16 +296,24 @@ function WorkoutSummary({ fromSeconds, toSeconds }: { fromSeconds: number; toSec
   return (
     <ThemedView style={[styles.summary, { paddingBottom: insets.bottom + Spacing.three }]}>
       <View style={styles.summaryContent}>
-        <ThemedText type="title" accessibilityRole="header" style={styles.centered}>
-          Workout complete
-        </ThemedText>
-        <ThemedText type="subtitle" themeColor="tint" style={styles.centered}>
-          +{formatDuration(toSeconds - fromSeconds)}
-        </ThemedText>
-        <View style={styles.summaryBar}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Total mobility time · {formatDuration(toSeconds)}
+        <Animated.View entering={ZoomIn.springify()} style={styles.summaryBadge}>
+          <IconBadge name={{ ios: 'checkmark', android: 'check' }} size={96} />
+        </Animated.View>
+        <View style={styles.summaryTitle}>
+          <ThemedText type="title" accessibilityRole="header" style={styles.centered}>
+            Workout complete
           </ThemedText>
+          <ThemedText type="stat" themeColor="tint" style={styles.centered}>
+            +{formatDuration(toSeconds - fromSeconds)}
+          </ThemedText>
+        </View>
+        <Card style={styles.summaryBar}>
+          <View style={styles.summaryRow}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.summaryLabel}>
+              Total mobility time
+            </ThemedText>
+            <ThemedText type="smallBold">{formatDuration(toSeconds)}</ThemedText>
+          </View>
           <MilestoneBar
             totalSeconds={toSeconds}
             animateFromSeconds={fromSeconds}
@@ -314,24 +321,17 @@ function WorkoutSummary({ fromSeconds, toSeconds }: { fromSeconds: number; toSec
             delayMs={300}
             onAnimationEnd={() => setFilled(true)}
           />
-        </View>
+        </Card>
         {filled && reached !== null && (
-          <Animated.View entering={FadeIn}>
-            <ThemedText type="smallBold" themeColor="tint" style={styles.centered}>
-              {reached}h milestone reached!
-            </ThemedText>
+          <Animated.View entering={ZoomIn.springify()} style={styles.milestone}>
+            <Tag label={`${reached}h milestone reached!`} highlighted />
           </Animated.View>
         )}
       </View>
       <View style={styles.summaryDone}>
         {filled && (
-          <Animated.View entering={ZoomIn}>
-            <ControlButton
-              label="Back to start"
-              icon={{ ios: 'checkmark', android: 'check' }}
-              primary
-              onPress={() => router.dismissTo('/')}
-            />
+          <Animated.View entering={FadeInDown.springify()}>
+            <Button title="Done" onPress={() => router.dismissTo('/')} />
           </Animated.View>
         )}
       </View>
@@ -351,24 +351,64 @@ type ControlButtonProps = {
 
 function ControlButton({ label, icon, onPress, primary, disabled, glow }: ControlButtonProps) {
   const theme = useTheme();
+  const scheme = useColorScheme();
 
   return (
     <View>
       {glow && <Animated.View style={[cssStyles.glow, { backgroundColor: theme.tint }]} />}
-      <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.control,
-        { backgroundColor: primary ? theme.tint : theme.backgroundElement },
-        (pressed || disabled) && styles.dimmed,
-        disabled && styles.disabled,
-      ]}>
-        <Icon name={icon} size={24} color={primary ? 'onTint' : 'text'} />
-      </Pressable>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={onPress}
+        pressedScale={0.9}
+        style={[
+          styles.control,
+          primary
+            ? { backgroundColor: theme.tint, boxShadow: `0 6px 16px ${theme.tint}55` }
+            : [{ backgroundColor: theme.backgroundElement }, Elevation[scheme]],
+          disabled && styles.disabled,
+        ]}>
+        <Icon name={icon} size={26} color={primary ? 'onTint' : 'text'} />
+      </PressableScale>
+    </View>
+  );
+}
+
+/** A small pill label. `highlighted` uses the accent color for the current state. */
+function Tag({ label, highlighted }: { label: string; highlighted?: boolean }) {
+  const theme = useTheme();
+
+  return (
+    <View style={[styles.tag, { backgroundColor: highlighted ? theme.tintSoft : theme.backgroundSelected }]}>
+      <ThemedText type="eyebrow" themeColor={highlighted ? 'tint' : 'textSecondary'}>
+        {label}
+      </ThemedText>
+    </View>
+  );
+}
+
+/** One segment per exercise: done ones filled, the current one half-tinted. */
+function WorkoutProgress({ count, current, finished }: { count: number; current: number; finished: boolean }) {
+  const theme = useTheme();
+
+  return (
+    <View style={styles.segments} importantForAccessibility="no-hide-descendants">
+      {Array.from({ length: count }, (_, i) => {
+        const done = finished || i + 1 < current;
+        const active = !finished && i + 1 === current;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.segment,
+              { backgroundColor: done || active ? theme.tint : theme.backgroundSelected },
+              active && styles.activeSegment,
+            ]}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -383,18 +423,51 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   info: {
+    gap: Spacing.two,
+  },
+  segments: {
+    flexDirection: 'row',
     gap: Spacing.one,
+    marginBottom: Spacing.one,
+  },
+  segment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  activeSegment: {
+    opacity: 0.45,
+  },
+  tags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  tag: {
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.two + Spacing.one,
+    paddingVertical: Spacing.one + Spacing.half,
+    borderRadius: Radius.full,
   },
   timer: {
     alignItems: 'center',
     gap: Spacing.two,
   },
   clock: {
-    fontSize: 72,
-    lineHeight: 84,
+    fontSize: 84,
+    lineHeight: 96,
+    letterSpacing: -2,
   },
   progress: {
     alignSelf: 'stretch',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  summaryLabel: {
+    flex: 1,
   },
   controls: {
     flexDirection: 'row',
@@ -408,9 +481,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dimmed: {
-    opacity: 0.6,
-  },
   disabled: {
     opacity: 0.3,
   },
@@ -422,15 +492,23 @@ const styles = StyleSheet.create({
   summaryContent: {
     flex: 1,
     justifyContent: 'center',
-    gap: Spacing.three,
+    gap: Spacing.four,
+  },
+  summaryBadge: {
+    alignItems: 'center',
+  },
+  summaryTitle: {
+    gap: Spacing.one,
   },
   summaryBar: {
-    gap: Spacing.two,
-    marginTop: Spacing.four,
+    gap: Spacing.three,
   },
-  summaryDone: {
-    height: 64,
+  milestone: {
     alignItems: 'center',
+  },
+  // Reserves the button's space so the content above doesn't shift when it appears.
+  summaryDone: {
+    minHeight: 56,
   },
   centered: {
     textAlign: 'center',

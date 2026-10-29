@@ -30,7 +30,11 @@ export function Pager({ children }: { children: ReactNode }) {
           {pages.map((_, index) => (
             <View
               key={index}
-              style={[styles.dot, { backgroundColor: index === page ? theme.tint : theme.border }]}
+              style={[
+                styles.dot,
+                index === page && styles.activeDot,
+                { backgroundColor: index === page ? theme.tint : theme.border },
+              ]}
             />
           ))}
         </View>
@@ -53,5 +57,8 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  activeDot: {
+    width: 20,
   },
 });

@@ -1,40 +1,59 @@
 import { Image, type ImageSource } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+import { PressableScale } from './pressable-scale';
 import { ThemedText } from './themed-text';
 
 type StartTileProps = {
   title: string;
   subtitle: string;
   onPress: () => void;
-  /** Optional background photo. Text switches to white over a dark scrim when set. */
+  /** Short label in a pill at the top-left, e.g. "5–15 min". */
+  tag?: string;
+  /** Optional background photo. Text switches to white over a dark gradient when set. */
   image?: ImageSource;
+  /** E.g. `flex: 1` to fill the space left on the screen instead of the default fixed height. */
+  style?: StyleProp<ViewStyle>;
 };
 
 /** Large tappable tile on the Start tab. */
-export function StartTile({ title, subtitle, onPress, image }: StartTileProps) {
+export function StartTile({ title, subtitle, onPress, tag, image, style }: StartTileProps) {
   const theme = useTheme();
   const onImage = image !== undefined;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${subtitle}`}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        { backgroundColor: theme.backgroundElement },
-        pressed && styles.pressed,
-      ]}>
+      style={[styles.tile, { backgroundColor: theme.backgroundElement }, style]}>
       {onImage && (
         <>
-          <Image source={image} style={StyleSheet.absoluteFill} contentFit="cover" />
-          <View style={[StyleSheet.absoluteFill, styles.scrim]} />
+          <Image source={image} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+          {/* Clear at the top so the photo shows, dark at the bottom so the text reads. */}
+          <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none">
+            <Defs>
+              <LinearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#000" stopOpacity={0.05} />
+                <Stop offset="0.45" stopColor="#000" stopOpacity={0.15} />
+                <Stop offset="1" stopColor="#000" stopOpacity={0.75} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#scrim)" />
+          </Svg>
         </>
+      )}
+      {tag && (
+        <View style={[styles.tag, onImage && styles.tagOnImage]}>
+          <ThemedText type="eyebrow" style={onImage ? styles.onImage : { color: theme.tint }}>
+            {tag}
+          </ThemedText>
+        </View>
       )}
       <View style={styles.footer}>
         <View style={styles.text}>
@@ -45,35 +64,52 @@ export function StartTile({ title, subtitle, onPress, image }: StartTileProps) {
             {subtitle}
           </ThemedText>
         </View>
-        <SymbolView
-          name={{ ios: 'chevron.right', android: 'chevron_right' }}
-          size={20}
-          tintColor={onImage ? '#FFFFFF' : theme.textSecondary}
-        />
+        <View style={[styles.go, { backgroundColor: onImage ? 'rgba(255, 255, 255, 0.22)' : theme.tintSoft }]}>
+          <SymbolView
+            name={{ ios: 'arrow.right', android: 'arrow_forward' }}
+            size={20}
+            tintColor={onImage ? '#FFFFFF' : theme.tint}
+          />
+        </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   tile: {
-    height: 180,
-    borderRadius: Radius.large,
+    height: 220,
+    borderRadius: Radius.xl,
+    borderCurve: 'continuous',
     overflow: 'hidden',
-    justifyContent: 'flex-end',
-    padding: Spacing.four,
+    justifyContent: 'space-between',
+    padding: Spacing.four - Spacing.one,
   },
-  scrim: {
+  tag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.two + Spacing.one,
+    paddingVertical: Spacing.one + Spacing.half,
+    borderRadius: Radius.full,
+  },
+  tagOnImage: {
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: Spacing.three,
+    marginTop: 'auto',
   },
   text: {
     flex: 1,
-    gap: Spacing.one,
+    gap: Spacing.half,
+  },
+  go: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   onImage: {
     color: '#FFFFFF',
@@ -81,8 +117,5 @@ const styles = StyleSheet.create({
   onImageSecondary: {
     color: '#FFFFFF',
     opacity: 0.85,
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

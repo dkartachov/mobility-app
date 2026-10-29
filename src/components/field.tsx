@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { Radius, Spacing } from '@/constants/theme';
@@ -10,7 +10,7 @@ import { ThemedText } from './themed-text';
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View style={styles.field}>
-      <ThemedText type="smallBold" themeColor="textSecondary">
+      <ThemedText type="eyebrow" themeColor="textSecondary">
         {label}
       </ThemedText>
       {children}
@@ -18,17 +18,31 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-export function TextField(props: TextInputProps) {
+/** Text input whose border turns the accent color while focused. */
+export function TextField({ onFocus, onBlur, ...props }: TextInputProps) {
   const theme = useTheme();
+  const [focused, setFocused] = useState(false);
 
   return (
     <TextInput
       placeholderTextColor={theme.textSecondary}
       selectionColor={theme.tint}
       {...props}
+      onFocus={(event) => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
       style={[
         styles.input,
-        { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+        {
+          color: theme.text,
+          backgroundColor: theme.backgroundElement,
+          borderColor: focused ? theme.tint : theme.border,
+        },
         props.style,
       ]}
     />
@@ -37,11 +51,12 @@ export function TextField(props: TextInputProps) {
 
 export const inputStyles = StyleSheet.create({
   box: {
-    borderRadius: Radius.medium,
-    borderWidth: 1,
+    borderRadius: Radius.medium + 2,
+    borderCurve: 'continuous',
+    borderWidth: 1.5,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three - 4,
-    minHeight: 48,
+    minHeight: 52,
   },
 });
 

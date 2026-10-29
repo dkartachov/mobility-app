@@ -2,7 +2,9 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/card';
+import { IconBadge } from '@/components/icon-badge';
 import { MilestoneBar } from '@/components/milestone-bar';
+import { PageHeader } from '@/components/page-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -20,27 +22,31 @@ export default function MobilityTimeScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
-        <ThemedText type="title" accessibilityRole="header">
-          Mobility time
-        </ThemedText>
+        <PageHeader
+          eyebrow={stats?.firstSessionDate ? `Since ${formatDateKey(stats.firstSessionDate)}` : undefined}
+          title="Mobility time"
+        />
         {stats && (
-          <Card>
-            <ThemedText type="small" themeColor="textSecondary">
-              Total mobility time
-            </ThemedText>
-            <ThemedText type="stat">{formatDuration(stats.totalSeconds)}</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {stats.firstSessionDate
-                ? `Started ${formatDateKey(stats.firstSessionDate)}`
-                : 'Complete a session to get started'}
-            </ThemedText>
-            <View style={styles.milestone}>
-              <MilestoneBar
-                totalSeconds={stats.totalSeconds}
-                animateFromSeconds={milestoneProgress(stats.totalSeconds).previousHours * 3600}
-                delayMs={FILL_DELAY_MS}
-              />
+          <Card style={styles.card}>
+            <View style={styles.header}>
+              <IconBadge name={{ ios: 'clock.fill', android: 'schedule' }} size={44} />
+              <View style={styles.headerText}>
+                <ThemedText type="eyebrow" themeColor="textSecondary">
+                  Total mobility time
+                </ThemedText>
+                <ThemedText type="stat">{formatDuration(stats.totalSeconds)}</ThemedText>
+              </View>
             </View>
+            {!stats.firstSessionDate && (
+              <ThemedText type="small" themeColor="textSecondary">
+                Complete a session to get started
+              </ThemedText>
+            )}
+            <MilestoneBar
+              totalSeconds={stats.totalSeconds}
+              animateFromSeconds={milestoneProgress(stats.totalSeconds).previousHours * 3600}
+              delayMs={FILL_DELAY_MS}
+            />
           </Card>
         )}
         {/* Graph goes here. */}
@@ -55,9 +61,18 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Spacing.three,
-    gap: Spacing.four,
+    gap: Spacing.three,
   },
-  milestone: {
-    marginTop: Spacing.two,
+  card: {
+    gap: Spacing.three,
+    padding: Spacing.four - Spacing.one,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  headerText: {
+    flex: 1,
   },
 });

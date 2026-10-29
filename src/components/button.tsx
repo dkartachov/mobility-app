@@ -1,8 +1,9 @@
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+import { PressableScale } from './pressable-scale';
 import { ThemedText } from './themed-text';
 
 type ButtonProps = {
@@ -19,16 +20,18 @@ export function Button({ title, onPress, variant = 'primary', disabled, loading 
   const textColor = isPrimary ? 'onTint' : variant === 'destructive' ? 'danger' : 'tint';
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled: disabled || loading }}
       disabled={disabled || loading}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         { backgroundColor: isPrimary ? theme.tint : theme.tintSoft },
-        variant === 'destructive' && { backgroundColor: theme.backgroundElement },
-        (pressed || disabled) && styles.dimmed,
+        isPrimary && { boxShadow: `0 6px 16px ${theme.tint}40` },
+        variant === 'destructive' && { backgroundColor: theme.backgroundElement, borderColor: theme.danger },
+        variant === 'destructive' && styles.outlined,
+        disabled && styles.dimmed,
       ]}>
       <View style={styles.content}>
         {loading ? (
@@ -39,25 +42,29 @@ export function Button({ title, onPress, variant = 'primary', disabled, loading 
           </ThemedText>
         )}
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: Radius.medium,
-    paddingVertical: Spacing.three - 2,
+    borderRadius: Radius.full,
+    paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.four,
   },
+  outlined: {
+    borderWidth: 1,
+  },
   content: {
-    minHeight: 20,
+    minHeight: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
     fontSize: 16,
+    letterSpacing: 0.2,
   },
   dimmed: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
 });

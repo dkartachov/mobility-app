@@ -90,3 +90,24 @@ export async function getStats(db: SQLiteDatabase): Promise<Stats> {
 export function useStats() {
   return useDbQuery(getStats, ['sessions']);
 }
+
+export const WEEK_DAYS = 7;
+
+/** The last seven days ending today, oldest first, each with whether it had a session. */
+export async function getRecentDays(db: SQLiteDatabase): Promise<{ date: DateKey; trained: boolean }[]> {
+  const today = todayKey();
+  const from = addDays(today, -(WEEK_DAYS - 1));
+  const rows = await db.getAllAsync<{ local_date: string }>(
+    'SELECT DISTINCT local_date FROM sessions WHERE local_date >= ?',
+    from
+  );
+  const trained = new Set(rows.map((row) => row.local_date));
+  return Array.from({ length: WEEK_DAYS }, (_, i) => {
+    const date = addDays(from, i);
+    return { date, trained: trained.has(date) };
+  });
+}
+
+export function useRecentDays() {
+  return useDbQuery(getRecentDays, ['sessions']);
+}

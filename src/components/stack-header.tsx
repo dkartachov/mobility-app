@@ -1,10 +1,12 @@
 import type { NativeStackHeaderProps } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 import { Icon } from './icon';
+import { PressableScale } from './pressable-scale';
 import { ThemedView } from './themed-view';
 
 /**
@@ -16,25 +18,28 @@ import { ThemedView } from './themed-view';
  * tab screens.
  */
 export function StackHeader({ back, options, navigation }: NativeStackHeaderProps) {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const isModal = options.presentation === 'modal';
 
   return (
     <ThemedView style={[styles.header, { paddingTop: insets.top }]}>
       {back ? (
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={isModal ? 'Close' : 'Back'}
+          hitSlop={Spacing.two}
           onPress={navigation.goBack}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+          pressedScale={0.9}
+          style={[styles.backButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
           <Icon
             name={isModal ? { ios: 'xmark', android: 'close' } : { ios: 'chevron.left', android: 'arrow_back' }}
-            size={24}
-            color="tint"
+            size={20}
+            color="text"
           />
-        </Pressable>
+        </PressableScale>
       ) : (
-        <View style={styles.backButton} />
+        <View style={styles.placeholder} />
       )}
     </ThemedView>
   );
@@ -45,16 +50,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.one,
-    minHeight: 56,
+    paddingHorizontal: Spacing.three,
+    minHeight: 60,
   },
   backButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: {
-    opacity: 0.6,
+  placeholder: {
+    height: 40,
   },
 });

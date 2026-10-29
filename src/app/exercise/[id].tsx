@@ -5,11 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/card';
 import { ExerciseVideo } from '@/components/exercise-video';
+import { IconBadge } from '@/components/icon-badge';
+import { PageHeader } from '@/components/page-header';
 import { Pager } from '@/components/pager';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { getExercise, type Exercise } from '@/data/exercises';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,6 +34,12 @@ export default function ExerciseScreen() {
       <ExerciseVideo photo={exercise.photo} />
       <Pager>
         <PageScroll>
+          <PageHeader
+            eyebrow={[exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides']
+              .filter(Boolean)
+              .join(' · ')}
+            title={exercise.name}
+          />
           <OverviewCard exercise={exercise} />
         </PageScroll>
       </Pager>
@@ -49,29 +58,36 @@ function PageScroll({ children }: { children: ReactNode }) {
 }
 
 function OverviewCard({ exercise }: { exercise: Exercise }) {
-  return (
-    <Card style={styles.card}>
-      <View style={styles.section}>
-        <ThemedText type="subtitle" accessibilityRole="header">
-          Stimulus
-        </ThemedText>
-        <ThemedText themeColor="textSecondary">{exercise.stimulus}</ThemedText>
-      </View>
+  const theme = useTheme();
 
-      <View style={styles.section}>
+  return (
+    <>
+      <Card style={styles.stimulus}>
+        <IconBadge name={{ ios: 'scope', android: 'target' }} />
+        <View style={styles.stimulusText}>
+          <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
+            Stimulus
+          </ThemedText>
+          <ThemedText>{exercise.stimulus}</ThemedText>
+        </View>
+      </Card>
+
+      <Card style={styles.card}>
         <ThemedText type="subtitle" accessibilityRole="header">
           Instructions
         </ThemedText>
         {exercise.instructions.map((step, index) => (
           <View key={index} style={styles.step}>
-            <ThemedText type="smallBold" themeColor="tint" style={styles.stepNumber}>
-              {index + 1}.
-            </ThemedText>
+            <View style={[styles.stepNumber, { backgroundColor: theme.tintSoft }]}>
+              <ThemedText type="smallBold" themeColor="tint">
+                {index + 1}
+              </ThemedText>
+            </View>
             <ThemedText style={styles.stepText}>{step}</ThemedText>
           </View>
         ))}
-      </View>
-    </Card>
+      </Card>
+    </>
   );
 }
 
@@ -86,20 +102,31 @@ const styles = StyleSheet.create({
   },
   page: {
     padding: Spacing.three,
+    gap: Spacing.three,
+  },
+  stimulus: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.three,
+  },
+  stimulusText: {
+    flex: 1,
+    gap: Spacing.half,
   },
   card: {
-    gap: Spacing.four,
-  },
-  section: {
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
   step: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    alignItems: 'flex-start',
+    gap: Spacing.three,
   },
   stepNumber: {
-    minWidth: 20,
-    lineHeight: 24,
+    width: 26,
+    height: 26,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stepText: {
     flex: 1,

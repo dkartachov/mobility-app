@@ -19,12 +19,12 @@ export function ProgressBar({ progress }: { progress: number }) {
 
 const styles = StyleSheet.create({
   track: {
-    height: 8,
-    borderRadius: 4,
+    height: 10,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 5,
   },
 });

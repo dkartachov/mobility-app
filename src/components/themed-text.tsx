@@ -4,7 +4,7 @@ import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'subtitle' | 'small' | 'smallBold' | 'stat';
+  type?: 'default' | 'title' | 'subtitle' | 'small' | 'smallBold' | 'stat' | 'eyebrow';
   themeColor?: ThemeColor;
 };
 
@@ -31,20 +31,31 @@ const styles = StyleSheet.create({
     fontWeight: 500,
   },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: 700,
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: 800,
+    letterSpacing: -0.6,
   },
   subtitle: {
     fontSize: 20,
     lineHeight: 26,
-    fontWeight: 600,
+    fontWeight: 700,
+    letterSpacing: -0.2,
   },
   stat: {
     fontFamily: Fonts?.rounded,
     fontSize: 32,
     lineHeight: 38,
-    fontWeight: 700,
+    fontWeight: 800,
+    letterSpacing: -0.5,
     fontVariant: ['tabular-nums'],
+  },
+  /** Small uppercase label above a title or a group. */
+  eyebrow: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: 700,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });
