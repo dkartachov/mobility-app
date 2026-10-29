@@ -15,6 +15,10 @@ describe('EXERCISES', () => {
     for (const exercise of EXERCISES) expect(exercise.instructions.length).toBeGreaterThan(0);
   });
 
+  it('has a photo for every exercise', () => {
+    for (const exercise of EXERCISES) expect(exercise.photo).toBeDefined();
+  });
+
   it('has enough one-sided exercises for workouts to fill odd minutes', () => {
     expect(EXERCISES.filter((e) => !e.twoSided).length).toBeGreaterThan(1);
   });

@@ -2,7 +2,7 @@ import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-rout
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useReducer, useState, type ComponentProps } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { css, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,7 +11,9 @@ import { Card } from '@/components/card';
 import { ExerciseVideo } from '@/components/exercise-video';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
+import { InstructionList } from '@/components/instruction-list';
 import { MilestoneBar } from '@/components/milestone-bar';
+import { Pager } from '@/components/pager';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -204,35 +206,35 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
     <ThemedView style={styles.screen}>
       <ExerciseVideo photo={step.exercise.photo} />
 
-      <View style={[styles.body, { paddingBottom: insets.bottom + Spacing.three }]}>
-        <View style={styles.info}>
-          <WorkoutProgress count={exerciseCount} current={exerciseNumber} finished={finished} />
-          <View style={styles.tags}>
-            <Tag label={`Exercise ${exerciseNumber} of ${exerciseCount}`} />
-            <Tag label={step.exercise.active ? 'Active' : 'Passive'} />
-            {step.side && <Tag label={`Side ${step.side} of 2`} highlighted />}
-          </View>
+      <View style={styles.status}>
+        <WorkoutProgress count={exerciseCount} current={exerciseNumber} finished={finished} />
+        <View style={styles.tags}>
+          <Tag label={`Exercise ${exerciseNumber} of ${exerciseCount}`} />
+          <Tag label={step.exercise.active ? 'Active' : 'Passive'} />
+          {step.side && <Tag label={`Side ${step.side} of 2`} highlighted />}
+        </View>
+      </View>
+
+      {/* Takes up whatever space is left, so long names or instructions scroll instead of moving the timer. */}
+      <Pager>
+        <ScrollView key={state.index} contentContainerStyle={styles.page}>
           <ThemedText type="title" accessibilityRole="header">
             {step.exercise.name}
           </ThemedText>
-          <ThemedText themeColor="textSecondary">{step.exercise.stimulus}</ThemedText>
-        </View>
+          <View style={styles.stimulus}>
+            <ThemedText type="eyebrow" themeColor="textSecondary">
+              Stimulus
+            </ThemedText>
+            <ThemedText>{step.exercise.stimulus}</ThemedText>
+          </View>
+        </ScrollView>
+        <ScrollView key={state.index} contentContainerStyle={styles.page}>
+          <InstructionList instructions={step.exercise.instructions} />
+        </ScrollView>
+      </Pager>
 
+      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
         <View style={styles.timer} accessibilityLiveRegion="polite">
-          <Tag
-            highlighted
-            label={finished
-              ? 'Workout complete'
-              : state.paused
-                ? 'Paused'
-                : state.phase === 'buffer'
-                  ? step.side === 2
-                    ? 'Switch sides'
-                    : 'Get ready'
-                  : step.exercise.active
-                    ? 'Move'
-                    : 'Hold'}
-          />
           <ThemedText type="stat" style={styles.clock}>
             {formatClock(Math.ceil(state.remainingMs / 1000))}
           </ThemedText>
@@ -417,18 +419,25 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  body: {
-    flex: 1,
-    padding: Spacing.three,
-    justifyContent: 'space-between',
+  status: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    gap: Spacing.three,
   },
-  info: {
-    gap: Spacing.two,
+  page: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+  },
+  stimulus: {
+    gap: Spacing.half,
+  },
+  footer: {
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.three,
   },
   segments: {
     flexDirection: 'row',
     gap: Spacing.one,
-    marginBottom: Spacing.one,
   },
   segment: {
     flex: 1,
@@ -454,8 +463,8 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   clock: {
-    fontSize: 84,
-    lineHeight: 96,
+    fontSize: 64,
+    lineHeight: 72,
     letterSpacing: -2,
   },
   progress: {
