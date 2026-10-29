@@ -18,8 +18,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.HIGH_SAMPLING_RATE_SENSORS"],
-      "blockedPermissions": ["android.permission.ACTIVITY_RECOGNITION"],
+      "permissions": [
+        "android.permission.HIGH_SAMPLING_RATE_SENSORS"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+      ],
       "package": "com.hogos.mobilityapp"
     },
     "plugins": [
@@ -66,7 +70,8 @@
           "color": "#0F8F82"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
