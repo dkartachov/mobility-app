@@ -105,6 +105,9 @@ function ProfileForm({ initial }: { initial: Profile }) {
 
   return (
     <FormScreen ref={scrollRef}>
+      <ThemedText type="title" accessibilityRole="header">
+        Edit profile
+      </ThemedText>
       <View style={styles.photo}>
         <Avatar photoFile={form.photoFile} initials={initials} size={112} />
         <View style={styles.photoButtons}>

@@ -13,6 +13,7 @@ import {
   makeDevTestDue,
   resetAllData,
 } from '@/db/dev';
+import { RETEST_INTERVAL_DAYS } from '@/db/mobility-tests';
 import { useStats } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDuration } from '@/lib/dates';
@@ -99,6 +100,9 @@ export function DevTools() {
           variant="secondary"
           onPress={() => addDevMobilityTestResults(db)}
         />
+        <ThemedText type="small" themeColor="textSecondary">
+          Adds a test today, moving earlier tests back {RETEST_INTERVAL_DAYS} days so they build a history.
+        </ThemedText>
         <Button title="Make today test day" variant="secondary" onPress={() => makeDevTestDue(db)} />
       </Card>
       <Card style={styles.card}>

@@ -17,6 +17,9 @@ export default function DailyScreen() {
   return (
     <ThemedView style={[styles.screen, { paddingBottom: insets.bottom + Spacing.three }]}>
       <View style={styles.content}>
+        <ThemedText type="title" accessibilityRole="header">
+          Daily
+        </ThemedText>
         <ThemedText type="subtitle" accessibilityRole="header">
           Available time
         </ThemedText>

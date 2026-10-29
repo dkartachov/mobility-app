@@ -70,6 +70,15 @@ describe('mobility tests', () => {
     // A later test without results, like the dev tools' "Log flexibility test today", doesn't count.
     await logMobilityTest(db, new Date(2026, 9, 2, 9));
 
-    expect(await getMobilityScore(db)).toMatchObject({ areas: { hips: 100, ankles: null }, overall: 100 });
+    expect(await getMobilityScore(db)).toMatchObject({
+      areas: { hips: 100, ankles: null },
+      overall: 100,
+      previous: { areas: { hips: 0, ankles: null }, overall: 0 },
+    });
+  });
+
+  it('has no previous score after only one test with results', async () => {
+    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'straddle', side: null, value: 150, unit: 'deg' }]);
+    expect(await getMobilityScore(db)).toMatchObject({ overall: 100, previous: null });
   });
 });

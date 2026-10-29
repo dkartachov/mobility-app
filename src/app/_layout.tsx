@@ -35,16 +35,8 @@ export default function RootLayout() {
         <StatusBar style="auto" />
         <Stack screenOptions={{ header: (props) => <StackHeader {...props} /> }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="daily" options={{ title: 'Daily' }} />
-          <Stack.Screen name="workout" options={{ title: '' }} />
-          <Stack.Screen name="library" options={{ title: 'Library' }} />
-          <Stack.Screen name="mobility-time" options={{ title: 'Mobility time' }} />
-          <Stack.Screen name="mobility-score" options={{ title: 'Mobility score' }} />
-          <Stack.Screen name="mobility-test" options={{ title: '' }} />
-          <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
-          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-          <Stack.Screen name="edit-profile" options={{ title: 'Edit profile', presentation: 'modal' }} />
-          <Stack.Screen name="new-goal" options={{ title: 'New goal', presentation: 'modal' }} />
+          <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
         </Stack>
       </ThemeProvider>
     </SQLiteProvider>

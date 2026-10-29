@@ -20,6 +20,9 @@ export default function MobilityTimeScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
+        <ThemedText type="title" accessibilityRole="header">
+          Mobility time
+        </ThemedText>
         {stats && (
           <Card>
             <ThemedText type="small" themeColor="textSecondary">

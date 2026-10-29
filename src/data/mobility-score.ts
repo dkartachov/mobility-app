@@ -12,7 +12,7 @@ export const SCORE_AREAS: { id: ScoreArea; label: string }[] = [
   { id: 'overhead', label: 'Overhead' },
   { id: 'thorax', label: 'Thorax' },
   { id: 'hips', label: 'Hips' },
-  { id: 'postChain', label: 'Post. chain' },
+  { id: 'postChain', label: 'Postchain' },
   { id: 'ankles', label: 'Ankles' },
 ];
 
@@ -56,6 +56,20 @@ export function mobilityScore(results: ScoredResult[]): MobilityScore {
   ) as AreaScores;
   const scored = Object.values(areas).filter((v) => v !== null);
   return { areas, overall: average(scored) };
+}
+
+/**
+ * Change from `previous` to `current` in score points (percent of the 0–100 scale), from the
+ * rounded scores so it matches the numbers shown. `null` if either is missing.
+ */
+export function scoreChange(current: number | null, previous: number | null | undefined) {
+  if (current === null || previous === null || previous === undefined) return null;
+  return Math.round(current) - Math.round(previous);
+}
+
+/** "+12%", "−8%" or "0%". */
+export function formatScoreChange(change: number) {
+  return `${change > 0 ? '+' : change < 0 ? '−' : ''}${Math.abs(change)}%`;
 }
 
 /** Colors from a score of 0 (red) through yellow to 100 (green), for gradients and interpolation. */

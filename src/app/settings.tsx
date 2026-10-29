@@ -40,6 +40,9 @@ export default function SettingsScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
+        <ThemedText type="title" accessibilityRole="header">
+          Settings
+        </ThemedText>
         <View style={styles.section}>
           <ThemedText type="smallBold" themeColor="textSecondary" accessibilityRole="header">
             APPEARANCE

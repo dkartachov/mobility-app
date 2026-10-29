@@ -5,10 +5,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { METHOD_UNITS, TEST_STEPS } from '@/data/mobility-tests';
-import { addDays, todayKey } from '@/lib/dates';
+import { addDays, daysBetween, todayKey } from '@/lib/dates';
 import { milestoneProgress } from '@/lib/milestones';
 
-import { logMobilityTest, RETEST_INTERVAL_DAYS } from './mobility-tests';
+import { getTestSchedule, logMobilityTest, RETEST_INTERVAL_DAYS } from './mobility-tests';
 import { getTotalSeconds, logSession } from './sessions';
 
 export async function addDevSession(db: SQLiteDatabase, durationSeconds: number, daysAgo = 0) {
@@ -48,37 +48,80 @@ export async function addDevMobilityTest(db: SQLiteDatabase, daysAgo = 0) {
   await logMobilityTest(db, takenAt);
 }
 
+/** How far a made-up result can move from the previous one, as a share of the test's scoring range. */
+const DEV_RESULT_DRIFT = 0.15;
+/** Where first made-up results fall, as shares of the test's scoring range (scores of 50–90). */
+const DEV_FIRST_RESULT_RANGE = [0.5, 0.9] as const;
+
 /**
- * Logs a flexibility test today with made-up results, spread across each test's whole scoring
- * range so the score areas come out in a variety of colors. It becomes the latest test, so the
- * score shows it instead of any earlier results.
+ * Made-up results for every test step. Without earlier results they land in the upper half of
+ * each test's scoring range; otherwise each one drifts a little from its previous value, so a
+ * run of them looks like a real history with ups and downs.
+ */
+function randomResults(previous: Map<string, number>) {
+  return TEST_STEPS.map(({ test, side }) => {
+    const { zeroAt, fullAt } = test.scoring;
+    const range = fullAt - zeroAt;
+    const last = previous.get(`${test.id}:${side}`);
+    const [firstLow, firstHigh] = DEV_FIRST_RESULT_RANGE;
+    const value =
+      last === undefined
+        ? zeroAt + (firstLow + Math.random() * (firstHigh - firstLow)) * range
+        : last + (Math.random() * 2 - 1) * DEV_RESULT_DRIFT * range;
+    const [low, high] = [Math.min(zeroAt, fullAt), Math.max(zeroAt, fullAt)];
+    return {
+      exerciseId: test.id,
+      side,
+      value: Math.round(Math.min(high, Math.max(low, value))),
+      unit: METHOD_UNITS[test.method.kind],
+    };
+  });
+}
+
+/**
+ * Logs a flexibility test today with made-up results, keeping every earlier test. Earlier tests
+ * move back `RETEST_INTERVAL_DAYS` first, so repeated presses build a history of tests a retest
+ * apart that ends today.
  */
 export async function addDevMobilityTestResults(db: SQLiteDatabase) {
-  await logMobilityTest(
-    db,
-    new Date(),
-    TEST_STEPS.map(({ test, side }) => {
-      const { zeroAt, fullAt } = test.scoring;
-      return {
-        exerciseId: test.id,
-        side,
-        value: Math.round(zeroAt + Math.random() * (fullAt - zeroAt)),
-        unit: METHOD_UNITS[test.method.kind],
-      };
-    })
+  const latest = await db.getAllAsync<{ exercise_id: string; side: string | null; value: number }>(
+    `SELECT exercise_id, side, value FROM mobility_test_results
+     WHERE mobility_test_id = (
+       SELECT t.id FROM mobility_tests t
+       WHERE EXISTS (SELECT 1 FROM mobility_test_results r WHERE r.mobility_test_id = t.id)
+       ORDER BY t.taken_at DESC, t.id DESC LIMIT 1
+     )`
+  );
+  const previous = new Map(latest.map((r) => [`${r.exercise_id}:${r.side}`, r.value]));
+  await moveDevMobilityTestsBack(db, RETEST_INTERVAL_DAYS);
+  await logMobilityTest(db, new Date(), randomResults(previous));
+}
+
+/** Moves every flexibility test `days` earlier, keeping their results. */
+async function moveDevMobilityTestsBack(db: SQLiteDatabase, days: number) {
+  const shift = `-${days} days`;
+  await db.runAsync(
+    `UPDATE mobility_tests
+     SET taken_at = strftime('%Y-%m-%dT%H:%M:%fZ', taken_at, ?), local_date = date(local_date, ?)
+     WHERE id IS NOT NULL`,
+    shift,
+    shift
   );
 }
 
 /**
- * Makes today test day: drops tests from the last `RETEST_INTERVAL_DAYS` days (the schedule
- * follows the most recent one) and logs one exactly that many days ago.
+ * Makes today test day by moving every test back until the latest is exactly
+ * `RETEST_INTERVAL_DAYS` ago, so their results and score stay. Without any tests, logs an empty
+ * one that long ago.
  */
 export async function makeDevTestDue(db: SQLiteDatabase) {
-  await db.runAsync(
-    'DELETE FROM mobility_tests WHERE local_date > ?',
-    addDays(todayKey(), -RETEST_INTERVAL_DAYS)
-  );
-  await addDevMobilityTest(db, RETEST_INTERVAL_DAYS);
+  const { lastTestDate } = await getTestSchedule(db);
+  if (!lastTestDate) {
+    await addDevMobilityTest(db, RETEST_INTERVAL_DAYS);
+    return;
+  }
+  const daysAgo = daysBetween(lastTestDate, todayKey());
+  if (daysAgo < RETEST_INTERVAL_DAYS) await moveDevMobilityTestsBack(db, RETEST_INTERVAL_DAYS - daysAgo);
 }
 
 /** Removes every flexibility test and its results, back to "no test taken yet". */

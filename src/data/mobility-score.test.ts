@@ -1,4 +1,12 @@
-import { mobilityScore, SCORE_AREAS, SCORE_COLOR_STOPS, SCORE_COLORS, scoreResult } from './mobility-score';
+import {
+  formatScoreChange,
+  mobilityScore,
+  SCORE_AREAS,
+  SCORE_COLOR_STOPS,
+  SCORE_COLORS,
+  scoreChange,
+  scoreResult,
+} from './mobility-score';
 import { FLEXIBILITY_TESTS } from './mobility-tests';
 
 describe('scoreResult', () => {
@@ -37,6 +45,25 @@ describe('mobilityScore', () => {
     expect(score.areas.ankles).toBeNull();
     expect(score.overall).toBeNull();
   });
+});
+
+describe('scoreChange', () => {
+  it('compares the rounded scores', () => {
+    expect(scoreChange(60.4, 50.6)).toBe(9);
+    expect(scoreChange(40, 52)).toBe(-12);
+  });
+
+  it('is null without both scores', () => {
+    expect(scoreChange(null, 50)).toBeNull();
+    expect(scoreChange(50, null)).toBeNull();
+    expect(scoreChange(50, undefined)).toBeNull();
+  });
+});
+
+it('formats changes with a sign', () => {
+  expect(formatScoreChange(12)).toBe('+12%');
+  expect(formatScoreChange(-8)).toBe('−8%');
+  expect(formatScoreChange(0)).toBe('0%');
 });
 
 it('has a test for every score area', () => {

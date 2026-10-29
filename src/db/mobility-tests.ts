@@ -60,17 +60,29 @@ export function useTestSchedule() {
   return useDbQuery(getTestSchedule, ['mobility_tests']);
 }
 
+/** The latest score, with the one from the test before it to compare against. */
+export type ScoreWithBaseline = MobilityScore & {
+  /** The score from the previous test with results, `null` before there are two. */
+  previous: MobilityScore | null;
+};
+
 /** The score from the most recent test with results, `null` before there is one. */
-export async function getMobilityScore(db: SQLiteDatabase): Promise<MobilityScore | null> {
-  const results = await db.getAllAsync<ScoredResult>(
-    `SELECT exercise_id AS exerciseId, value, unit FROM mobility_test_results
-     WHERE mobility_test_id = (
-       SELECT t.id FROM mobility_tests t
-       WHERE EXISTS (SELECT 1 FROM mobility_test_results r WHERE r.mobility_test_id = t.id)
-       ORDER BY t.taken_at DESC, t.id DESC LIMIT 1
-     )`
+export async function getMobilityScore(db: SQLiteDatabase): Promise<ScoreWithBaseline | null> {
+  const tests = await db.getAllAsync<{ id: number }>(
+    `SELECT t.id FROM mobility_tests t
+     WHERE EXISTS (SELECT 1 FROM mobility_test_results r WHERE r.mobility_test_id = t.id)
+     ORDER BY t.taken_at DESC, t.id DESC LIMIT 2`
   );
-  return results.length ? mobilityScore(results) : null;
+  const scoreOf = async (testId: number) =>
+    mobilityScore(
+      await db.getAllAsync<ScoredResult>(
+        'SELECT exercise_id AS exerciseId, value, unit FROM mobility_test_results WHERE mobility_test_id = ?',
+        testId
+      )
+    );
+  const [latest, previous] = tests;
+  if (!latest) return null;
+  return { ...(await scoreOf(latest.id)), previous: previous ? await scoreOf(previous.id) : null };
 }
 
 export function useMobilityScore() {

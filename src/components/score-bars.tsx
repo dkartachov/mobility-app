@@ -9,13 +9,20 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Spacing } from '@/constants/theme';
-import { SCORE_AREAS, SCORE_COLOR_STOPS, SCORE_COLORS, type AreaScores } from '@/data/mobility-score';
+import {
+  formatScoreChange,
+  SCORE_AREAS,
+  SCORE_COLOR_STOPS,
+  SCORE_COLORS,
+  scoreChange,
+  type AreaScores,
+} from '@/data/mobility-score';
 import { useTheme } from '@/hooks/use-theme';
 
 import { ThemedText } from './themed-text';
 
 const BAR_HEIGHT = 180;
-const BAR_WIDTH = 16;
+const BAR_WIDTH = 10;
 const FILL_MS = 1200;
 /** Each bar starts filling this long after the one before it. */
 const STAGGER_MS = 80;
@@ -26,6 +33,8 @@ const GRADIENT = `linear-gradient(to top, ${SCORE_COLORS.map((color, i) => `${co
 type ScoreBarsProps = {
   /** 0–100 for each area, `null` for none yet. */
   scores: AreaScores;
+  /** Scores from the previous test, to show each area's change under its label. */
+  previous?: AreaScores | null;
   delayMs?: number;
 };
 
@@ -33,17 +42,32 @@ type ScoreBarsProps = {
  * A vertical bar per score area, filling up from the bottom on mount and again from where it is
  * whenever its score changes.
  */
-export function ScoreBars({ scores, delayMs = 0 }: ScoreBarsProps) {
+export function ScoreBars({ scores, previous, delayMs = 0 }: ScoreBarsProps) {
   return (
     <View style={styles.row}>
       {SCORE_AREAS.map(({ id, label }, i) => (
-        <ScoreBar key={id} label={label} score={scores[id]} delayMs={delayMs + i * STAGGER_MS} />
+        <ScoreBar
+          key={id}
+          label={label}
+          score={scores[id]}
+          // `undefined` without a previous test, so no change row shows at all.
+          change={previous ? scoreChange(scores[id], previous[id]) : undefined}
+          delayMs={delayMs + i * STAGGER_MS}
+        />
       ))}
     </View>
   );
 }
 
-function ScoreBar({ label, score, delayMs }: { label: string; score: number | null; delayMs: number }) {
+type ScoreBarProps = {
+  label: string;
+  score: number | null;
+  /** Points since the previous test, `null` if either test has no score for this area. */
+  change: number | null | undefined;
+  delayMs: number;
+};
+
+function ScoreBar({ label, score, change, delayMs }: ScoreBarProps) {
   const theme = useTheme();
   const target = score === null ? 0 : Math.min(100, Math.max(0, score));
   const fill = useSharedValue(0);
@@ -72,9 +96,18 @@ function ScoreBar({ label, score, delayMs }: { label: string; score: number | nu
           <View style={[styles.gradient, { backgroundImage: GRADIENT }]} />
         </Animated.View>
       </View>
-      <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} adjustsFontSizeToFit>
+      <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.label}>
         {label}
       </ThemedText>
+      {change !== undefined && (
+        <ThemedText
+          type="smallBold"
+          themeColor={change === null || change === 0 ? 'textSecondary' : change > 0 ? 'tint' : 'danger'}
+          accessibilityLabel={change === null ? undefined : `${formatScoreChange(change)} since last test`}
+          style={styles.label}>
+          {change === null ? '—' : formatScoreChange(change)}
+        </ThemedText>
+      )}
     </View>
   );
 }
@@ -102,6 +135,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderRadius: BAR_WIDTH / 2,
     overflow: 'hidden',
+  },
+  /**
+   * One size for every label, a little wider than a column on narrow phones so the longest
+   * ("Shoulders", "Postchain") fit; they stay centered under their bar and clear of each other.
+   */
+  label: {
+    width: 68,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   gradient: {
     position: 'absolute',

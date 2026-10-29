@@ -37,6 +37,9 @@ export default function NewGoalScreen() {
 
   return (
     <FormScreen>
+      <ThemedText type="title" accessibilityRole="header">
+        New goal
+      </ThemedText>
       <ThemedText>How many hours do you want to train in the next {GOAL_PERIOD_DAYS} days?</ThemedText>
 
       <View accessibilityRole="radiogroup" style={styles.chips}>

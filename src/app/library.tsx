@@ -29,6 +29,9 @@ export default function LibraryScreen() {
       keyboardDismissMode="on-drag"
       ListHeaderComponent={
         <View style={styles.header}>
+          <ThemedText type="title" accessibilityRole="header" style={styles.title}>
+            Library
+          </ThemedText>
           <TextField
             value={query}
             onChangeText={setQuery}
@@ -75,6 +78,9 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: Spacing.two,
+  },
+  title: {
+    marginBottom: Spacing.two,
   },
   tile: {
     flexDirection: 'row',
