@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mobilityapp",
     "userInterfaceStyle": "automatic",
-    "platforms": ["android"],
     "ios": {
       "icon": "./assets/expo.icon"
     },
