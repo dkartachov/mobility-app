@@ -51,15 +51,16 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "APP_VARIANT=development expo start",
-    "android": "APP_VARIANT=development expo start --android",
-    "ios": "APP_VARIANT=development expo start --ios",
+    "start": "expo start",
+    "dev": "APP_VARIANT=development expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
     "lint": "expo lint",
     "build:dev": "npx eas-cli@latest build --profile development",
     "build:preview": "npx eas-cli@latest build --profile preview",
     "build:prod": "npx eas-cli@latest build --profile production",
     "update:dev": "APP_VARIANT=development npx eas-cli@latest update --channel development --environment development --platform android",
-    "update:preview": "npx eas-cli@latest update --channel preview --environment preview --platform android",
+    "update:preview": "APP_VARIANT=preview npx eas-cli@latest update --channel preview --environment preview --platform android",
     "update:prod": "npx eas-cli@latest update --channel production --environment production --platform android",
     "test": "jest"
   },

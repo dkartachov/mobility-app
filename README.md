@@ -24,7 +24,7 @@ Tests sit next to the code they cover (`*.test.ts(x)`). Database tests run real 
 ## Commands
 
 ```bash
-npm start                               # dev server (needs the development build installed)
+npm run dev                             # dev server (needs the development build installed)
 npx expo lint                           # lint
 npx tsc --noEmit                        # typecheck
 npm test                                # unit and component tests (Jest)
@@ -35,7 +35,17 @@ npm run build:prod                      # store build
 npm run update:dev -- --message "..."   # over-the-air update; also update:preview, update:prod
 ```
 
-The development build is a separate app variant (`app.config.ts`): "Mobility (Dev)", package `com.hogos.mobilityapp.dev`, scheme `mobilityapp-dev`. It installs next to the production app and keeps its own data. Preview and production builds share the production package, so they replace each other. Anything aimed at the dev build needs `APP_VARIANT=development`, including updates to the `development` channel, or they won't match its fingerprint; `npm start`, `build:dev` (through `eas.json`) and `update:dev` set it. The scripts use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
+### App variants
+
+Each build profile is a separate app ([Expo app variants](https://docs.expo.dev/tutorial/eas/multiple-app-variants/), set up in `app.config.ts`), so all three can be installed on one device, each with its own data:
+
+| Variant | `APP_VARIANT` | Name | Identifier | Scheme |
+|---|---|---|---|---|
+| Development | `development` | Mobility (Dev) | `com.hogos.mobilityapp.dev` | `mobilityapp-dev` |
+| Preview | `preview` | Mobility (Preview) | `com.hogos.mobilityapp.preview` | `mobilityapp-preview` |
+| Production | unset | Mobility | `com.hogos.mobilityapp` | `mobilityapp` |
+
+EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use the `dev` and `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
 
 ## Mobility score and its sources
 
