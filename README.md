@@ -30,19 +30,17 @@ npx tsc --noEmit                        # typecheck
 npm test                                # unit and component tests (Jest)
 npx expo-doctor                         # check dependencies and config
 npm run build:dev                       # new dev build after adding native packages
-npm run build:preview                   # internal preview build
-npm run build:prod                      # store build
-npm run update:dev -- --message "..."   # over-the-air update; also update:preview, update:prod
+npm run build:prod                      # production build (APK)
+npm run update:dev -- --message "..."   # over-the-air update; update:prod for production
 ```
 
 ### App variants
 
-Each build profile is a separate app ([Expo app variants](https://docs.expo.dev/tutorial/eas/multiple-app-variants/), set up in `app.config.ts`), so all three can be installed on one device, each with its own data:
+The development and production builds are separate apps ([Expo app variants](https://docs.expo.dev/tutorial/eas/multiple-app-variants/), set up in `app.config.ts`), so both can be installed on one device, each with its own data. Production builds an APK, so it installs from its EAS build page like the dev build:
 
 | Variant | `APP_VARIANT` | Name | Identifier | Scheme |
 |---|---|---|---|---|
 | Development | `development` | Mobility (Dev) | `com.hogos.mobilityapp.dev` | `mobilityapp-dev` |
-| Preview | `preview` | Mobility (Preview) | `com.hogos.mobilityapp.preview` | `mobilityapp-preview` |
 | Production | unset | Mobility | `com.hogos.mobilityapp` | `mobilityapp` |
 
 EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use the `dev` and `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.

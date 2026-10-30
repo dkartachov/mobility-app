@@ -12,16 +12,12 @@
         "APP_VARIANT": "development"
       }
     },
-    "preview": {
-      "distribution": "internal",
-      "channel": "preview",
-      "env": {
-        "APP_VARIANT": "preview"
-      }
-    },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
