@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { deleteAllSessions } from '@/db/sessions';
+import { DEV_TOOLS_ENABLED } from '@/lib/dev-settings';
 import {
   THEME_PREFERENCES,
   THEME_PREFERENCE_LABELS,
@@ -87,7 +88,7 @@ export default function SettingsScreen() {
           </Card>
         </View>
 
-        {__DEV__ && <DevTools />}
+        {DEV_TOOLS_ENABLED && <DevTools />}
       </ScrollView>
     </ThemedView>
   );
