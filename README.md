@@ -24,7 +24,7 @@ Tests sit next to the code they cover (`*.test.ts(x)`). Database tests run real 
 ## Commands
 
 ```bash
-npx expo start                          # dev server (needs the development build installed)
+APP_VARIANT=development npx expo start  # dev server (needs the development build installed)
 npx expo lint                           # lint
 npx tsc --noEmit                        # typecheck
 npm test                                # unit and component tests (Jest)
@@ -32,6 +32,8 @@ npx expo-doctor                         # check dependencies and config
 npx eas-cli@latest build --profile development   # new dev build after adding native packages
 npx eas-cli@latest update               # ship an over-the-air update
 ```
+
+The development build is a separate app variant (`app.config.ts`): "Mobility (Dev)", package `com.hogos.mobilityapp.dev`, scheme `mobilityapp-dev`. It installs next to the production app and keeps its own data. Set `APP_VARIANT=development` for anything aimed at it (the `development` EAS build profile already does), including updates to the `development` channel, or they won't match its fingerprint.
 
 ## Mobility score and its sources
 
