@@ -4,8 +4,8 @@
  * chosen so each one can be measured alone with a tape measure or the phone held against the
  * body, and has published norms to score it against (see the README).
  *
- * Order is the order they're tested in, grouped so you move from kneeling and standing to
- * sitting to lying down with as few setup changes as possible.
+ * Order is the order they're tested in, grouped so you move from standing to sitting to lying
+ * down with as few setup changes as possible.
  */
 
 import type { ScoreArea } from './mobility-score';
@@ -132,28 +132,9 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     method: { kind: 'distance', min: 0, max: 20, step: 0.5 },
   },
   {
-    id: 'thoracic-rotation',
-    name: 'Thoracic rotation',
-    area: 'thorax',
-    movement: 'Rotation',
-    norm: {
-      // Lumbar-locked rotation: about 30–50° in young active adults, over 50° counts as
-      // unrestricted (Johnson 2012; Shin & Yoo 2024). No large normative study yet.
-      mean: { male: 42, female: 42 },
-      sd: 10,
-      perDecade: { male: -2, female: -2 },
-      evidence: 'limited',
-    },
-    twoSided: true,
-    instructions:
-      'Kneel and sit back on your heels, leaning slightly forward over your knees to keep your lower back from turning. Cross your arms over your chest and hold the phone flat against your breastbone. Rotate your upper body to this side as far as you can, keeping your hips still.',
-    measurement: 'Rotation angle of the upper back',
-    method: { kind: 'rotation', startPosition: 'Chest facing straight ahead' },
-  },
-  {
     id: 'shoulder-abduction',
     name: 'Shoulder abduction',
-    area: 'overhead',
+    area: 'shoulders',
     movement: 'Abduction',
     norm: {
       // Active abduction standing, with an inclinometer, 2404 adults without shoulder pain (Gill
@@ -232,7 +213,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
   {
     id: 'sit-and-reach',
     name: 'Sit and reach',
-    area: 'postChain',
+    area: 'hamstrings',
     movement: 'Forward fold',
     norm: {
       // Canadian Health Measures Survey 2016–17 (Statistics Canada), a national sample: medians of
@@ -288,6 +269,27 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
   },
   {
+    id: 'straight-leg-raise',
+    name: 'Straight leg raise',
+    area: 'hamstrings',
+    movement: 'Leg raise',
+    norm: {
+      // Passive, lying on the back: 79° ± 18 in men and 89° ± 12 in women aged about 25 (Marshall &
+      // Siegler 2014, 90 adults). Women about 8° further and no change with age from 20 to 79
+      // (Youdas 2005, 214 adults), whose full tables are paywalled.
+      mean: { male: 79, female: 89 },
+      sd: 15,
+      perDecade: { male: 0, female: 0 },
+      evidence: 'moderate',
+    },
+    twoSided: true,
+    instructions:
+      "Lie on your back with both legs straight. Strap the phone to the outside of this thigh, just above the knee, and loop a towel, belt or strap around the ball of this foot. Use something that doesn't stretch, so the leg stays still at the top. Keeping both knees straight and the other leg flat on the floor, pull the leg up with it as far as you can, stopping at a firm stretch behind the thigh.",
+    measurement: 'Angle of the leg from the floor',
+    // Same phone position as knee to chest. With the knee straight, the thigh's angle is the leg's.
+    method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
+  },
+  {
     id: 'hip-abduction',
     name: 'Hip abduction',
     area: 'hips',
@@ -313,7 +315,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
   {
     id: 'overhead-reach',
     name: 'Overhead reach',
-    area: 'overhead',
+    area: 'shoulders',
     movement: 'Flexion',
     norm: {
       // Active flexion with an inclinometer, 2404 adults without shoulder pain (Gill 2020): about

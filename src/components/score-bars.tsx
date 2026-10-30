@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   /**
    * One size for every label, a little wider than a column on narrow phones so the longest
-   * ("Shoulders", "Postchain") fit; they stay centered under their bar and clear of each other.
+   * ("Shoulders", "Hamstrings") fit; they stay centered under their bar and clear of each other.
    */
   label: {
     width: 68,

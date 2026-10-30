@@ -1,7 +1,4 @@
-/**
- * The mobility score is broken down by movement area rather than by body part, since several
- * areas (overhead reach, the posterior chain) span more than one joint.
- */
+/** The mobility score is broken down by the part of the body each test stretches. */
 
 import {
   FLEXIBILITY_TESTS,
@@ -13,14 +10,12 @@ import {
   type Unit,
 } from './mobility-tests';
 
-export type ScoreArea = 'shoulders' | 'overhead' | 'thorax' | 'hips' | 'postChain' | 'ankles';
+export type ScoreArea = 'shoulders' | 'hips' | 'hamstrings' | 'ankles';
 
 export const SCORE_AREAS: { id: ScoreArea; label: string }[] = [
   { id: 'shoulders', label: 'Shoulders' },
-  { id: 'overhead', label: 'Overhead' },
-  { id: 'thorax', label: 'Thorax' },
   { id: 'hips', label: 'Hips' },
-  { id: 'postChain', label: 'Postchain' },
+  { id: 'hamstrings', label: 'Hamstrings' },
   { id: 'ankles', label: 'Ankles' },
 ];
 

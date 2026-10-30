@@ -1,4 +1,4 @@
-import { Stack, router, usePreventRemove } from 'expo-router';
+import { router, Stack, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
@@ -11,13 +11,15 @@ import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
 import { ProgressBar } from '@/components/progress-bar';
+import { ScoreBars } from '@/components/score-bars';
+import { ScoreBreakdown } from '@/components/score-breakdown';
 import { ScoreRing } from '@/components/score-ring';
 import { ScrollView } from '@/components/scroll-view';
 import { TestMeasurement } from '@/components/test-measurement';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
-import { SCORE_AREAS } from '@/data/mobility-score';
+import { formatScoreChange, SCORE_AREAS, SCORE_BAND_LABELS, scoreBand, scoreChange } from '@/data/mobility-score';
 import {
   BODY_MEASUREMENT_LABELS,
   DEFAULT_BODY,
@@ -26,13 +28,16 @@ import {
   SIDE_LABELS,
   TEST_STEPS,
 } from '@/data/mobility-tests';
-import { logMobilityTest } from '@/db/mobility-tests';
+import { logMobilityTest, useMobilityScore } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
 import { useTheme } from '@/hooks/use-theme';
 import { useSkipTestMeasurements } from '@/lib/dev-settings';
 
-/** Placeholder until the score is actually calculated. */
+/** The calculating screen shows at least this long, even when saving is quicker. */
 const CALCULATING_MS = 2000;
+
+/** Lets the results fade in before the score animates. */
+const ANIMATION_DELAY_MS = 300;
 
 const TIPS = [
   'Test at the same time of day, ideally before a workout.',
@@ -45,15 +50,20 @@ const BODY_MEASUREMENT_KEYS = Object.keys(BODY_MEASUREMENT_LABELS) as (keyof typ
 
 const AREA_LABELS = Object.fromEntries(SCORE_AREAS.map(({ id, label }) => [id, label]));
 
-type Phase = 'intro' | 'measuring' | 'calculating' | 'results';
+/** 'calculating' turns into 'results' on its own, once the save is done and the minimum time is up. */
+type Phase = 'intro' | 'measuring' | 'calculating';
 
 export default function MobilityTestScreen() {
   const db = useSQLiteContext();
-  const [phase, setPhase] = useState<Phase>('intro');
+  const [startedPhase, setPhase] = useState<Phase>('intro');
   const [index, setIndex] = useState(0);
   const [values, setValues] = useState<(number | null)[]>(() => TEST_STEPS.map(() => null));
   const [leaving, setLeaving] = useState<'cancel' | 'done'>();
+  const [saving, setSaving] = useState<'pending' | 'saved' | 'failed'>('pending');
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const skipMeasurements = useSkipTestMeasurements();
+  // The results read the score back from the database, so they wait for the save to finish.
+  const phase = startedPhase === 'calculating' && minTimeElapsed && saving !== 'pending' ? 'results' : startedPhase;
 
   // Mid-test, leaving loses the measurements; on the results screen it means "done".
   usePreventRemove(phase !== 'intro' && !leaving, () => {
@@ -73,10 +83,10 @@ export default function MobilityTestScreen() {
   }, [leaving]);
 
   useEffect(() => {
-    if (phase !== 'calculating') return;
-    const id = setTimeout(() => setPhase('results'), CALCULATING_MS);
+    if (startedPhase !== 'calculating') return;
+    const id = setTimeout(() => setMinTimeElapsed(true), CALCULATING_MS);
     return () => clearTimeout(id);
-  }, [phase]);
+  }, [startedPhase]);
 
   const finish = async () => {
     setPhase('calculating');
@@ -89,7 +99,13 @@ export default function MobilityTestScreen() {
         const value = values[i] ?? (skipMeasurements ? 0 : null);
         return value === null ? [] : [{ exerciseId: test.id, side, value, unit: METHOD_UNITS[test.method.kind] }];
       })
-    ).catch(console.error);
+    ).then(
+      () => setSaving('saved'),
+      (error) => {
+        console.error(error);
+        setSaving('failed');
+      }
+    );
   };
 
   const next = () => {
@@ -129,7 +145,7 @@ export default function MobilityTestScreen() {
         />
       )}
       {phase === 'calculating' && <Calculating />}
-      {phase === 'results' && <Results onDone={() => setLeaving('done')} />}
+      {phase === 'results' && <Results saveFailed={saving === 'failed'} onDone={() => setLeaving('done')} />}
     </>
   );
 }
@@ -159,7 +175,7 @@ function Intro({ onStart }: { onStart: () => void }) {
           <CardTitle icon={{ ios: 'shippingbox.fill', android: 'inventory_2' }} title="You'll need" />
           <ThemedText>
             A clear wall, some floor space, a stair or sturdy box, a table, a tape measure, a strap to hold the phone to
-            your leg, and a partner for the hip rotation tests.
+            your leg, a towel or belt (anything that doesn&apos;t stretch), and a partner for the hip rotation tests.
           </ThemedText>
         </Card>
         <Card style={styles.introCard}>
@@ -296,8 +312,14 @@ function SidePill({ label }: { label: string }) {
   );
 }
 
-function Results({ onDone }: { onDone: () => void }) {
+function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => void }) {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  // The test just saved is the latest one, so this is its score.
+  const loaded = useMobilityScore();
+  const score = saveFailed ? null : loaded;
+  const overall = score?.overall ?? null;
+  const overallChange = score ? scoreChange(score.overall, score.previous?.overall) : null;
 
   return (
     <ThemedView style={[styles.screen, { paddingTop: insets.top }]}>
@@ -306,20 +328,37 @@ function Results({ onDone }: { onDone: () => void }) {
           <ThemedText type="eyebrow" themeColor="tint">
             Test complete
           </ThemedText>
-          <ScoreRing score={null} label="Mobility score" size={180} thickness={14} />
-          <ThemedText type="small" themeColor="textSecondary">
-            Scoring coming soon. Your measurements are saved.
-          </ThemedText>
-        </Animated.View>
-        <Card style={styles.introCard}>
-          <CardTitle icon={{ ios: 'chart.bar.fill', android: 'bar_chart' }} title="Improvement by area" />
-          {SCORE_AREAS.map(({ id, label }) => (
-            <View key={id} style={styles.partRow}>
-              <ThemedText>{label}</ThemedText>
-              <ThemedText themeColor="textSecondary">—</ThemedText>
+          <ScoreRing score={overall} label="Mobility score" size={180} thickness={14} delayMs={ANIMATION_DELAY_MS} />
+          {saveFailed ? (
+            <ThemedText type="small" themeColor="danger">
+              Your measurements couldn&apos;t be saved. Please try the test again.
+            </ThemedText>
+          ) : (
+            overall !== null && <ThemedText type="smallBold">{SCORE_BAND_LABELS[scoreBand(overall)]}</ThemedText>
+          )}
+          {overallChange !== null && (
+            <View
+              style={[styles.change, { backgroundColor: overallChange < 0 ? `${theme.danger}1F` : theme.tintSoft }]}>
+              <ThemedText
+                type="smallBold"
+                themeColor={overallChange > 0 ? 'tint' : overallChange < 0 ? 'danger' : 'textSecondary'}>
+                {formatScoreChange(overallChange)} since last test
+              </ThemedText>
             </View>
-          ))}
-        </Card>
+          )}
+        </Animated.View>
+        {score && (
+          <>
+            <Card style={styles.introCard}>
+              <CardTitle
+                icon={{ ios: 'chart.bar.fill', android: 'bar_chart' }}
+                title={score.previous ? 'Improvement by area' : 'By area'}
+              />
+              <ScoreBars scores={score.areas} previous={score.previous?.areas} delayMs={ANIMATION_DELAY_MS} />
+            </Card>
+            <ScoreBreakdown score={score} />
+          </>
+        )}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
         <Button title="Done" onPress={onDone} />
@@ -408,6 +447,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     paddingVertical: Spacing.four,
+  },
+  change: {
+    marginTop: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+    borderRadius: Radius.full,
   },
   partRow: {
     flexDirection: 'row',

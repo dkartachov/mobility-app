@@ -72,9 +72,9 @@ describe('mobility tests', () => {
     await logMobilityTest(db, new Date(2026, 9, 2, 9));
 
     expect(await getMobilityScore(db)).toMatchObject({
-      areas: { postChain: expect.closeTo(84.13, 2), ankles: null },
+      areas: { hamstrings: expect.closeTo(84.13, 2), ankles: null },
       overall: expect.closeTo(84.13, 2),
-      previous: { areas: { postChain: expect.closeTo(50, 5), ankles: null }, overall: expect.closeTo(50, 5) },
+      previous: { areas: { hamstrings: expect.closeTo(50, 5), ankles: null }, overall: expect.closeTo(50, 5) },
     });
   });
 
