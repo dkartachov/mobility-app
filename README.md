@@ -24,7 +24,7 @@ Tests sit next to the code they cover (`*.test.ts(x)`). Database tests run real 
 ## Commands
 
 ```bash
-npm run dev                             # dev server (needs the development build installed)
+npm start                               # dev server (needs the development build installed)
 npx expo lint                           # lint
 npx tsc --noEmit                        # typecheck
 npm test                                # unit and component tests (Jest)
@@ -43,7 +43,7 @@ The development and production builds are separate apps ([Expo app variants](htt
 | Development | `development` | Mobility (Dev) | `com.hogos.mobilityapp.dev` | `mobilityapp-dev` |
 | Production | unset | Mobility | `com.hogos.mobilityapp` | `mobilityapp` |
 
-EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use the `dev` and `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
+EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use `npm start` and the `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
 
 ## Mobility score and its sources
 

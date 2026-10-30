@@ -2,7 +2,7 @@
  * App variants: the development build installs alongside the production app, with its own name,
  * identifier and URL scheme (and so its own storage). Everything else comes from `app.json`.
  * `APP_VARIANT=development` picks the development variant: the `development` profile in
- * `eas.json` sets it for EAS builds, and the `dev` and `update:dev` scripts set it for the dev
+ * `eas.json` sets it for EAS builds, and the `start` and `update:dev` scripts set it for the dev
  * server and EAS updates, which don't read `eas.json`.
  * https://docs.expo.dev/tutorial/eas/multiple-app-variants/
  */
