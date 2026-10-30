@@ -51,9 +51,10 @@ export function formatDuration(seconds: number): string {
   return `${hours}h ${minutes}m`;
 }
 
-export function ageFromDateKey(key: DateKey): number {
+/** Age in whole years on the day `on`, today by default. */
+export function ageFromDateKey(key: DateKey, on: DateKey = todayKey()): number {
   const dob = fromDateKey(key);
-  const now = new Date();
+  const now = fromDateKey(on);
   let age = now.getFullYear() - dob.getFullYear();
   const hadBirthday =
     now.getMonth() > dob.getMonth() ||

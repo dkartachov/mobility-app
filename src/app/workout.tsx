@@ -2,7 +2,7 @@ import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-rout
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useReducer, useState, type ComponentProps } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { css, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +15,7 @@ import { InstructionList } from '@/components/instruction-list';
 import { MilestoneBar } from '@/components/milestone-bar';
 import { Pager } from '@/components/pager';
 import { PressableScale } from '@/components/pressable-scale';
+import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimerBar } from '@/components/timer-bar';

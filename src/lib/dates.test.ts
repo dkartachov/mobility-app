@@ -60,4 +60,9 @@ describe('ageFromDateKey', () => {
     expect(ageFromDateKey('2000-10-29')).toBe(25);
     expect(ageFromDateKey('2000-11-01')).toBe(25);
   });
+
+  it('gives the age on another day', () => {
+    expect(ageFromDateKey('2000-10-28', '2010-10-27')).toBe(9);
+    expect(ageFromDateKey('2000-10-28', '2010-10-28')).toBe(10);
+  });
 });

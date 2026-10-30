@@ -1,10 +1,11 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { expectedResult } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { addDays, todayKey } from '@/lib/dates';
 import { createTestDb } from '@/test-utils/sqlite';
 
-import { addDevMobilityTestResults, makeDevTestDue } from './dev';
+import { addDevMobilityTestResults, DEV_RESULT_SPREAD, makeDevTestDue } from './dev';
 import { getMobilityScore, getTestSchedule, RETEST_INTERVAL_DAYS } from './mobility-tests';
 
 describe('addDevMobilityTestResults', () => {
@@ -36,16 +37,17 @@ describe('addDevMobilityTestResults', () => {
     expect(await getMobilityScore(db)).not.toBeNull();
   });
 
-  it('keeps every result within its test scoring range', async () => {
+  it('keeps every result near its test norm', async () => {
     for (let i = 0; i < 5; i++) await addDevMobilityTestResults(db);
 
     const results = await db.getAllAsync<{ exercise_id: string; value: number }>(
       'SELECT exercise_id, value FROM mobility_test_results'
     );
     for (const { exercise_id, value } of results) {
-      const { zeroAt, fullAt } = FLEXIBILITY_TESTS.find((t) => t.id === exercise_id)!.scoring;
-      expect(value).toBeGreaterThanOrEqual(Math.min(zeroAt, fullAt));
-      expect(value).toBeLessThanOrEqual(Math.max(zeroAt, fullAt));
+      const { norm } = FLEXIBILITY_TESTS.find((t) => t.id === exercise_id)!;
+      const mean = expectedResult(norm, { sex: null, age: null });
+      // Rounding can take a result half a unit past the spread.
+      expect(Math.abs(value - mean)).toBeLessThanOrEqual(DEV_RESULT_SPREAD * norm.sd + 0.5);
     }
   });
 });

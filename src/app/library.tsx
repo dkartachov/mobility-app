@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/card';
@@ -9,6 +9,7 @@ import { TextField } from '@/components/field';
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/page-header';
 import { PressableScale } from '@/components/pressable-scale';
+import { FlatList } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { EXERCISES, searchExercises, type Exercise } from '@/data/exercises';

@@ -41,24 +41,22 @@ describe('TEST_STEPS', () => {
   });
 });
 
-describe('forward fold hint', () => {
-  const hint = hintFor('forward-fold');
+describe('sit and reach hint', () => {
+  const hint = hintFor('sit-and-reach');
 
   it('uses default hand sizes when none are entered', () => {
-    // Palms flat at or below -(handLength - 1), fingers flat at or below -(fingerLength - 2).
-    expect(hint(-(DEFAULT_BODY.handLength - 1), NO_BODY)).toBe('Palms flat on the floor');
-    expect(hint(-(DEFAULT_BODY.handLength - 2), NO_BODY)).toBe('Fingers flat on the floor');
-    expect(hint(-(DEFAULT_BODY.fingerLength - 2), NO_BODY)).toBe('Fingers flat on the floor');
-    expect(hint(-1, NO_BODY)).toBe('Fingertips touch the floor');
-    expect(hint(0, NO_BODY)).toBe('Fingertips touch the floor');
-    expect(hint(10, NO_BODY)).toBe('Fingertips at the ankles');
-    expect(hint(40, NO_BODY)).toBe('Fingertips at the shins');
+    expect(hint(-20, NO_BODY)).toBe('Fingertips at the shins');
+    expect(hint(-5, NO_BODY)).toBe('Fingertips at the tops of your feet');
+    expect(hint(0, NO_BODY)).toBe('Fingertips at your toes');
+    expect(hint(DEFAULT_BODY.fingerLength, NO_BODY)).toBe('Fingers past your toes');
+    expect(hint(DEFAULT_BODY.fingerLength + 1, NO_BODY)).toBe('Palms past your toes');
+    expect(hint(DEFAULT_BODY.handLength, NO_BODY)).toBe('Palms past your toes');
+    expect(hint(DEFAULT_BODY.handLength + 1, NO_BODY)).toBe('Wrists past your toes');
   });
 
   it("uses the person's own hand length", () => {
     const body = { ...NO_BODY, handLength: 21 };
-    expect(hint(-19, NO_BODY)).toBe('Palms flat on the floor');
-    expect(hint(-19, body)).toBe('Fingers flat on the floor');
-    expect(hint(-20, body)).toBe('Palms flat on the floor');
+    expect(hint(20, NO_BODY)).toBe('Wrists past your toes');
+    expect(hint(20, body)).toBe('Palms past your toes');
   });
 });

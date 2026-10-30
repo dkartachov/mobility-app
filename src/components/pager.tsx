@@ -1,8 +1,10 @@
 import { Children, useState, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+import { ScrollView } from './scroll-view';
 
 /** Full-width pages you swipe between horizontally. Shows page dots once there is more than one page. */
 export function Pager({ children }: { children: ReactNode }) {
@@ -16,7 +18,6 @@ export function Pager({ children }: { children: ReactNode }) {
       <ScrollView
         horizontal
         pagingEnabled
-        showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(event) => setPage(Math.round(event.nativeEvent.contentOffset.x / width))}>
         {pages.map((child, index) => (
           <View key={index} style={{ width }}>

@@ -38,15 +38,15 @@ describe('mobility tests', () => {
 
   it('saves every measurement with the test', async () => {
     await logMobilityTest(db, new Date(2026, 9, 1, 9), [
-      { exerciseId: 'straddle', side: null, value: 110, unit: 'deg' },
-      { exerciseId: 'ankle-lunge', side: 'left', value: 38.5, unit: 'deg' },
+      { exerciseId: 'sit-and-reach', side: null, value: 5, unit: 'cm' },
+      { exerciseId: 'knee-to-wall', side: 'left', value: 9.5, unit: 'cm' },
     ]);
 
     expect(
       await db.getAllAsync('SELECT mobility_test_id, exercise_id, side, value, unit FROM mobility_test_results ORDER BY id')
     ).toEqual([
-      { mobility_test_id: 1, exercise_id: 'straddle', side: null, value: 110, unit: 'deg' },
-      { mobility_test_id: 1, exercise_id: 'ankle-lunge', side: 'left', value: 38.5, unit: 'deg' },
+      { mobility_test_id: 1, exercise_id: 'sit-and-reach', side: null, value: 5, unit: 'cm' },
+      { mobility_test_id: 1, exercise_id: 'knee-to-wall', side: 'left', value: 9.5, unit: 'cm' },
     ]);
   });
 
@@ -64,21 +64,34 @@ describe('mobility tests', () => {
     expect(await getMobilityScore(db)).toBeNull();
   });
 
+  // Without a profile, sit and reach is compared with both sexes up to the peak age: 1.75 cm ± 10 cm.
   it('scores the latest test with results', async () => {
-    await logMobilityTest(db, new Date(2026, 8, 1, 9), [{ exerciseId: 'straddle', side: null, value: 60, unit: 'deg' }]);
-    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'straddle', side: null, value: 150, unit: 'deg' }]);
+    await logMobilityTest(db, new Date(2026, 8, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 1.75, unit: 'cm' }]);
+    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.75, unit: 'cm' }]);
     // A later test without results, like the dev tools' "Log flexibility test today", doesn't count.
     await logMobilityTest(db, new Date(2026, 9, 2, 9));
 
     expect(await getMobilityScore(db)).toMatchObject({
-      areas: { hips: 100, ankles: null },
-      overall: 100,
-      previous: { areas: { hips: 0, ankles: null }, overall: 0 },
+      areas: { postChain: expect.closeTo(84.13, 2), ankles: null },
+      overall: expect.closeTo(84.13, 2),
+      previous: { areas: { postChain: expect.closeTo(50, 5), ankles: null }, overall: expect.closeTo(50, 5) },
     });
   });
 
   it('has no previous score after only one test with results', async () => {
-    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'straddle', side: null, value: 150, unit: 'deg' }]);
-    expect(await getMobilityScore(db)).toMatchObject({ overall: 100, previous: null });
+    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.75, unit: 'cm' }]);
+    expect(await getMobilityScore(db)).toMatchObject({ overall: expect.closeTo(84.13, 2), previous: null });
+  });
+
+  it("compares with the profile's sex and the age on the day of each test", async () => {
+    await db.runAsync("UPDATE profile SET gender = 'female', date_of_birth = '1976-06-01' WHERE id = 1");
+    // 5 cm for women, less 0.6 cm a decade past 30: 3.8 cm at 50 and 3.2 cm at 60.
+    await logMobilityTest(db, new Date(2026, 8, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 3.8, unit: 'cm' }]);
+    await logMobilityTest(db, new Date(2036, 8, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 3.2, unit: 'cm' }]);
+
+    expect(await getMobilityScore(db)).toMatchObject({
+      overall: expect.closeTo(50, 5),
+      previous: { overall: expect.closeTo(50, 5) },
+    });
   });
 });

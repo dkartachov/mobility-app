@@ -22,6 +22,9 @@ import { Card } from './card';
 import { ProgressBar } from './progress-bar';
 import { ThemedText } from './themed-text';
 
+/** Lines kept for the status under the reading, enough for the longest start position. */
+const STATUS_LINES = 3;
+
 /** Until the profile loads, hints fall back to average sizes. */
 const NO_BODY: BodyMeasurements = { handLength: null, fingerLength: null, handSpan: null };
 
@@ -47,6 +50,7 @@ export function TestMeasurement({ test, value, onChange }: MeasurementProps) {
           onChange={onChange}
           min={method.min}
           max={method.max}
+          step={method.step}
           hint={hint && ((v) => hint(v, body))}
           unit={UNIT_LABELS.cm}
           label={test.measurement}
@@ -99,56 +103,55 @@ function PhoneMeasurement({
     );
   }
 
-  if (phase === 'zeroing' || phase === 'measuring') {
-    return (
-      <View style={styles.phone}>
-        <ThemedText type="stat" style={styles.reading} themeColor={phase === 'zeroing' ? 'textSecondary' : 'text'}>
-          {phase === 'zeroing' ? '—' : `${angle}${unit}`}
-        </ThemedText>
-        <ThemedText type="smallBold" style={styles.centered}>
-          {phase === 'zeroing'
-            ? `Get into the start position and hold still: ${method.startPosition.toLowerCase()}`
-            : 'Move into the stretch, then hold still at your furthest point'}
-        </ThemedText>
-        {/* Always laid out, so the screen doesn't shift when holding still starts. */}
-        <View style={[styles.hold, { opacity: holdProgress > 0 ? 1 : 0 }]}>
-          <ProgressBar progress={holdProgress} />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-            {phase === 'zeroing' ? 'Setting the start position…' : 'Hold still, saving…'}
-          </ThemedText>
-        </View>
-        <Button title="Cancel" variant="secondary" onPress={cancel} />
-      </View>
-    );
-  }
+  const active = phase === 'zeroing' || phase === 'measuring';
+  const reading = phase === 'measuring' ? angle : phase === 'zeroing' ? null : value;
+  const status = {
+    idle: 'Hands-free: a tone plays once the start position is set, and again when the result is saved.',
+    zeroing: `Get into the start position and hold still: ${method.startPosition.toLowerCase()}`,
+    measuring: 'Move into the stretch, then hold still at your furthest point',
+    done: 'Saved. Measure again if it didn’t feel like your furthest point.',
+  }[phase === 'idle' && value !== null ? 'done' : phase];
 
+  // The same layout in every phase, only the contents change, so the box keeps its size when
+  // measuring starts and ends.
   return (
     <View style={styles.phone}>
-      {value !== null ? (
-        <ThemedText type="stat" style={styles.reading}>
-          {value}
-          {unit}
+      <ThemedText type="stat" style={styles.reading} themeColor={reading === null ? 'textSecondary' : 'text'}>
+        {reading === null ? '—' : `${reading}${unit}`}
+      </ThemedText>
+      <ThemedText
+        type={active ? 'smallBold' : 'small'}
+        themeColor={active ? 'text' : 'textSecondary'}
+        style={[styles.centered, styles.status]}
+        numberOfLines={STATUS_LINES}>
+        {status}
+      </ThemedText>
+      <View style={[styles.hold, { opacity: active && holdProgress > 0 ? 1 : 0 }]}>
+        <ProgressBar progress={holdProgress} />
+        <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
+          {phase === 'zeroing' ? 'Setting the start position…' : 'Hold still, saving…'}
         </ThemedText>
+      </View>
+      {active ? (
+        <Button title="Cancel" variant="secondary" onPress={cancel} />
       ) : (
-        <ThemedText themeColor="textSecondary">
-          Hands-free: a tone plays once the start position is set, and again when the result is saved.
-        </ThemedText>
+        <Button
+          title={value !== null ? 'Measure again' : 'Start measuring'}
+          variant={value !== null ? 'secondary' : 'primary'}
+          onPress={start}
+        />
       )}
-      <Button
-        title={value !== null ? 'Measure again' : 'Start measuring'}
-        variant={value !== null ? 'secondary' : 'primary'}
-        onPress={start}
-      />
     </View>
   );
 }
 
-/** Whole-unit slider. Shows "—" until it's first moved, so an untouched step can't be saved by accident. */
+/** Slider in steps of `step` units, whole units by default. Shows "—" until it's first moved, so an untouched step can't be saved by accident. */
 function ValueSlider({
   value,
   onChange,
   min,
   max,
+  step = 1,
   hint: hintOf,
   unit,
   label,
@@ -157,12 +160,13 @@ function ValueSlider({
   onChange: (value: number) => void;
   min: number;
   max: number;
+  step?: number;
   hint?: (value: number) => string | undefined;
   unit: string;
   label: string;
 }) {
   const theme = useTheme();
-  // Untouched, the thumb rests at 0 (the floor, for forward fold) or the low end of the range.
+  // Untouched, the thumb rests at 0 (the toes, for sit and reach) or the low end of the range.
   const initial = Math.min(max, Math.max(min, 0));
   const hint = value === null ? undefined : hintOf?.(value);
 
@@ -181,8 +185,8 @@ function ValueSlider({
         value={value ?? initial}
         minimumValue={min}
         maximumValue={max}
-        step={1}
-        onValueChange={(next) => onChange(Math.round(next))}
+        step={step}
+        onValueChange={(next) => onChange(Math.round(next / step) * step)}
         minimumTrackTintColor={theme.tint}
         maximumTrackTintColor={theme.backgroundSelected}
         thumbTintColor={theme.tint}
@@ -202,13 +206,17 @@ function ValueSlider({
 
 const styles = StyleSheet.create({
   phone: {
-    gap: Spacing.three,
-    paddingTop: Spacing.two,
+    gap: Spacing.two + Spacing.one,
+    paddingTop: Spacing.one,
   },
   reading: {
     textAlign: 'center',
-    fontSize: 64,
-    lineHeight: 72,
+    fontSize: 56,
+    lineHeight: 64,
+  },
+  /** Room for the longest status, so a shorter one doesn't shrink the box. Small text is 20 high. */
+  status: {
+    height: STATUS_LINES * 20,
   },
   hold: {
     gap: Spacing.one,

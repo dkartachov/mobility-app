@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/card';
@@ -10,6 +10,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ScoreBars } from '@/components/score-bars';
 import { ScoreBreakdown } from '@/components/score-breakdown';
 import { ScoreRing } from '@/components/score-ring';
+import { ScrollView } from '@/components/scroll-view';
 import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';

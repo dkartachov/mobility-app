@@ -7,4 +7,20 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react-native',
+              importNames: ['ScrollView', 'FlatList'],
+              message: "Import from '@/components/scroll-view', which hides scroll bars app-wide.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

@@ -4,6 +4,7 @@
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { expectedResult } from '@/data/mobility-score';
 import { METHOD_UNITS, TEST_STEPS } from '@/data/mobility-tests';
 import { addDays, daysBetween, todayKey } from '@/lib/dates';
 import { milestoneProgress } from '@/lib/milestones';
@@ -48,27 +49,32 @@ export async function addDevMobilityTest(db: SQLiteDatabase, daysAgo = 0) {
   await logMobilityTest(db, takenAt);
 }
 
-/** How far a made-up result can move from the previous one, as a share of the test's scoring range. */
-const DEV_RESULT_DRIFT = 0.15;
-/** Where first made-up results fall, as shares of the test's scoring range (scores of 50–90). */
-const DEV_FIRST_RESULT_RANGE = [0.5, 0.9] as const;
+/** How far a made-up result can move from the previous one, in standard deviations of its test's norm. */
+const DEV_RESULT_DRIFT = 0.3;
+/** Where first made-up results fall, in standard deviations better than average (scores of 50–90). */
+const DEV_FIRST_RESULT_RANGE = [0, 1.28] as const;
+/** Made-up results stay within this many standard deviations of average. */
+export const DEV_RESULT_SPREAD = 2.5;
 
 /**
- * Made-up results for every test step. Without earlier results they land in the upper half of
- * each test's scoring range; otherwise each one drifts a little from its previous value, so a
+ * Made-up results for every test step. Without earlier results they land between average and the
+ * top tenth of each test's norm; otherwise each one drifts a little from its previous value, so a
  * run of them looks like a real history with ups and downs.
  */
 function randomResults(previous: Map<string, number>) {
   return TEST_STEPS.map(({ test, side }) => {
-    const { zeroAt, fullAt } = test.scoring;
-    const range = fullAt - zeroAt;
+    const { sd } = test.norm;
+    const mean = expectedResult(test.norm, { sex: null, age: null });
     const last = previous.get(`${test.id}:${side}`);
     const [firstLow, firstHigh] = DEV_FIRST_RESULT_RANGE;
     const value =
       last === undefined
-        ? zeroAt + (firstLow + Math.random() * (firstHigh - firstLow)) * range
-        : last + (Math.random() * 2 - 1) * DEV_RESULT_DRIFT * range;
-    const [low, high] = [Math.min(zeroAt, fullAt), Math.max(zeroAt, fullAt)];
+        ? mean + (firstLow + Math.random() * (firstHigh - firstLow)) * sd
+        : last + (Math.random() * 2 - 1) * DEV_RESULT_DRIFT * sd;
+    // Distances also stay on their slider.
+    const { method } = test;
+    const low = Math.max(mean - DEV_RESULT_SPREAD * sd, method.kind === 'distance' ? method.min : -Infinity);
+    const high = Math.min(mean + DEV_RESULT_SPREAD * sd, method.kind === 'distance' ? method.max : Infinity);
     return {
       exerciseId: test.id,
       side,

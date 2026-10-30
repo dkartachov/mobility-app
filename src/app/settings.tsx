@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -9,6 +9,7 @@ import { Chip } from '@/components/chip';
 import { DevTools } from '@/components/dev-tools';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
+import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';

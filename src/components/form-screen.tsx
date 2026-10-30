@@ -1,9 +1,11 @@
 import type { ReactNode, Ref } from 'react';
-import { ScrollView, StyleSheet, type ScrollViewInstance } from 'react-native';
+import { StyleSheet, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+import { ScrollView } from './scroll-view';
 
 /** Scrollable container for modal forms (shown under the Stack header). */
 export function FormScreen({ children, ref }: { children: ReactNode; ref?: Ref<ScrollViewInstance> }) {

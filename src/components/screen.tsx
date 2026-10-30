@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
-import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { PageHeader } from './page-header';
+import { ScrollView } from './scroll-view';
 
 type ScreenProps = {
   title: string;
@@ -28,7 +28,7 @@ export function Screen({ title, subtitle, eyebrow, headerAction, gap = Spacing.f
     <ScrollView
       style={{ backgroundColor: theme.background }}
       contentInsetAdjustmentBehavior="never"
-      showsVerticalScrollIndicator={false}
+     
       alwaysBounceVertical={false}
       contentContainerStyle={[
         {

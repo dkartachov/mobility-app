@@ -1,7 +1,7 @@
 import { Stack, router, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,7 @@ import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
 import { ProgressBar } from '@/components/progress-bar';
 import { ScoreRing } from '@/components/score-ring';
+import { ScrollView } from '@/components/scroll-view';
 import { TestMeasurement } from '@/components/test-measurement';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -34,10 +35,8 @@ import { useSkipTestMeasurements } from '@/lib/dev-settings';
 const CALCULATING_MS = 2000;
 
 const TIPS = [
-  'Test at the same time of day, ideally before climbing or training rather than after.',
-  'Use the same place, wall and floor surface each time.',
+  'Test at the same time of day, ideally before a workout.',
   'Do the same warm-up every time, or none at all.',
-  'Test barefoot in clothes that don’t restrict movement.',
   'Move slowly into each position and stop at a firm stretch, never pain.',
   'Measure the same way each time so results are comparable.',
 ];
@@ -145,7 +144,7 @@ function Intro({ onStart }: { onStart: () => void }) {
         <PageHeader
           eyebrow="About 20 minutes"
           title="Flexibility test"
-          subtitle={`${FLEXIBILITY_TESTS.length} tests, ${TEST_STEPS.length} measurements in total. Two-sided tests are done left, then right.`}
+          subtitle={`${FLEXIBILITY_TESTS.length} tests, ${TEST_STEPS.length} measurements in total.`}
         />
         <Card style={styles.introCard}>
           <CardTitle icon={{ ios: 'lightbulb.fill', android: 'lightbulb' }} title="For accurate results" />
@@ -158,7 +157,10 @@ function Intro({ onStart }: { onStart: () => void }) {
         </Card>
         <Card style={styles.introCard}>
           <CardTitle icon={{ ios: 'shippingbox.fill', android: 'inventory_2' }} title="You'll need" />
-          <ThemedText>A clear wall, some floor space, a table and a tape measure.</ThemedText>
+          <ThemedText>
+            A clear wall, some floor space, a stair or sturdy box, a table, a tape measure, a strap to hold the phone to
+            your leg, and a partner for the hip rotation tests.
+          </ThemedText>
         </Card>
         <Card style={styles.introCard}>
           <CardTitle icon={{ ios: 'ruler.fill', android: 'straighten' }} title="Your body measurements" />
@@ -217,14 +219,34 @@ function Measure({ index, value, onChange, onBack, onNext, canSkip }: MeasurePro
       <View style={styles.progress}>
         <ProgressBar progress={(index + 1) / TEST_STEPS.length} />
       </View>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+       
+        keyboardShouldPersistTaps="handled">
         <View style={styles.heading}>
-          <PageHeader eyebrow={AREA_LABELS[test.area]} title={test.name} />
-          {side && <SidePill label={SIDE_LABELS[side]} />}
+          <View style={styles.headingRow}>
+            <ThemedText type="eyebrow" themeColor="tint">
+              {AREA_LABELS[test.area]}
+            </ThemedText>
+            {side && <SidePill label={SIDE_LABELS[side]} />}
+          </View>
+          {/* One line even for long names like "Shoulder external rotation", shrinking if it has to. */}
+          <ThemedText
+            type="title"
+            style={styles.testName}
+            accessibilityRole="header"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}>
+            {test.name}
+          </ThemedText>
         </View>
         <ThemedText>{test.instructions}</ThemedText>
-        <TestMeasurement test={test} value={value} onChange={onChange} />
       </ScrollView>
+      {/* Outside the scroll view, so the reading and Cancel stay in view however long the instructions are. */}
+      <View style={styles.measurement}>
+        <TestMeasurement test={test} value={value} onChange={onChange} />
+      </View>
       <View style={[styles.footer, styles.footerRow, { paddingBottom: insets.bottom + Spacing.three }]}>
         {onBack && (
           <View style={styles.footerButton}>
@@ -323,7 +345,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   heading: {
+    gap: Spacing.one,
+  },
+  headingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Spacing.two,
+  },
+  testName: {
+    fontSize: 26,
+    lineHeight: 32,
+  },
+  measurement: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
   },
   introCard: {
     gap: Spacing.three,
@@ -334,12 +370,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two + Spacing.one,
   },
   sidePill: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one + Spacing.half,
+    gap: Spacing.one + Spacing.half,
+    paddingHorizontal: Spacing.two + Spacing.one,
+    paddingVertical: Spacing.one,
     borderRadius: Radius.full,
   },
   spinner: {

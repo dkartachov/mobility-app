@@ -1,9 +1,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { mobilityScore, type MobilityScore, type ScoredResult } from '@/data/mobility-score';
+import { mobilityScore, type Demographics, type MobilityScore, type ScoredResult } from '@/data/mobility-score';
 import type { Side, Unit } from '@/data/mobility-tests';
-import { addDays, daysBetween, toDateKey, todayKey, type DateKey } from '@/lib/dates';
+import { addDays, ageFromDateKey, daysBetween, toDateKey, todayKey, type DateKey } from '@/lib/dates';
 
+import { getProfile } from './profile';
 import { useDbQuery } from './use-db-query';
 
 /** A flexibility test is due this many days after the previous one. */
@@ -66,25 +67,36 @@ export type ScoreWithBaseline = MobilityScore & {
   previous: MobilityScore | null;
 };
 
-/** The score from the most recent test with results, `null` before there is one. */
+/**
+ * The score from the most recent test with results, `null` before there is one. Results are
+ * compared with people of the profile's sex and the age the person was on the day of each test.
+ */
 export async function getMobilityScore(db: SQLiteDatabase): Promise<ScoreWithBaseline | null> {
-  const tests = await db.getAllAsync<{ id: number }>(
-    `SELECT t.id FROM mobility_tests t
+  const { gender, dateOfBirth } = await getProfile(db);
+  const sex = gender === 'male' || gender === 'female' ? gender : null;
+  const tests = await db.getAllAsync<{ id: number; local_date: DateKey }>(
+    `SELECT t.id, t.local_date FROM mobility_tests t
      WHERE EXISTS (SELECT 1 FROM mobility_test_results r WHERE r.mobility_test_id = t.id)
      ORDER BY t.taken_at DESC, t.id DESC LIMIT 2`
   );
-  const scoreOf = async (testId: number) =>
-    mobilityScore(
+  const scoreOf = async (test: (typeof tests)[number]) => {
+    const demographics: Demographics = {
+      sex,
+      age: dateOfBirth ? ageFromDateKey(dateOfBirth, test.local_date) : null,
+    };
+    return mobilityScore(
       await db.getAllAsync<ScoredResult>(
         'SELECT exercise_id AS exerciseId, side, value, unit FROM mobility_test_results WHERE mobility_test_id = ?',
-        testId
-      )
+        test.id
+      ),
+      demographics
     );
+  };
   const [latest, previous] = tests;
   if (!latest) return null;
-  return { ...(await scoreOf(latest.id)), previous: previous ? await scoreOf(previous.id) : null };
+  return { ...(await scoreOf(latest)), previous: previous ? await scoreOf(previous) : null };
 }
 
 export function useMobilityScore() {
-  return useDbQuery(getMobilityScore, ['mobility_tests', 'mobility_test_results']);
+  return useDbQuery(getMobilityScore, ['mobility_tests', 'mobility_test_results', 'profile']);
 }
