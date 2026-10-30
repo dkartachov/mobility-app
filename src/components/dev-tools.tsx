@@ -30,7 +30,7 @@ import { Button } from './button';
 import { Card } from './card';
 import { ThemedText } from './themed-text';
 
-/** Settings section for faking data during development. Render it behind `DEV_TOOLS_ENABLED` only. */
+/** Settings section for faking data during development. Render it behind `__DEV__` only. */
 export function DevTools() {
   const db = useSQLiteContext();
   const theme = useTheme();

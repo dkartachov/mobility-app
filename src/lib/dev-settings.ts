@@ -1,18 +1,12 @@
 /**
  * Development-only switches, toggled from the Developer section in Settings. They always read
- * as off unless dev tools are enabled, even if a value was stored.
+ * as off in production builds, even if a value was stored.
  */
 import Storage from 'expo-sqlite/kv-store';
 import { useSyncExternalStore } from 'react';
 
-/**
- * Whether the Developer section and its switches are available: when running from Metro, or in
- * bundles exported with `EXPO_PUBLIC_DEV_TOOLS=true`, such as development-channel EAS updates.
- */
-export const DEV_TOOLS_ENABLED = __DEV__ || process.env.EXPO_PUBLIC_DEV_TOOLS === 'true';
-
 function devSwitch(key: string) {
-  let enabled = DEV_TOOLS_ENABLED && Storage.getItemSync(key) === 'true';
+  let enabled = __DEV__ && Storage.getItemSync(key) === 'true';
   const listeners = new Set<() => void>();
 
   const subscribe = (listener: () => void) => {
@@ -21,7 +15,7 @@ function devSwitch(key: string) {
   };
   const get = () => enabled;
   const set = (next: boolean) => {
-    if (!DEV_TOOLS_ENABLED) return;
+    if (!__DEV__) return;
     Storage.setItemSync(key, String(next));
     enabled = next;
     listeners.forEach((listener) => listener());

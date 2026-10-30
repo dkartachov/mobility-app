@@ -1,6 +1,6 @@
 /**
  * Development-only helpers for faking data. Only reachable from the Developer section in
- * Settings, which renders behind `DEV_TOOLS_ENABLED`.
+ * Settings, which renders behind `__DEV__`.
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 
