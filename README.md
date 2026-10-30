@@ -24,14 +24,26 @@ Tests sit next to the code they cover (`*.test.ts(x)`). Database tests run real 
 ## Commands
 
 ```bash
-npx expo start                          # dev server (needs the development build installed)
+npm start                               # dev server (needs the development build installed)
 npx expo lint                           # lint
 npx tsc --noEmit                        # typecheck
 npm test                                # unit and component tests (Jest)
 npx expo-doctor                         # check dependencies and config
-npx eas-cli@latest build --profile development   # new dev build after adding native packages
-npx eas-cli@latest update               # ship an over-the-air update
+npm run build:dev                       # new dev build after adding native packages
+npm run build:prod                      # production build (APK)
+npm run update:dev -- --message "..."   # over-the-air update; update:prod for production
 ```
+
+### App variants
+
+The development and production builds are separate apps ([Expo app variants](https://docs.expo.dev/tutorial/eas/multiple-app-variants/), set up in `app.config.ts`), so both can be installed on one device, each with its own data. Production builds an APK, so it installs from its EAS build page like the dev build:
+
+| Variant | `APP_VARIANT` | Name | Identifier | Scheme |
+|---|---|---|---|---|
+| Development | `development` | Mobility (Dev) | `com.hogos.mobilityapp.dev` | `mobilityapp-dev` |
+| Production | unset | Mobility | `com.hogos.mobilityapp` | `mobilityapp` |
+
+EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use `npm start` and the `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
 
 ## Mobility score and its sources
 

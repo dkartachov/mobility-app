@@ -51,11 +51,12 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "start": "APP_VARIANT=development expo start",
     "lint": "expo lint",
-    "build:dev": "eas build --profile development",
+    "build:dev": "npx eas-cli@latest build --profile development",
+    "build:prod": "npx eas-cli@latest build --profile production",
+    "update:dev": "APP_VARIANT=development npx eas-cli@latest update --channel development --environment development --platform android",
+    "update:prod": "npx eas-cli@latest update --channel production --environment production --platform android",
     "test": "jest"
   },
   "private": true,
