@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { AutoBackup } from '@/components/auto-backup';
 import { DialogHost } from '@/components/dialog';
+import { ReminderScheduler } from '@/components/reminder-scheduler';
 import { StackHeader } from '@/components/stack-header';
 import { Colors } from '@/constants/theme';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
@@ -34,6 +35,7 @@ export default function RootLayout() {
       onInit={migrateDbIfNeeded}
       options={{ enableChangeListener: true }}>
       <AutoBackup />
+      <ReminderScheduler />
       <ThemeProvider value={navigationTheme}>
         <StatusBar style="auto" />
         <Stack screenOptions={{ header: (props) => <StackHeader {...props} /> }}>

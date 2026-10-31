@@ -45,6 +45,12 @@ The development and production builds are separate apps ([Expo app variants](htt
 
 EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use `npm start` and the `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
 
+## Exercise reminders
+
+Settings has a list of reminder times, each with its own days of the week and on/off switch. They're stored in the `reminders` table, so backups include them. `src/lib/reminders.ts` matches the scheduled local notifications to that table whenever it changes and whenever the app opens, with one weekly trigger per selected day. Reminders show while the app is open, and tapping one goes to the Start tab, except during a workout or flexibility test.
+
+With no reminders set, pressing Done after a workout suggests adding one (`src/lib/reminder-prompt.ts`). "Don't ask again" is permanent; "Later" and going to Settings wait three workouts.
+
 ## Cloud backups
 
 SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the whole file to a private Supabase Storage bucket, plus the profile photo: about 5 seconds after any change, and when the app opens or goes to the background if an earlier upload didn't finish. There's one snapshot per day, with the last 30 days kept. Postgres isn't used, so new tables and columns need no backup changes, and restoring an old snapshot runs the normal migrations.

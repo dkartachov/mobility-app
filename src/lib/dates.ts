@@ -41,6 +41,16 @@ export function formatDateKey(key: DateKey): string {
   });
 }
 
+/** A time of day as a `Date`, for time pickers and formatting. The day itself is arbitrary. */
+export function timeOfDayDate(hour: number, minute: number): Date {
+  return new Date(2024, 0, 1, hour, minute);
+}
+
+/** A time of day in the device's format, like "6:30 PM" or "18:30". */
+export function formatTimeOfDay(hour: number, minute: number): string {
+  return timeOfDayDate(hour, minute).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
 /** Days since the Monday of the week `date` falls in. */
 function daysSinceMonday(date: Date) {
   return (date.getDay() + 6) % 7;

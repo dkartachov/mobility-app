@@ -14,6 +14,10 @@ export type DialogOptions = {
   cancelLabel?: string;
   /** The destructive choice. Without it, the dialog is only a message to dismiss. */
   confirm?: { label: string; onPress: () => void };
+  /** Replaces the buttons above, for a choice that isn't between doing something and cancelling. */
+  actions?: { label: string; variant: 'primary' | 'secondary'; onPress: () => void }[];
+  /** Runs when the dialog closes without an action: its cancel button, the backdrop or Android's back. */
+  onDismiss?: () => void;
 };
 
 /** `options` outlives `visible`, so the dialog keeps its contents while it fades out. */
@@ -51,14 +55,15 @@ export function DialogHost() {
   const { options, visible } = useSyncExternalStore(subscribe, getState);
   if (!options) return null;
 
-  const { title, message, confirm, cancelLabel = confirm ? 'Cancel' : 'OK' } = options;
+  const { title, message, confirm, cancelLabel = confirm ? 'Cancel' : 'OK', actions, onDismiss } = options;
 
   // The buttons stay pressable while fading out, and a double tap mustn't run the action twice.
-  const pressConfirm = () => {
+  const closeAndRun = (action?: () => void) => {
     if (!getState().visible) return;
     closeDialog();
-    confirm?.onPress();
+    action?.();
   };
+  const dismiss = () => closeAndRun(onDismiss);
 
   return (
     <Modal
@@ -67,17 +72,27 @@ export function DialogHost() {
       animationType="fade"
       statusBarTranslucent
       navigationBarTranslucent
-      onRequestClose={closeDialog}>
+      onRequestClose={dismiss}>
       <View style={styles.overlay}>
-        <Pressable accessible={false} onPress={closeDialog} style={styles.backdrop} />
+        <Pressable accessible={false} onPress={dismiss} style={styles.backdrop} />
         <Card accessibilityRole="alert" style={styles.card}>
           <ThemedText type="subtitle" accessibilityRole="header">
             {title}
           </ThemedText>
           <ThemedText themeColor="textSecondary">{message}</ThemedText>
           <View style={styles.buttons}>
-            {confirm && <Button title={confirm.label} variant="destructive" onPress={pressConfirm} />}
-            <Button title={cancelLabel} variant="secondary" onPress={closeDialog} />
+            {actions ? (
+              actions.map(({ label, variant, onPress }) => (
+                <Button key={label} title={label} variant={variant} onPress={() => closeAndRun(onPress)} />
+              ))
+            ) : (
+              <>
+                {confirm && (
+                  <Button title={confirm.label} variant="destructive" onPress={() => closeAndRun(confirm.onPress)} />
+                )}
+                <Button title={cancelLabel} variant="secondary" onPress={dismiss} />
+              </>
+            )}
           </View>
         </Card>
       </View>

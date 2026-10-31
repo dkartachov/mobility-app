@@ -16,6 +16,7 @@ import { InstructionList } from '@/components/instruction-list';
 import { MilestoneBar } from '@/components/milestone-bar';
 import { Pager } from '@/components/pager';
 import { PressableScale } from '@/components/pressable-scale';
+import { promptForReminderIfDue } from '@/components/reminder-prompt';
 import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -27,6 +28,7 @@ import { useWorkoutCues, type WorkoutCue } from '@/hooks/use-workout-cues';
 import { formatDuration } from '@/lib/dates';
 import { getFastWorkouts } from '@/lib/dev-settings';
 import { milestoneReached } from '@/lib/milestones';
+import { countWorkoutForReminderPrompt } from '@/lib/reminder-prompt';
 import { useColorScheme } from '@/lib/theme-preference';
 import {
   BUFFER_SECONDS,
@@ -201,6 +203,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
     setCompleting(true);
     const fromSeconds = await getTotalSeconds(db);
     await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: 'daily' });
+    countWorkoutForReminderPrompt();
     setResult({ fromSeconds, toSeconds: fromSeconds + plannedSeconds });
   };
 
@@ -295,9 +298,16 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
 
 /** Shown after completing: the milestone bar grows by the time just logged. */
 function WorkoutSummary({ fromSeconds, toSeconds }: { fromSeconds: number; toSeconds: number }) {
+  const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const [filled, setFilled] = useState(false);
   const reached = milestoneReached(fromSeconds, toSeconds);
+
+  // Waits for Done, so nothing interrupts the summary and its milestone.
+  const finish = () => {
+    router.dismissTo('/');
+    promptForReminderIfDue(db).catch(console.warn);
+  };
 
   return (
     <ThemedView style={[styles.summary, { paddingBottom: insets.bottom + Spacing.three }]}>
@@ -337,7 +347,7 @@ function WorkoutSummary({ fromSeconds, toSeconds }: { fromSeconds: number; toSec
       <View style={styles.summaryDone}>
         {filled && (
           <Animated.View entering={FadeInDown.springify()}>
-            <Button title="Done" onPress={() => router.dismissTo('/')} />
+            <Button title="Done" onPress={finish} />
           </Animated.View>
         )}
       </View>

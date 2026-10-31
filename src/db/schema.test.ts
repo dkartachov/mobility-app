@@ -9,7 +9,14 @@ describe('migrateDbIfNeeded', () => {
     const tables = await db.getAllAsync<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
     );
-    expect(tables.map((t) => t.name)).toEqual(['goals', 'mobility_test_results', 'mobility_tests', 'profile', 'sessions']);
+    expect(tables.map((t) => t.name)).toEqual([
+      'goals',
+      'mobility_test_results',
+      'mobility_tests',
+      'profile',
+      'reminders',
+      'sessions',
+    ]);
 
     const profileColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(profile)');
     expect(profileColumns.map((c) => c.name)).toEqual([

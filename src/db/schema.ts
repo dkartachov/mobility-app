@@ -52,6 +52,15 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX mobility_test_results_test ON mobility_test_results (mobility_test_id);
   `,
+  `
+  CREATE TABLE reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hour INTEGER NOT NULL,
+    minute INTEGER NOT NULL,
+    weekdays TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1
+  );
+  `,
 ];
 
 /** The `user_version` of a fully migrated database. */

@@ -39,4 +39,40 @@ describe('DialogHost', () => {
 
     expect(screen.queryByText('Failed')).toBeNull();
   });
+
+  it('shows only the given actions and runs the one pressed, once', async () => {
+    const first = jest.fn();
+    const second = jest.fn();
+    const onDismiss = jest.fn();
+    await render(<DialogHost />);
+    await act(async () =>
+      showDialog({
+        title: 'Choose',
+        message: '',
+        actions: [
+          { label: 'First', variant: 'primary', onPress: first },
+          { label: 'Second', variant: 'secondary', onPress: second },
+        ],
+        onDismiss,
+      })
+    );
+    expect(screen.getAllByRole('button').length).toBe(2);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Second' }));
+
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(screen.queryByText('Choose')).toBeNull();
+  });
+
+  it('runs onDismiss when cancelled', async () => {
+    const onDismiss = jest.fn();
+    await render(<DialogHost />);
+    await act(async () => showDialog({ title: 'Note', message: '', onDismiss }));
+
+    await fireEvent.press(screen.getByRole('button', { name: 'OK' }));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });

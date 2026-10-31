@@ -1,6 +1,7 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { StyleSheet, View } from 'react-native';
+import { useRef } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackupCard } from '@/components/backup-card';
@@ -11,6 +12,7 @@ import { DevTools } from '@/components/dev-tools';
 import { showDialog } from '@/components/dialog';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
+import { RemindersCard } from '@/components/reminders-card';
 import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -27,6 +29,16 @@ export default function SettingsScreen() {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const themePreference = useThemePreference();
+  const { section } = useLocalSearchParams<{ section?: 'reminders' }>();
+  const scrollView = useRef<ScrollViewInstance>(null);
+  const scrolledToSection = useRef(false);
+
+  // Only the first layout: the section lays out again as its reminders change, and must not jump.
+  const scrollToReminders = ({ nativeEvent }: LayoutChangeEvent) => {
+    if (section !== 'reminders' || scrolledToSection.current) return;
+    scrolledToSection.current = true;
+    scrollView.current?.scrollTo({ y: nativeEvent.layout.y - Spacing.three });
+  };
 
   const confirmDeleteSessions = () => {
     showDialog({
@@ -45,6 +57,7 @@ export default function SettingsScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ScrollView
+        ref={scrollView}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
         <PageHeader title="Settings" />
@@ -68,6 +81,13 @@ export default function SettingsScreen() {
               ))}
             </View>
           </Card>
+        </View>
+
+        <View style={styles.section} onLayout={scrollToReminders}>
+          <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
+            Reminders
+          </ThemedText>
+          <RemindersCard />
         </View>
 
         <View style={styles.section}>
