@@ -11,7 +11,7 @@ const mockObjects = new Map<string, ArrayBuffer>();
 const mockFailUploads = { value: false };
 const SIGNED_IN = { user: { id: 'user-1' } };
 const mockSession = { value: SIGNED_IN as object | null, error: null as { message: string } | null };
-const mockApp = { id: 'com.hogos.mobilityapp.dev' };
+const mockApp = { id: 'com.hogos.plie.dev' };
 const mockBucketsUsed = new Set<string>();
 const mockDownloads: { bytes: Uint8Array; deleted: boolean } = { bytes: new Uint8Array(), deleted: false };
 
@@ -123,7 +123,7 @@ describe('backups', () => {
     mockLocalFiles.clear();
     mockFailUploads.value = false;
     mockSession.value = SIGNED_IN;
-    mockApp.id = 'com.hogos.mobilityapp.dev';
+    mockApp.id = 'com.hogos.plie.dev';
     mockBucketsUsed.clear();
     mockSession.error = null;
     mockDownloads.bytes = new Uint8Array();
@@ -183,8 +183,8 @@ describe('backups', () => {
   });
 
   it.each([
-    ['com.hogos.mobilityapp.dev', 'backups-dev'],
-    ['com.hogos.mobilityapp', 'backups-prod'],
+    ['com.hogos.plie.dev', 'backups-dev'],
+    ['com.hogos.plie', 'backups-prod'],
   ])('backs up %s to %s', async (id, bucket) => {
     mockApp.id = id;
     const { linkDevice } = loadBackup();

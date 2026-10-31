@@ -40,8 +40,8 @@ The development and production builds are separate apps ([Expo app variants](htt
 
 | Variant | `APP_VARIANT` | Name | Identifier | Scheme |
 |---|---|---|---|---|
-| Development | `development` | Plie (Dev) | `com.hogos.mobilityapp.dev` | `mobilityapp-dev` |
-| Production | unset | Plie | `com.hogos.mobilityapp` | `mobilityapp` |
+| Development | `development` | Plie (Dev) | `com.hogos.plie.dev` | `plie-dev` |
+| Production | unset | Plie | `com.hogos.plie` | `plie` |
 
 EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use `npm start` and the `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
 
@@ -53,8 +53,8 @@ Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` i
 
 | Variant | App ID | Bucket | Login |
 |---|---|---|---|
-| Development | `com.hogos.mobilityapp.dev` | `backups-dev` | Dev user |
-| Production | `com.hogos.mobilityapp` | `backups-prod` | Your real user |
+| Development | `com.hogos.plie.dev` | `backups-dev` | Dev user |
+| Production | `com.hogos.plie` | `backups-prod` | Your real user |
 
 Separate logins aren't required, but they're worth keeping: if a bug ever sent the dev build to the production bucket, the dev login would only reach its own folder there.
 

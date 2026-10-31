@@ -10,13 +10,13 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 const IS_DEV = process.env.APP_VARIANT === 'development';
 
-const IDENTIFIER = IS_DEV ? 'com.hogos.mobilityapp.dev' : 'com.hogos.mobilityapp';
+const IDENTIFIER = IS_DEV ? 'com.hogos.plie.dev' : 'com.hogos.plie';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: IS_DEV ? 'Plie (Dev)' : 'Plie',
-  slug: 'mobility-app',
-  scheme: IS_DEV ? 'mobilityapp-dev' : 'mobilityapp',
+  slug: 'plie',
+  scheme: IS_DEV ? 'plie-dev' : 'plie',
   ios: {
     ...config.ios,
     bundleIdentifier: IDENTIFIER,

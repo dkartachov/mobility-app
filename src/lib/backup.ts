@@ -33,8 +33,8 @@ const LAST_BACKUP_KEY = 'backup.lastBackupAt';
 const UPLOADED_PHOTO_KEY = 'backup.uploadedPhoto';
 
 const BUCKETS: Record<string, string> = {
-  'com.hogos.mobilityapp': 'backups-prod',
-  'com.hogos.mobilityapp.dev': 'backups-dev',
+  'com.hogos.plie': 'backups-prod',
+  'com.hogos.plie.dev': 'backups-dev',
 };
 
 // Anything else, like Expo Go, has no bucket: guessing could put test data among real backups.

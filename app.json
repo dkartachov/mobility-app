@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Plie",
-    "slug": "mobility-app",
+    "slug": "plie",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobilityapp",
+    "scheme": "plie",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -24,7 +24,7 @@
       "blockedPermissions": [
         "android.permission.ACTIVITY_RECOGNITION"
       ],
-      "package": "com.hogos.mobilityapp"
+      "package": "com.hogos.plie"
     },
     "plugins": [
       "expo-router",
