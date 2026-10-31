@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
+import { AutoBackup } from '@/components/auto-backup';
 import { StackHeader } from '@/components/stack-header';
 import { Colors } from '@/constants/theme';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
@@ -31,6 +32,7 @@ export default function RootLayout() {
       databaseName={DATABASE_NAME}
       onInit={migrateDbIfNeeded}
       options={{ enableChangeListener: true }}>
+      <AutoBackup />
       <ThemeProvider value={navigationTheme}>
         <StatusBar style="auto" />
         <Stack screenOptions={{ header: (props) => <StackHeader {...props} /> }}>

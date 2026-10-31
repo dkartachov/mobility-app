@@ -3,6 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { Alert, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BackupCard } from '@/components/backup-card';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
@@ -42,7 +43,9 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
         <PageHeader title="Settings" />
         <View style={styles.section}>
           <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
@@ -70,6 +73,7 @@ export default function SettingsScreen() {
           <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
             Data
           </ThemedText>
+          <BackupCard />
           <Card style={styles.card}>
             <View style={styles.rowTitle}>
               <IconBadge

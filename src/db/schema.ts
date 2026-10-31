@@ -70,6 +70,9 @@ const MIGRATIONS: string[] = [
   `,
 ];
 
+/** The `user_version` of a fully migrated database. */
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 

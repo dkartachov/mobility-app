@@ -1,6 +1,6 @@
 # Mobility
 
-A stretching and mobility app built with Expo (SDK 58) and Expo Router. iOS and Android only. All data is stored on the device in SQLite; there is no backend.
+A stretching and mobility app built with Expo (SDK 58) and Expo Router. iOS and Android only. All data lives on the device in SQLite, with [snapshot backups](#cloud-backups) to Supabase Storage.
 
 ## Structure
 
@@ -44,6 +44,35 @@ The development and production builds are separate apps ([Expo app variants](htt
 | Production | unset | Mobility | `com.hogos.mobilityapp` | `mobilityapp` |
 
 EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use `npm start` and the `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
+
+## Cloud backups
+
+SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the whole file to a private Supabase Storage bucket, plus the profile photo: about 5 seconds after any change, and when the app opens or goes to the background if an earlier upload didn't finish. There's one snapshot per day, with the last 30 days kept. Postgres isn't used, so new tables and columns need no backup changes, and restoring an old snapshot runs the normal migrations.
+
+Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` in `src/lib/backup.ts`), so development data stays out of production however the dev server was started. Inside a bucket, each user can only reach a folder named after their user ID (`supabase/setup.sql`):
+
+| Variant | App ID | Bucket | Login |
+|---|---|---|---|
+| Development | `com.hogos.mobilityapp.dev` | `backups-dev` | Dev user |
+| Production | `com.hogos.mobilityapp` | `backups-prod` | Your real user |
+
+Separate logins aren't required, but they're worth keeping: if a bug ever sent the dev build to the production bucket, the dev login would only reach its own folder there.
+
+After signing in on a phone, backups stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
+
+### Setup
+
+1. Create a Supabase project.
+2. Under Authentication, turn off new user sign-ups, then add a dev user and a real user, both already confirmed.
+3. Run `supabase/setup.sql` in the SQL editor.
+4. Copy `.env.example` to `.env.local` and fill it in, for the dev server.
+5. Add the same two values to EAS for builds and updates, once per variable and value:
+
+   ```bash
+   npx eas-cli@latest env:set --environment development --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value "..."
+   ```
+
+6. Make new builds with `npm run build:dev` and `npm run build:prod`, then sign in under Settings.
 
 ## Mobility score and its sources
 

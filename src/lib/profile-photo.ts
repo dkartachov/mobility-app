@@ -8,6 +8,12 @@ import * as ImagePicker from 'expo-image-picker';
  */
 const photoDir = new Directory(Paths.document, 'profile');
 
+/** A photo's file, creating the directory if needed so the file can be written to. */
+export function profilePhotoFile(fileName: string) {
+  photoDir.create({ intermediates: true, idempotent: true });
+  return new File(photoDir, fileName);
+}
+
 export function profilePhotoUri(fileName: string | null) {
   if (!fileName) return null;
   const file = new File(photoDir, fileName);
