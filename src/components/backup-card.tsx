@@ -1,5 +1,5 @@
 import { reloadAppAsync } from 'expo';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
@@ -24,6 +24,15 @@ import { supabase } from '@/lib/supabase';
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function restoreAndReload(db: SQLiteDatabase, date: DateKey) {
+  try {
+    await restoreSnapshot(db, date);
+    await reloadAppAsync('Restored a backup');
+  } catch (error) {
+    Alert.alert("Couldn't restore this backup", errorMessage(error));
+  }
 }
 
 /** The Settings card for cloud backups: sign in, see the last backup, back up or restore. */
@@ -121,14 +130,19 @@ function SignedIn() {
     if (!linked && snapshots?.length === 0) linkDevice(db);
   }, [linked, snapshots, db]);
 
-  const restore = async (date: DateKey) => {
-    try {
-      await restoreSnapshot(db, date);
-      await reloadAppAsync('Restored a backup');
-    } catch (error) {
-      Alert.alert("Couldn't restore this backup", errorMessage(error));
-    }
-  };
+  // Declining leaves the card's choices below: older backups, or keeping this phone's data.
+  useEffect(() => {
+    const latest = snapshots?.[0];
+    if (linked || !latest) return;
+    Alert.alert(
+      'Restore your latest backup?',
+      `This account has a backup from ${formatDateKey(latest)}. Restoring replaces everything on this phone with it, then restarts the app.`,
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Restore', style: 'destructive', onPress: () => restoreAndReload(db, latest) },
+      ]
+    );
+  }, [linked, snapshots, db]);
 
   const confirmRestore = (date: DateKey) => {
     Alert.alert(
@@ -136,7 +150,7 @@ function SignedIn() {
       'This replaces everything on this phone with that backup, then restarts the app.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Restore', style: 'destructive', onPress: () => restore(date) },
+        { text: 'Restore', style: 'destructive', onPress: () => restoreAndReload(db, date) },
       ]
     );
   };
