@@ -14,7 +14,7 @@ const IDENTIFIER = IS_DEV ? 'com.hogos.mobilityapp.dev' : 'com.hogos.mobilityapp
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: IS_DEV ? 'Mobility (Dev)' : 'Mobility',
+  name: IS_DEV ? 'Plie (Dev)' : 'Plie',
   slug: 'mobility-app',
   scheme: IS_DEV ? 'mobilityapp-dev' : 'mobilityapp',
   ios: {

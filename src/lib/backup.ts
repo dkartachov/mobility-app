@@ -240,7 +240,7 @@ async function assertRestorable(source: SQLiteDatabase) {
   if (integrity?.integrity_check !== 'ok') throw new Error('This backup is damaged');
 
   const version = await source.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-  if (!version?.user_version) throw new Error('This backup is not a Mobility database');
+  if (!version?.user_version) throw new Error('This backup is not a Plie database');
   if (version.user_version > SCHEMA_VERSION) {
     throw new Error('This backup is from a newer version of the app. Update the app first');
   }

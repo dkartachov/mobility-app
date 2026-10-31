@@ -1,4 +1,4 @@
-# Mobility
+# Plie
 
 A stretching and mobility app built with Expo (SDK 58) and Expo Router. iOS and Android only. All data lives on the device in SQLite, with [snapshot backups](#cloud-backups) to Supabase Storage.
 
@@ -40,8 +40,8 @@ The development and production builds are separate apps ([Expo app variants](htt
 
 | Variant | `APP_VARIANT` | Name | Identifier | Scheme |
 |---|---|---|---|---|
-| Development | `development` | Mobility (Dev) | `com.hogos.mobilityapp.dev` | `mobilityapp-dev` |
-| Production | unset | Mobility | `com.hogos.mobilityapp` | `mobilityapp` |
+| Development | `development` | Plie (Dev) | `com.hogos.mobilityapp.dev` | `mobilityapp-dev` |
+| Production | unset | Plie | `com.hogos.mobilityapp` | `mobilityapp` |
 
 EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use `npm start` and the `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
 

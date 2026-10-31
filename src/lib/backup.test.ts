@@ -299,7 +299,7 @@ describe('backups', () => {
 
   it.each([
     ['a damaged file', restorableSource(SCHEMA_VERSION, 'row 3 missing'), 'damaged'],
-    ['a database from another app', restorableSource(0), 'not a Mobility database'],
+    ['a database from another app', restorableSource(0), 'not a Plie database'],
     ['a newer schema', restorableSource(SCHEMA_VERSION + 1), 'newer version'],
   ])('refuses %s without touching the database', async (_name, source, message) => {
     const { restoreSnapshot } = loadBackup();
