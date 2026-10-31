@@ -56,6 +56,7 @@
   "scripts": {
     "start": "cross-env APP_VARIANT=development expo start",
     "lint": "expo lint",
+    "doctor": "npx expo-doctor",
     "build:dev": "npx eas-cli@latest build --profile development",
     "build:prod": "npx eas-cli@latest build --profile production",
     "update:dev": "cross-env APP_VARIANT=development npx eas-cli@latest update --channel development --environment development --platform android",
