@@ -77,16 +77,17 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "extra": {
-      "eas": {
-        "projectId": "f6ca5ee9-b743-48f9-9592-f2928adf7cb8"
-      }
-    },
     "runtimeVersion": {
       "policy": "fingerprint"
     },
     "updates": {
-      "url": "https://u.expo.dev/f6ca5ee9-b743-48f9-9592-f2928adf7cb8"
-    }
+      "url": "https://u.expo.dev/95b79aa5-1e53-4a45-ba56-38c5c0cfc20e"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "95b79aa5-1e53-4a45-ba56-38c5c0cfc20e"
+      }
+    },
+    "owner": "hogos"
   }
 }
