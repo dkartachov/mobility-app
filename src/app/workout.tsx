@@ -2,12 +2,13 @@ import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-rout
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useReducer, useState, type ComponentProps } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { css, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { showDialog } from '@/components/dialog';
 import { ExerciseVideo } from '@/components/exercise-video';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
@@ -163,10 +164,12 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
 
   // Leaving mid-workout loses it, so confirm first and then go all the way back to the start screen.
   usePreventRemove(!result && !cancelled, () => {
-    Alert.alert('Cancel workout?', "This workout won't be saved.", [
-      { text: 'Keep going', style: 'cancel' },
-      { text: 'Cancel workout', style: 'destructive', onPress: () => setCancelled(true) },
-    ]);
+    showDialog({
+      title: 'Cancel workout?',
+      message: "This workout won't be saved.",
+      cancelLabel: 'Keep going',
+      confirm: { label: 'Cancel workout', onPress: () => setCancelled(true) },
+    });
   });
   // Runs after the re-render that lifts the prevention above, so this navigation isn't blocked.
   useEffect(() => {

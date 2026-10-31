@@ -3,6 +3,7 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
 import { AutoBackup } from '@/components/auto-backup';
+import { DialogHost } from '@/components/dialog';
 import { StackHeader } from '@/components/stack-header';
 import { Colors } from '@/constants/theme';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
@@ -40,6 +41,7 @@ export default function RootLayout() {
           <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
           <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
         </Stack>
+        <DialogHost />
       </ThemeProvider>
     </SQLiteProvider>
   );

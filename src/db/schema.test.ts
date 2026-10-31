@@ -19,9 +19,6 @@ describe('migrateDbIfNeeded', () => {
       'date_of_birth',
       'gender',
       'photo_file',
-      'hand_length_cm',
-      'finger_length_cm',
-      'hand_span_cm',
     ]);
     expect(await db.getAllAsync('SELECT id, first_name FROM profile')).toEqual([{ id: 1, first_name: '' }]);
   });

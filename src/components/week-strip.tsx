@@ -1,29 +1,28 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Spacing, type ThemeColor } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { fromDateKey, type DateKey } from '@/lib/dates';
+import { fromDateKey, todayKey, type DateKey } from '@/lib/dates';
 
 import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
-const DOT = 32;
+const DOT = 28;
 
 type WeekStripProps = {
   days: { date: DateKey; trained: boolean }[];
-  /** Fill of untrained days; pick one that stands out from the card behind. */
-  emptyColor?: ThemeColor;
 };
 
-/** One dot per day, filled with a check on trained days. The last day is today and gets a ring. */
-export function WeekStrip({ days, emptyColor = 'backgroundSelected' }: WeekStripProps) {
+/** One dot per day, filled with a check on trained days. Today gets a ring until it's trained. */
+export function WeekStrip({ days }: WeekStripProps) {
   const theme = useTheme();
+  const today = todayKey();
 
   return (
     <View style={styles.row}>
-      {days.map(({ date, trained }, i) => {
+      {days.map(({ date, trained }) => {
         const day = fromDateKey(date);
-        const isToday = i === days.length - 1;
+        const isToday = date === today;
         return (
           <View
             key={date}
@@ -36,10 +35,8 @@ export function WeekStrip({ days, emptyColor = 'backgroundSelected' }: WeekStrip
             <View
               style={[
                 styles.dot,
-                trained
-                  ? { backgroundColor: theme.streak }
-                  : { backgroundColor: theme[emptyColor] },
-                isToday && !trained && { borderWidth: 2, borderColor: theme.streak, borderStyle: 'dashed' },
+                { backgroundColor: trained ? theme.trained : theme.backgroundSelected },
+                isToday && !trained && { borderWidth: 2, borderColor: theme.trained, borderStyle: 'dashed' },
               ]}>
               {trained && <Icon name={{ ios: 'checkmark', android: 'check' }} size={16} color="onTint" />}
             </View>
@@ -57,7 +54,7 @@ const styles = StyleSheet.create({
   },
   day: {
     alignItems: 'center',
-    gap: Spacing.one + Spacing.half,
+    gap: Spacing.one,
   },
   dot: {
     width: DOT,

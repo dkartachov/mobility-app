@@ -6,14 +6,7 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import {
-  METHOD_UNITS,
-  UNIT_LABELS,
-  type BodyMeasurements,
-  type FlexibilityTest,
-  type PhoneMethod,
-} from '@/data/mobility-tests';
-import { useProfile } from '@/db/profile';
+import { METHOD_UNITS, UNIT_LABELS, type FlexibilityTest, type PhoneMethod } from '@/data/mobility-tests';
 import { usePhoneMeasurement } from '@/hooks/use-phone-measurement';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -25,9 +18,6 @@ import { ThemedText } from './themed-text';
 /** Lines kept for the status under the reading, enough for the longest start position. */
 const STATUS_LINES = 3;
 
-/** Until the profile loads, hints fall back to average sizes. */
-const NO_BODY: BodyMeasurements = { handLength: null, fingerLength: null, handSpan: null };
-
 type MeasurementProps = {
   test: FlexibilityTest;
   value: number | null;
@@ -37,8 +27,6 @@ type MeasurementProps = {
 /** The measuring part of a test step: a phone sensor reading or a distance on a slider. */
 export function TestMeasurement({ test, value, onChange }: MeasurementProps) {
   const { method } = test;
-  const body = useProfile()?.body ?? NO_BODY;
-  const hint = method.kind === 'distance' ? method.hint : undefined;
   return (
     <Card>
       <ThemedText type="small" themeColor="textSecondary">
@@ -51,7 +39,6 @@ export function TestMeasurement({ test, value, onChange }: MeasurementProps) {
           min={method.min}
           max={method.max}
           step={method.step}
-          hint={hint && ((v) => hint(v, body))}
           unit={UNIT_LABELS.cm}
           label={test.measurement}
         />
@@ -152,7 +139,6 @@ function ValueSlider({
   min,
   max,
   step = 1,
-  hint: hintOf,
   unit,
   label,
 }: {
@@ -161,26 +147,18 @@ function ValueSlider({
   min: number;
   max: number;
   step?: number;
-  hint?: (value: number) => string | undefined;
   unit: string;
   label: string;
 }) {
   const theme = useTheme();
   // Untouched, the thumb rests at 0 (the toes, for sit and reach) or the low end of the range.
   const initial = Math.min(max, Math.max(min, 0));
-  const hint = value === null ? undefined : hintOf?.(value);
 
   return (
     <View style={styles.slider}>
       <ThemedText type="stat" style={styles.reading} themeColor={value === null ? 'textSecondary' : 'text'}>
         {value === null ? '—' : `${value} ${unit}`}
       </ThemedText>
-      {hintOf && (
-        // Always rendered, so the slider doesn't jump when the first hint appears.
-        <ThemedText type="smallBold" themeColor="tint" style={styles.centered} accessibilityLiveRegion="polite">
-          {hint ?? ' '}
-        </ThemedText>
-      )}
       <Slider
         value={value ?? initial}
         minimumValue={min}

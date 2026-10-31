@@ -21,7 +21,6 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { ThemedText } from './themed-text';
 
-const BAR_HEIGHT = 180;
 const BAR_WIDTH = 10;
 const FILL_MS = 1200;
 /** Each bar starts filling this long after the one before it. */
@@ -36,13 +35,16 @@ type ScoreBarsProps = {
   /** Scores from the previous test, to show each area's change under its label. */
   previous?: AreaScores | null;
   delayMs?: number;
+  barHeight?: number;
+  /** A small version with only the bars, no numbers or labels. */
+  barsOnly?: boolean;
 };
 
 /**
  * A vertical bar per score area, filling up from the bottom on mount and again from where it is
  * whenever its score changes.
  */
-export function ScoreBars({ scores, previous, delayMs = 0 }: ScoreBarsProps) {
+export function ScoreBars({ scores, previous, delayMs = 0, barHeight = 180, barsOnly = false }: ScoreBarsProps) {
   return (
     <View style={styles.row}>
       {SCORE_AREAS.map(({ id, label }, i) => (
@@ -53,6 +55,8 @@ export function ScoreBars({ scores, previous, delayMs = 0 }: ScoreBarsProps) {
           // `undefined` without a previous test, so no change row shows at all.
           change={previous ? scoreChange(scores[id], previous[id]) : undefined}
           delayMs={delayMs + i * STAGGER_MS}
+          height={barHeight}
+          barOnly={barsOnly}
         />
       ))}
     </View>
@@ -65,9 +69,11 @@ type ScoreBarProps = {
   /** Points since the previous test, `null` if either test has no score for this area. */
   change: number | null | undefined;
   delayMs: number;
+  height: number;
+  barOnly: boolean;
 };
 
-function ScoreBar({ label, score, change, delayMs }: ScoreBarProps) {
+function ScoreBar({ label, score, change, delayMs, height, barOnly }: ScoreBarProps) {
   const theme = useTheme();
   const target = score === null ? 0 : Math.min(100, Math.max(0, score));
   const fill = useSharedValue(0);
@@ -82,24 +88,28 @@ function ScoreBar({ label, score, change, delayMs }: ScoreBarProps) {
 
   return (
     <View style={styles.column}>
-      <ThemedText type="smallBold" themeColor={score === null ? 'textSecondary' : 'text'}>
-        {score === null ? '—' : Math.round(target)}
-      </ThemedText>
+      {!barOnly && (
+        <ThemedText type="smallBold" themeColor={score === null ? 'textSecondary' : 'text'}>
+          {score === null ? '—' : Math.round(target)}
+        </ThemedText>
+      )}
       <View
         accessible
         accessibilityRole="progressbar"
         accessibilityLabel={label}
         accessibilityValue={score === null ? undefined : { min: 0, max: 100, now: Math.round(target) }}
-        style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
+        style={[styles.track, { height, backgroundColor: theme.backgroundSelected }]}>
         <Animated.View style={[styles.fill, fillStyle]}>
           {/* Full track height inside a clipped fill, so the gradient stays put as the fill grows. */}
-          <View style={[styles.gradient, { backgroundImage: GRADIENT }]} />
+          <View style={[styles.gradient, { height, backgroundImage: GRADIENT }]} />
         </Animated.View>
       </View>
-      <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.label}>
-        {label}
-      </ThemedText>
-      {change !== undefined && (
+      {!barOnly && (
+        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.label}>
+          {label}
+        </ThemedText>
+      )}
+      {!barOnly && change !== undefined && (
         <ThemedText
           type="smallBold"
           themeColor={change === null || change === 0 ? 'textSecondary' : change > 0 ? 'tint' : 'danger'}
@@ -124,7 +134,6 @@ const styles = StyleSheet.create({
   },
   track: {
     width: BAR_WIDTH,
-    height: BAR_HEIGHT,
     borderRadius: BAR_WIDTH / 2,
     overflow: 'hidden',
   },
@@ -151,6 +160,5 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: BAR_HEIGHT,
   },
 });

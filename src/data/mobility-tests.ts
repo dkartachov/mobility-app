@@ -29,41 +29,7 @@ export type MeasurementMethod =
       max: number;
       /** Slider step, 1 cm when not set. */
       step?: number;
-      /**
-       * A body landmark for the slider's current value, to help place it without a tape measure.
-       * Uses the person's own body measurements. Only landmarks, never a rating of how mobile
-       * someone is.
-       */
-      hint?: (value: number, body: BodyMeasurements) => string | undefined;
     };
-
-/** Optional body measurements from the profile, in cm. `null` when not entered. */
-export type BodyMeasurements = {
-  /** Wrist crease to the tip of the middle finger. */
-  handLength: number | null;
-  /** Base to tip of the middle finger, on the palm side. */
-  fingerLength: number | null;
-  /** Tip of the thumb to the tip of the little finger, spread wide. */
-  handSpan: number | null;
-};
-
-export const BODY_MEASUREMENT_LABELS: Record<keyof BodyMeasurements, string> = {
-  handLength: 'Hand length',
-  fingerLength: 'Finger length',
-  handSpan: 'Hand span',
-};
-
-/** Average adult sizes, used for any measurement that hasn't been entered. */
-export const DEFAULT_BODY = {
-  handLength: 18,
-  fingerLength: 8,
-  handSpan: 20,
-} satisfies Record<keyof BodyMeasurements, number>;
-
-/** The label of the first `[upTo, label]` pair that `value` is at or below. Pairs go in ascending order. */
-function byThreshold(value: number, thresholds: [upTo: number, label: string][]) {
-  return thresholds.find(([upTo]) => value <= upTo)?.[1];
-}
 
 export type PhoneMethod = Extract<MeasurementMethod, { kind: 'tilt' | 'rotation' }>;
 
@@ -228,24 +194,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     instructions:
       'Sit on the floor with your legs straight and together, and the soles of your feet flat against the bottom stair or a sturdy box. Lay a tape measure along the top with 0 at the edge by your toes, running away from you. With one hand on top of the other, slowly reach forward along the tape as far as you can, keeping the knees straight. Hold the furthest point for 2 seconds without bouncing, and take the best of three.',
     measurement: 'Fingertip distance past your toes, negative if you fall short',
-    method: {
-      kind: 'distance',
-      min: -30,
-      max: 30,
-      hint: (value, body) => {
-        const hand = body.handLength ?? DEFAULT_BODY.handLength;
-        const finger = body.fingerLength ?? DEFAULT_BODY.fingerLength;
-        // The ankles sit about 8 cm back from the soles with the feet upright against the step.
-        return byThreshold(value, [
-          [-9, 'Fingertips at the shins'],
-          [-1, 'Fingertips at the tops of your feet'],
-          [1, 'Fingertips at your toes'],
-          [finger, 'Fingers past your toes'],
-          [hand, 'Palms past your toes'],
-          [Infinity, 'Wrists past your toes'],
-        ]);
-      },
-    },
+    method: { kind: 'distance', min: -30, max: 30 },
   },
   {
     id: 'knee-to-chest',

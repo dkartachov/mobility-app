@@ -29,9 +29,9 @@ export async function jumpToNextMilestone(db: SQLiteDatabase, secondsShort: numb
 
 /**
  * Walks back from today and logs a session on the first `days` days that have none, so
- * repeated presses keep extending the streak instead of re-filling the same days.
+ * repeated presses keep going further back instead of re-filling the same days.
  */
-export async function addDevStreak(db: SQLiteDatabase, days: number) {
+export async function addDevTrainingDays(db: SQLiteDatabase, days: number) {
   const rows = await db.getAllAsync<{ local_date: string }>('SELECT DISTINCT local_date FROM sessions');
   const trained = new Set(rows.map((r) => r.local_date));
   let added = 0;
@@ -146,7 +146,6 @@ export async function resetAllData(db: SQLiteDatabase) {
     DELETE FROM sessions WHERE id IS NOT NULL;
     DELETE FROM mobility_tests WHERE id IS NOT NULL;
     DELETE FROM goals WHERE id IS NOT NULL;
-    UPDATE profile SET first_name = '', last_name = '', date_of_birth = NULL, gender = NULL, photo_file = NULL,
-      hand_length_cm = NULL, finger_length_cm = NULL, hand_span_cm = NULL;
+    UPDATE profile SET first_name = '', last_name = '', date_of_birth = NULL, gender = NULL, photo_file = NULL;
   `);
 }

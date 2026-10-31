@@ -22,6 +22,8 @@ export const SCORE_AREAS: { id: ScoreArea; label: string }[] = [
 /** 0–100 for each area, `null` for an area with no results. */
 export type AreaScores = Record<ScoreArea, number | null>;
 
+export const NO_AREA_SCORES = Object.fromEntries(SCORE_AREAS.map(({ id }) => [id, null])) as AreaScores;
+
 /** 0–100 for one flexibility test, and for each side of a two-sided one. */
 export type TestScore = { score: number; sides: Partial<Record<Side, number>> };
 

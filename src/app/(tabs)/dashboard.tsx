@@ -1,120 +1,115 @@
-import { Link, router } from 'expo-router';
-import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState, type ReactNode } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Card } from '@/components/card';
-import { GoalCard } from '@/components/goal-card';
 import { Icon } from '@/components/icon';
-import { IconBadge } from '@/components/icon-badge';
 import { MilestoneBar } from '@/components/milestone-bar';
 import { PressableScale } from '@/components/pressable-scale';
 import { Screen } from '@/components/screen';
+import { ScoreBars } from '@/components/score-bars';
 import { ScoreRing } from '@/components/score-ring';
-import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { WeekStrip } from '@/components/week-strip';
 import { Radius, Spacing } from '@/constants/theme';
-import { formatScoreChange, scoreChange } from '@/data/mobility-score';
-import { useGoals } from '@/db/goals';
-import { useMobilityScore, useTestSchedule } from '@/db/mobility-tests';
+import { formatScoreChange, NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
+import { useMobilityScore } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
-import { useRecentDays, useStats } from '@/db/sessions';
+import { useStats, useWeekDays } from '@/db/sessions';
 import { formatDuration } from '@/lib/dates';
+import { milestoneProgress } from '@/lib/milestones';
 import { useTheme } from '@/hooks/use-theme';
 
-function days(n: number) {
-  return `${n} ${n === 1 ? 'day' : 'days'}`;
-}
+/** Matches the side padding of `Screen`. */
+const SCREEN_PADDING = Spacing.three + Spacing.one;
+const TILE_GAP = Spacing.three;
+const TILE_PADDING = Spacing.three;
+/** Lets the tab finish appearing before the cards animate. */
+const ANIMATION_DELAY_MS = 200;
 
 export default function DashboardScreen() {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
   const stats = useStats();
-  const recentDays = useRecentDays();
-  const goals = useGoals();
+  const weekDays = useWeekDays();
   const profile = useProfile();
-  const testSchedule = useTestSchedule();
   const score = useMobilityScore();
-  const activeGoals = goals?.filter((goal) => goal.status === 'active') ?? [];
+  // Fills its half-width tile, whatever the size of the phone.
+  const ringSize = (width - SCREEN_PADDING * 2 - TILE_GAP) / 2 - TILE_PADDING * 2;
   const scoreDelta = score ? scoreChange(score.overall, score.previous?.overall) : null;
 
-  if (!stats) return null;
+  // Native tabs all mount when the app loads, with Start showing. Waiting for the first time this
+  // tab is opened means the cards' animations play when they can be seen.
+  const [opened, setOpened] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setOpened(true);
+    }, [])
+  );
 
-  const streaking = stats.currentStreak > 0;
-  const streakHint = stats.trainedToday
-    ? 'You trained today. Nice work!'
-    : streaking
-      ? 'Train today to keep your streak going.'
-      : 'Complete a session to start a streak.';
+  if (!stats || !opened) return null;
 
-  // Short enough to fit under the ring in a half-width tile.
-  const testHint = !testSchedule
-    ? undefined
-    : !testSchedule.lastTestDate
-      ? 'Take your first test'
-      : testSchedule.isDue
-        ? "It's test day!"
-        : `Next test in ${days(testSchedule.daysUntilNext)}`;
+  const trainedAllWeek = weekDays?.every((day) => day.trained) ?? false;
+  const trainingMessage = trainedAllWeek
+    ? 'You trained all week!'
+    : stats.trainedToday
+      ? 'You trained today. Nice work!'
+      : stats.sessionCount > 0
+        ? "You haven't trained yet today."
+        : 'Complete a session to get started.';
 
   return (
     <Screen
       eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
       title={profile?.firstName ? `Hi, ${profile.firstName}` : 'Dashboard'}
       gap={Spacing.three}>
-      <Card style={[styles.streakCard, { backgroundColor: streaking ? theme.streakSoft : theme.backgroundElement }]}>
-        <View style={styles.streakHeader}>
-          <IconBadge
-            name={{ ios: 'flame.fill', android: 'local_fire_department' }}
-            color={streaking ? 'streak' : 'textSecondary'}
-            background={streaking ? 'backgroundElement' : 'backgroundSelected'}
-            size={52}
-          />
-          <View style={styles.streakText}>
-            <View style={styles.streakNumber}>
-              <ThemedText type="stat" style={styles.bigStat}>
-                {stats.currentStreak}
-              </ThemedText>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                day streak
-              </ThemedText>
-            </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              {streakHint}
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={`Training days. ${trainingMessage}`}
+        onPress={() => router.push('/training-days')}>
+        <Card
+          style={[
+            styles.trainingCard,
+            trainedAllWeek && {
+              borderWidth: 1,
+              borderColor: `${theme.trained}80`,
+              boxShadow: `0 0 16px ${theme.trained}59`,
+            },
+          ]}>
+          <View style={styles.trainingHeader}>
+            <ThemedText type="smallBold" style={styles.trainingMessage}>
+              {trainingMessage}
             </ThemedText>
+            <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={14} />
           </View>
-          <View style={styles.best}>
-            <ThemedText type="eyebrow" themeColor="textSecondary">
-              Best
-            </ThemedText>
-            <ThemedText type="smallBold">{days(stats.longestStreak)}</ThemedText>
-          </View>
-        </View>
-        {recentDays && (
-          <WeekStrip days={recentDays} emptyColor={streaking ? 'backgroundElement' : 'backgroundSelected'} />
-        )}
-      </Card>
+          {weekDays && <WeekStrip days={weekDays} />}
+        </Card>
+      </PressableScale>
 
-      {/* Time is a short, wide card; score sits beside it as a tall rectangle. */}
+      {/* Equal widths; time stays short while score grows taller to fit its ring and bars. */}
       <View style={styles.tileRow}>
         <DashboardTile
           label="Mobility time"
           accessibilityLabel={`Mobility time, ${formatDuration(stats.totalSeconds)}`}
-          onPress={() => router.push('/mobility-time')}
-          style={styles.timeTile}>
+          onPress={() => router.push('/mobility-time')}>
           <View style={styles.timeBody}>
             <ThemedText type="stat" numberOfLines={1} adjustsFontSizeToFit>
               {formatDuration(stats.totalSeconds)}
             </ThemedText>
           </View>
-          <MilestoneBar totalSeconds={stats.totalSeconds} />
+          <MilestoneBar
+            totalSeconds={stats.totalSeconds}
+            animateFromSeconds={milestoneProgress(stats.totalSeconds).previousHours * 3600}
+            delayMs={ANIMATION_DELAY_MS}
+          />
         </DashboardTile>
 
         <DashboardTile
           label="Score"
-          accessibilityLabel={`Mobility score${score?.overall == null ? '' : ` ${Math.round(score.overall)}`}. ${testHint ?? ''}`}
-          onPress={() => router.push('/mobility-score')}
-          style={styles.scoreTile}>
+          accessibilityLabel={`Mobility score${score?.overall == null ? '' : ` ${Math.round(score.overall)}`}`}
+          onPress={() => router.push('/mobility-score')}>
           <View style={styles.scoreBody}>
-            <ScoreRing score={score?.overall ?? null} size={104} thickness={10} />
+            <ScoreRing score={score?.overall ?? null} size={ringSize} thickness={12} delayMs={ANIMATION_DELAY_MS} />
             {scoreDelta !== null && (
               <View
                 style={[styles.delta, { backgroundColor: scoreDelta < 0 ? `${theme.danger}1F` : theme.tintSoft }]}>
@@ -126,37 +121,14 @@ export default function DashboardScreen() {
               </View>
             )}
           </View>
-          {testHint && (
-            <ThemedText
-              type="smallBold"
-              themeColor={testSchedule?.isDue ? 'tint' : 'textSecondary'}
-              numberOfLines={2}
-              style={styles.centered}>
-              {testHint}
-            </ThemedText>
-          )}
+          <ScoreBars
+            scores={score?.areas ?? NO_AREA_SCORES}
+            delayMs={ANIMATION_DELAY_MS}
+            barHeight={72}
+            barsOnly
+          />
         </DashboardTile>
       </View>
-
-      <SectionHeader title="Active goals" action={{ label: 'New goal', href: '/new-goal' }} />
-      {activeGoals.length > 0 ? (
-        activeGoals.map((goal) => <GoalCard key={goal.id} goal={goal} />)
-      ) : (
-        <Link href="/new-goal" asChild>
-          <PressableScale accessibilityRole="button">
-            <Card style={styles.emptyGoal}>
-              <IconBadge name={{ ios: 'flag.fill', android: 'flag' }} />
-              <View style={styles.emptyGoalText}>
-                <ThemedText type="smallBold">No active goals</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Set one like &quot;10 hours in 30 days&quot;.
-                </ThemedText>
-              </View>
-              <Icon name={{ ios: 'plus', android: 'add' }} color="tint" size={20} />
-            </Card>
-          </PressableScale>
-        </Link>
-      )}
     </Screen>
   );
 }
@@ -165,16 +137,18 @@ type DashboardTileProps = {
   label: string;
   accessibilityLabel: string;
   onPress: () => void;
-  /** Sets the tile's share of the row, e.g. `flex: 3`. */
-  style: StyleProp<ViewStyle>;
   /** The main visual, then a footer. The tile is as tall as its content. */
   children: ReactNode;
 };
 
 /** Tappable card with a label and chevron along the top. */
-function DashboardTile({ label, accessibilityLabel, onPress, style, children }: DashboardTileProps) {
+function DashboardTile({ label, accessibilityLabel, onPress, children }: DashboardTileProps) {
   return (
-    <PressableScale accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={style}>
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={styles.tile}>
       <Card style={styles.tileCard}>
         <View style={styles.tileHeader}>
           <ThemedText type="eyebrow" themeColor="textSecondary" numberOfLines={1} style={styles.tileLabel}>
@@ -189,45 +163,29 @@ function DashboardTile({ label, accessibilityLabel, onPress, style, children }: 
 }
 
 const styles = StyleSheet.create({
-  streakCard: {
-    gap: Spacing.four - Spacing.one,
-    padding: Spacing.four - Spacing.one,
+  trainingCard: {
+    gap: Spacing.two + Spacing.one,
   },
-  streakHeader: {
+  trainingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.one,
   },
-  streakText: {
+  trainingMessage: {
     flex: 1,
-  },
-  streakNumber: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: Spacing.one + Spacing.half,
-  },
-  bigStat: {
-    fontSize: 40,
-    lineHeight: 46,
-  },
-  best: {
-    alignItems: 'flex-end',
-    alignSelf: 'flex-start',
   },
   // Top-aligned so each tile keeps its own height: score stays tall, time stays short.
   tileRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.three,
+    gap: TILE_GAP,
   },
-  scoreTile: {
-    flex: 3,
-  },
-  timeTile: {
-    flex: 4,
+  tile: {
+    flex: 1,
   },
   tileCard: {
     gap: Spacing.three,
+    padding: TILE_PADDING,
   },
   tileHeader: {
     flexDirection: 'row',
@@ -247,19 +205,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.half,
     borderRadius: Radius.full,
   },
-  centered: {
-    textAlign: 'center',
-  },
   timeBody: {
     gap: Spacing.two,
-  },
-  emptyGoalText: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  emptyGoal: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
   },
 });

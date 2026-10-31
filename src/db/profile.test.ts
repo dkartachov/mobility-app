@@ -12,7 +12,6 @@ describe('profile', () => {
       dateOfBirth: null,
       gender: null,
       photoFile: null,
-      body: { handLength: null, fingerLength: null, handSpan: null },
     });
   });
 
@@ -24,7 +23,6 @@ describe('profile', () => {
       dateOfBirth: '1990-12-10',
       gender: 'female',
       photoFile: 'photo.jpg',
-      body: { handLength: 18.5, fingerLength: null, handSpan: 21 },
     };
 
     await updateProfile(db, profile);

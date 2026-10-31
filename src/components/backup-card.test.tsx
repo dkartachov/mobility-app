@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 
 import { formatDateKey } from '@/lib/dates';
 
@@ -10,10 +9,12 @@ const mockSession = { value: {} as object | null };
 const mockLinkDevice = jest.fn();
 const mockListSnapshots = jest.fn();
 const mockRestoreSnapshot = jest.fn();
+const mockShowDialog = jest.fn();
 const mockState = { linked: false, lastBackupAt: null as string | null, lastError: null as string | null, running: false };
 
 jest.mock('expo', () => ({ ...jest.requireActual('expo'), reloadAppAsync: jest.fn() }));
 jest.mock('expo-sqlite', () => ({ useSQLiteContext: () => mockDb }));
+jest.mock('@/components/dialog', () => ({ showDialog: (...args: unknown[]) => mockShowDialog(...args) }));
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
@@ -37,11 +38,8 @@ jest.mock('@/lib/backup', () => ({
 }));
 
 describe('BackupCard', () => {
-  let alert: jest.SpyInstance;
-
   beforeEach(() => {
-    alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    alert.mockClear();
+    mockShowDialog.mockClear();
     mockRestoreSnapshot.mockReset();
     mockSession.value = {};
     mockState.linked = false;
@@ -74,23 +72,23 @@ describe('BackupCard', () => {
   it('offers to restore the latest backup after signing in', async () => {
     mockListSnapshots.mockResolvedValue(['2026-01-02', '2026-01-01']);
     await render(<BackupCard />);
-    await waitFor(() => expect(alert).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockShowDialog).toHaveBeenCalledTimes(1));
 
-    const [title, message, buttons] = alert.mock.calls[0];
+    const [{ title, message, confirm }] = mockShowDialog.mock.calls[0];
     expect(title).toBe('Restore your latest backup?');
     expect(message).toContain(formatDateKey('2026-01-02'));
 
-    await buttons.find((button: { text: string }) => button.text === 'Restore').onPress();
+    expect(confirm.label).toBe('Restore');
+    await confirm.onPress();
     expect(mockRestoreSnapshot).toHaveBeenCalledWith(mockDb, '2026-01-02');
   });
 
   it("doesn't restore or start backing up when the offer is declined", async () => {
     mockListSnapshots.mockResolvedValue(['2026-01-02']);
     await render(<BackupCard />);
-    await waitFor(() => expect(alert).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockShowDialog).toHaveBeenCalledTimes(1));
 
-    const [, , buttons] = alert.mock.calls[0];
-    expect(buttons.find((button: { text: string }) => button.text === 'Not now').onPress).toBeUndefined();
+    expect(mockShowDialog.mock.calls[0][0].cancelLabel).toBe('Not now');
     expect(mockRestoreSnapshot).not.toHaveBeenCalled();
     expect(mockLinkDevice).not.toHaveBeenCalled();
     expect(screen.getByText("Keep this phone's data")).toBeTruthy();
@@ -99,14 +97,14 @@ describe('BackupCard', () => {
   it("doesn't offer a restore on a device that's already linked", async () => {
     mockState.linked = true;
     await render(<BackupCard />);
-    expect(alert).not.toHaveBeenCalled();
+    expect(mockShowDialog).not.toHaveBeenCalled();
   });
 
   it("doesn't offer a restore when the account has no backups", async () => {
     mockListSnapshots.mockResolvedValue([]);
     await render(<BackupCard />);
     await waitFor(() => expect(mockLinkDevice).toHaveBeenCalled());
-    expect(alert).not.toHaveBeenCalled();
+    expect(mockShowDialog).not.toHaveBeenCalled();
   });
 
   it("stays paused when it can't check for backups", async () => {

@@ -1,12 +1,12 @@
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
-import { Alert, StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import {
   addDevMobilityTest,
   addDevMobilityTestResults,
   addDevSession,
-  addDevStreak,
+  addDevTrainingDays,
   clearDevMobilityTests,
   clearDevSessions,
   jumpToNextMilestone,
@@ -28,6 +28,7 @@ import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
 
 import { Button } from './button';
 import { Card } from './card';
+import { showDialog } from './dialog';
 import { ThemedText } from './themed-text';
 
 /** Settings section for faking data during development. Render it behind `__DEV__` only. */
@@ -40,10 +41,7 @@ export function DevTools() {
   const nextHours = stats ? milestoneProgress(stats.totalSeconds).nextHours : null;
 
   const confirm = (title: string, message: string, action: (db: SQLiteDatabase) => Promise<void>) => {
-    Alert.alert(title, message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => action(db) },
-    ]);
+    showDialog({ title, message, confirm: { label: 'Delete', onPress: () => action(db) } });
   };
 
   return (
@@ -93,7 +91,7 @@ export function DevTools() {
           disabled={nextHours === null}
           onPress={() => jumpToNextMilestone(db, 2 * 60)}
         />
-        <Button title="Extend streak by 7 days" variant="secondary" onPress={() => addDevStreak(db, 7)} />
+        <Button title="Add 7 training days" variant="secondary" onPress={() => addDevTrainingDays(db, 7)} />
         <Button title="Log flexibility test today" variant="secondary" onPress={() => addDevMobilityTest(db)} />
         <Button
           title="Make up test results"
@@ -122,7 +120,7 @@ export function DevTools() {
           title="Clear sessions"
           variant="destructive"
           onPress={() =>
-            confirm('Clear sessions?', 'Deletes every logged session, including streaks and milestones.', clearDevSessions)
+            confirm('Clear sessions?', 'Deletes every logged session, including milestones.', clearDevSessions)
           }
         />
         <Button
@@ -131,7 +129,7 @@ export function DevTools() {
           onPress={() =>
             confirm(
               'Reset all data?',
-              'Deletes sessions, goals and flexibility tests and clears your profile.',
+              'Deletes sessions and flexibility tests and clears your profile.',
               resetAllData
             )
           }

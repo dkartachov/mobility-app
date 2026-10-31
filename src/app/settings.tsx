@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackupCard } from '@/components/backup-card';
@@ -8,6 +8,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
 import { DevTools } from '@/components/dev-tools';
+import { showDialog } from '@/components/dialog';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
 import { ScrollView } from '@/components/scroll-view';
@@ -28,17 +29,17 @@ export default function SettingsScreen() {
   const themePreference = useThemePreference();
 
   const confirmDeleteSessions = () => {
-    Alert.alert('Delete all sessions?', 'This wipes your workout history, streaks and goal progress.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
+    showDialog({
+      title: 'Delete all sessions?',
+      message: 'This wipes your workout history.',
+      confirm: {
+        label: 'Delete',
         onPress: async () => {
           await deleteAllSessions(db);
           router.back();
         },
       },
-    ]);
+    });
   };
 
   return (
@@ -85,7 +86,7 @@ export default function SettingsScreen() {
               <ThemedText type="smallBold">Workout history</ThemedText>
             </View>
             <ThemedText themeColor="textSecondary">
-              Remove every logged session, including test data. Your profile and goals are kept.
+              Remove every logged session, including test data. Your profile is kept.
             </ThemedText>
             <Button title="Delete all sessions" variant="destructive" onPress={confirmDeleteSessions} />
           </Card>

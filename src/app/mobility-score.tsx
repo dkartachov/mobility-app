@@ -15,15 +15,13 @@ import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
-import { formatScoreChange, SCORE_AREAS, scoreChange, type AreaScores } from '@/data/mobility-score';
+import { formatScoreChange, NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
 import { useMobilityScore, useTestSchedule, type TestSchedule } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateKey } from '@/lib/dates';
 
 /** Lets the screen finish sliding in before the score animates. */
 const ANIMATION_DELAY_MS = 300;
-
-const NO_SCORES = Object.fromEntries(SCORE_AREAS.map(({ id }) => [id, null])) as AreaScores;
 
 function nextTestLabel(schedule: TestSchedule) {
   if (!schedule.lastTestDate) return 'Take your first test';
@@ -52,8 +50,8 @@ export default function MobilityScoreScreen() {
             <ScoreRing
               score={score?.overall ?? null}
               label="Overall"
-              size={200}
-              thickness={16}
+              size={180}
+              thickness={14}
               delayMs={ANIMATION_DELAY_MS}
             />
             {score === null && (
@@ -76,7 +74,12 @@ export default function MobilityScoreScreen() {
             )}
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          <ScoreBars scores={score?.areas ?? NO_SCORES} previous={score?.previous?.areas} delayMs={ANIMATION_DELAY_MS} />
+          <ScoreBars
+            scores={score?.areas ?? NO_AREA_SCORES}
+            previous={score?.previous?.areas}
+            delayMs={ANIMATION_DELAY_MS}
+            barHeight={140}
+          />
         </Card>
 
         {schedule && (
@@ -123,7 +126,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   hero: {
-    gap: Spacing.four,
+    gap: Spacing.three,
     paddingVertical: Spacing.four,
   },
   ring: {

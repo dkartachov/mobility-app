@@ -19,8 +19,9 @@ import { ThemedText } from './themed-text';
 type MilestoneBarProps = {
   totalSeconds: number;
   /**
-   * When set, the bar animates from this total up to `totalSeconds` on mount. If that crosses a
-   * milestone, the bar fills up, resets and keeps going towards the following one.
+   * When set, the bar animates from this total up to `totalSeconds` on mount, and from where it is
+   * whenever `totalSeconds` changes. If that crosses a milestone, the bar fills up, resets and keeps
+   * going towards the following one.
    */
   animateFromSeconds?: number;
   durationMs?: number;
@@ -46,7 +47,7 @@ export function MilestoneBar({
     if (!animated) seconds.set(totalSeconds);
   }, [animated, seconds, totalSeconds]);
 
-  // Animated bars fill once on mount; later prop changes don't restart the fill.
+  // Only the total restarts it; the delay is for the first fill.
   useEffect(() => {
     if (!animated) return;
     seconds.set(
@@ -58,7 +59,7 @@ export function MilestoneBar({
       )
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [totalSeconds]);
 
   useAnimatedReaction(
     () => milestoneProgress(seconds.value).nextHours,

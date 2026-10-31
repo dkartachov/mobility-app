@@ -1,5 +1,5 @@
 /**
- * Calendar days are stored as local `YYYY-MM-DD` keys so streaks and goal windows follow
+ * Calendar days are stored as local `YYYY-MM-DD` keys so training days and goal windows follow
  * the user's wall-clock day, not UTC.
  */
 
@@ -39,6 +39,43 @@ export function formatDateKey(key: DateKey): string {
     month: 'long',
     day: 'numeric',
   });
+}
+
+/** Days since the Monday of the week `date` falls in. */
+function daysSinceMonday(date: Date) {
+  return (date.getDay() + 6) % 7;
+}
+
+/** The Monday of the week `key` falls in. */
+export function startOfWeek(key: DateKey): DateKey {
+  return addDays(key, -daysSinceMonday(fromDateKey(key)));
+}
+
+/** The first day of the month `key` falls in. Months are passed around as this key. */
+export function startOfMonth(key: DateKey): DateKey {
+  return `${key.slice(0, 7)}-01`;
+}
+
+export function addMonths(month: DateKey, months: number): DateKey {
+  const date = fromDateKey(month);
+  return toDateKey(new Date(date.getFullYear(), date.getMonth() + months, 1));
+}
+
+export function formatMonth(month: DateKey): string {
+  return fromDateKey(month).toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+}
+
+/** The month as calendar rows of seven, Monday first, with `null` for days outside the month. */
+export function monthWeeks(month: DateKey): (DateKey | null)[][] {
+  const first = fromDateKey(month);
+  const blanksBefore = daysSinceMonday(first);
+  const dayCount = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const cells: (DateKey | null)[] = [
+    ...Array.from({ length: blanksBefore }, () => null),
+    ...Array.from({ length: dayCount }, (_, i) => addDays(month, i)),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
 }
 
 /** "2h 15m", "45m", "0m" */

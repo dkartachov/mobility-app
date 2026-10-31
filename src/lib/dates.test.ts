@@ -1,4 +1,55 @@
-import { addDays, ageFromDateKey, daysBetween, formatDuration, fromDateKey, toDateKey, todayKey } from './dates';
+import {
+  addDays,
+  addMonths,
+  ageFromDateKey,
+  daysBetween,
+  formatDuration,
+  fromDateKey,
+  monthWeeks,
+  startOfMonth,
+  startOfWeek,
+  toDateKey,
+  todayKey,
+} from './dates';
+
+describe('startOfWeek', () => {
+  it('finds the Monday of the week, which runs through Sunday', () => {
+    expect(startOfWeek('2026-10-26')).toBe('2026-10-26');
+    expect(startOfWeek('2026-10-28')).toBe('2026-10-26');
+    expect(startOfWeek('2026-11-01')).toBe('2026-10-26');
+    expect(startOfWeek('2026-11-02')).toBe('2026-11-02');
+  });
+});
+
+describe('months', () => {
+  it('finds the start of a month', () => {
+    expect(startOfMonth('2026-10-28')).toBe('2026-10-01');
+  });
+
+  it('moves between months across year boundaries', () => {
+    expect(addMonths('2026-01-01', -1)).toBe('2025-12-01');
+    expect(addMonths('2026-12-01', 1)).toBe('2027-01-01');
+  });
+
+  it('lays a month out in weeks starting on Monday', () => {
+    // October 2026 starts on a Thursday and ends on a Saturday.
+    const weeks = monthWeeks('2026-10-01');
+    expect(weeks[0]).toEqual([null, null, null, '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
+    expect(weeks[weeks.length - 1]).toEqual(['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', null]);
+    expect(weeks.flat().filter(Boolean)).toHaveLength(31);
+  });
+
+  it('adds no blank days to a month that fills its weeks exactly', () => {
+    // February 2027 starts on a Monday and has 28 days.
+    const weeks = monthWeeks('2027-02-01');
+    expect(weeks).toHaveLength(4);
+    expect(weeks.flat()).not.toContain(null);
+  });
+
+  it('counts leap days', () => {
+    expect(monthWeeks('2028-02-01').flat().filter(Boolean)).toHaveLength(29);
+  });
+});
 
 describe('date keys', () => {
   it('formats local dates as zero-padded YYYY-MM-DD', () => {

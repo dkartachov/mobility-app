@@ -1,11 +1,12 @@
 import { reloadAppAsync } from 'expo';
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
+import { showDialog } from '@/components/dialog';
 import { Field, TextField } from '@/components/field';
 import { IconBadge } from '@/components/icon-badge';
 import { ThemedText } from '@/components/themed-text';
@@ -31,7 +32,7 @@ async function restoreAndReload(db: SQLiteDatabase, date: DateKey) {
     await restoreSnapshot(db, date);
     await reloadAppAsync('Restored a backup');
   } catch (error) {
-    Alert.alert("Couldn't restore this backup", errorMessage(error));
+    showDialog({ title: "Couldn't restore this backup", message: errorMessage(error) });
   }
 }
 
@@ -134,36 +135,29 @@ function SignedIn() {
   useEffect(() => {
     const latest = snapshots?.[0];
     if (linked || !latest) return;
-    Alert.alert(
-      'Restore your latest backup?',
-      `This account has a backup from ${formatDateKey(latest)}. Restoring replaces everything on this phone with it, then restarts the app.`,
-      [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Restore', style: 'destructive', onPress: () => restoreAndReload(db, latest) },
-      ]
-    );
+    showDialog({
+      title: 'Restore your latest backup?',
+      message: `This account has a backup from ${formatDateKey(latest)}. Restoring replaces everything on this phone with it, then restarts the app.`,
+      cancelLabel: 'Not now',
+      confirm: { label: 'Restore', onPress: () => restoreAndReload(db, latest) },
+    });
   }, [linked, snapshots, db]);
 
   const confirmRestore = (date: DateKey) => {
-    Alert.alert(
-      `Restore ${formatDateKey(date)}?`,
-      'This replaces everything on this phone with that backup, then restarts the app.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Restore', style: 'destructive', onPress: () => restoreAndReload(db, date) },
-      ]
-    );
+    showDialog({
+      title: `Restore ${formatDateKey(date)}?`,
+      message: 'This replaces everything on this phone with that backup, then restarts the app.',
+      confirm: { label: 'Restore', onPress: () => restoreAndReload(db, date) },
+    });
   };
 
   const confirmKeep = () => {
-    Alert.alert(
-      "Keep this phone's data?",
-      "This phone starts backing up, replacing today's backup if there is one. Backups from earlier days stay available for now.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Keep', style: 'destructive', onPress: () => linkDevice(db) },
-      ]
-    );
+    showDialog({
+      title: "Keep this phone's data?",
+      message:
+        "This phone starts backing up, replacing today's backup if there is one. Backups from earlier days stay available for now.",
+      confirm: { label: 'Keep', onPress: () => linkDevice(db) },
+    });
   };
 
   const signOut = async () => {

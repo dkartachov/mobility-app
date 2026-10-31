@@ -1,14 +1,13 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { useCallback } from 'react';
 
-import { addDays, daysBetween, toDateKey, todayKey, type DateKey } from '@/lib/dates';
+import { addDays, addMonths, startOfWeek, toDateKey, todayKey, type DateKey } from '@/lib/dates';
 
 import { useDbQuery } from './use-db-query';
 
 export type Stats = {
   totalSeconds: number;
   sessionCount: number;
-  currentStreak: number;
-  longestStreak: number;
   trainedToday: boolean;
   /** Day of the very first session, `null` before any. */
   firstSessionDate: DateKey | null;
@@ -42,48 +41,23 @@ export async function deleteAllSessions(db: SQLiteDatabase) {
   await db.runAsync('DELETE FROM sessions WHERE id IS NOT NULL');
 }
 
-/**
- * A day counts towards a streak if it has at least one session. The current streak stays
- * alive through today if yesterday was trained, so it only resets after a full missed day.
- */
-export function computeStreaks(sortedDays: DateKey[], today: DateKey) {
-  let longest = 0;
-  let run = 0;
-  for (let i = 0; i < sortedDays.length; i++) {
-    run = i > 0 && daysBetween(sortedDays[i - 1], sortedDays[i]) === 1 ? run + 1 : 1;
-    longest = Math.max(longest, run);
-  }
-
-  const days = new Set(sortedDays);
-  let current = 0;
-  let cursor = days.has(today) ? today : addDays(today, -1);
-  while (days.has(cursor)) {
-    current++;
-    cursor = addDays(cursor, -1);
-  }
-
-  return { current, longest, trainedToday: days.has(today) };
-}
-
 export async function getStats(db: SQLiteDatabase): Promise<Stats> {
-  const totals = await db.getFirstAsync<{ total: number | null; count: number }>(
-    'SELECT SUM(duration_seconds) AS total, COUNT(*) AS count FROM sessions'
-  );
-  const days = await db.getAllAsync<{ local_date: string }>(
-    'SELECT DISTINCT local_date FROM sessions ORDER BY local_date'
-  );
-  const streaks = computeStreaks(
-    days.map((d) => d.local_date),
+  const row = await db.getFirstAsync<{
+    total: number | null;
+    count: number;
+    today: number | null;
+    first: string | null;
+  }>(
+    `SELECT SUM(duration_seconds) AS total, COUNT(*) AS count, SUM(local_date = ?) AS today, MIN(local_date) AS first
+     FROM sessions`,
     todayKey()
   );
 
   return {
-    totalSeconds: totals?.total ?? 0,
-    sessionCount: totals?.count ?? 0,
-    currentStreak: streaks.current,
-    longestStreak: streaks.longest,
-    trainedToday: streaks.trainedToday,
-    firstSessionDate: days[0]?.local_date ?? null,
+    totalSeconds: row?.total ?? 0,
+    sessionCount: row?.count ?? 0,
+    trainedToday: (row?.today ?? 0) > 0,
+    firstSessionDate: row?.first ?? null,
   };
 }
 
@@ -93,10 +67,9 @@ export function useStats() {
 
 export const WEEK_DAYS = 7;
 
-/** The last seven days ending today, oldest first, each with whether it had a session. */
-export async function getRecentDays(db: SQLiteDatabase): Promise<{ date: DateKey; trained: boolean }[]> {
-  const today = todayKey();
-  const from = addDays(today, -(WEEK_DAYS - 1));
+/** This week from Monday to Sunday, each day with whether it had a session. */
+export async function getWeekDays(db: SQLiteDatabase): Promise<{ date: DateKey; trained: boolean }[]> {
+  const from = startOfWeek(todayKey());
   const rows = await db.getAllAsync<{ local_date: string }>(
     'SELECT DISTINCT local_date FROM sessions WHERE local_date >= ?',
     from
@@ -108,6 +81,30 @@ export async function getRecentDays(db: SQLiteDatabase): Promise<{ date: DateKey
   });
 }
 
-export function useRecentDays() {
-  return useDbQuery(getRecentDays, ['sessions']);
+export function useWeekDays() {
+  return useDbQuery(getWeekDays, ['sessions']);
+}
+
+export type TrainingDay = {
+  date: DateKey;
+  sessions: number;
+  seconds: number;
+};
+
+/** The days with a session in `month`, given as its first day, oldest first. */
+export async function getMonthTrainingDays(db: SQLiteDatabase, month: DateKey): Promise<TrainingDay[]> {
+  return db.getAllAsync<TrainingDay>(
+    `SELECT local_date AS date, COUNT(*) AS sessions, SUM(duration_seconds) AS seconds
+     FROM sessions
+     WHERE local_date >= ? AND local_date < ?
+     GROUP BY local_date
+     ORDER BY local_date`,
+    month,
+    addMonths(month, 1)
+  );
+}
+
+export function useMonthTrainingDays(month: DateKey) {
+  const query = useCallback((db: SQLiteDatabase) => getMonthTrainingDays(db, month), [month]);
+  return useDbQuery(query, ['sessions']);
 }

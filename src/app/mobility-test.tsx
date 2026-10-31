@@ -1,12 +1,13 @@
 import { router, Stack, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { showDialog } from '@/components/dialog';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
@@ -20,16 +21,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
 import { formatScoreChange, SCORE_AREAS, SCORE_BAND_LABELS, scoreBand, scoreChange } from '@/data/mobility-score';
-import {
-  BODY_MEASUREMENT_LABELS,
-  DEFAULT_BODY,
-  FLEXIBILITY_TESTS,
-  METHOD_UNITS,
-  SIDE_LABELS,
-  TEST_STEPS,
-} from '@/data/mobility-tests';
+import { FLEXIBILITY_TESTS, METHOD_UNITS, SIDE_LABELS, TEST_STEPS } from '@/data/mobility-tests';
 import { logMobilityTest, useMobilityScore } from '@/db/mobility-tests';
-import { useProfile } from '@/db/profile';
 import { useTheme } from '@/hooks/use-theme';
 import { useSkipTestMeasurements } from '@/lib/dev-settings';
 
@@ -45,8 +38,6 @@ const TIPS = [
   'Move slowly into each position and stop at a firm stretch, never pain.',
   'Measure the same way each time so results are comparable.',
 ];
-
-const BODY_MEASUREMENT_KEYS = Object.keys(BODY_MEASUREMENT_LABELS) as (keyof typeof BODY_MEASUREMENT_LABELS)[];
 
 const AREA_LABELS = Object.fromEntries(SCORE_AREAS.map(({ id, label }) => [id, label]));
 
@@ -68,10 +59,12 @@ export default function MobilityTestScreen() {
   // Mid-test, leaving loses the measurements; on the results screen it means "done".
   usePreventRemove(phase !== 'intro' && !leaving, () => {
     if (phase === 'measuring') {
-      Alert.alert('Stop the test?', "Your measurements won't be saved.", [
-        { text: 'Keep going', style: 'cancel' },
-        { text: 'Stop test', style: 'destructive', onPress: () => setLeaving('cancel') },
-      ]);
+      showDialog({
+        title: 'Stop the test?',
+        message: "Your measurements won't be saved.",
+        cancelLabel: 'Keep going',
+        confirm: { label: 'Stop test', onPress: () => setLeaving('cancel') },
+      });
     } else if (phase === 'results') {
       setLeaving('done');
     }
@@ -152,7 +145,6 @@ export default function MobilityTestScreen() {
 
 function Intro({ onStart }: { onStart: () => void }) {
   const insets = useSafeAreaInsets();
-  const profile = useProfile();
 
   return (
     <ThemedView style={styles.screen}>
@@ -177,35 +169,6 @@ function Intro({ onStart }: { onStart: () => void }) {
             A clear wall, some floor space, a stair or sturdy box, a table, a tape measure, a strap to hold the phone to
             your leg, a towel or belt (anything that doesn&apos;t stretch), and a partner for the hip rotation tests.
           </ThemedText>
-        </Card>
-        <Card style={styles.introCard}>
-          <CardTitle icon={{ ios: 'ruler.fill', android: 'straighten' }} title="Your body measurements" />
-          <ThemedText themeColor="textSecondary">
-            Used to make the hints during the test match your body. Anything you haven&apos;t entered uses an
-            average size.
-          </ThemedText>
-          {profile &&
-            BODY_MEASUREMENT_KEYS.map((key) => {
-              const own = profile.body[key];
-              const fallback = DEFAULT_BODY[key];
-              return (
-                <View key={key} style={styles.partRow}>
-                  <ThemedText>{BODY_MEASUREMENT_LABELS[key]}</ThemedText>
-                  {own !== null ? (
-                    <ThemedText>{own} cm</ThemedText>
-                  ) : (
-                    <ThemedText themeColor="textSecondary">
-                      {fallback === null ? 'Not set' : `${fallback} cm (default)`}
-                    </ThemedText>
-                  )}
-                </View>
-              );
-            })}
-          <Button
-            title="Update measurements"
-            variant="secondary"
-            onPress={() => router.push('/edit-profile?section=body')}
-          />
         </Card>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
@@ -453,9 +416,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
     borderRadius: Radius.full,
-  },
-  partRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
 });
