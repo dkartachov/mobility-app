@@ -239,7 +239,7 @@ function SignedIn() {
             <Button title="Keep this phone's data" variant="secondary" onPress={confirmKeep} disabled={running} />
           </>
         )}
-        <Button title="Sign out" variant="secondary" onPress={signOut} />
+        <Button title="Turn off backups" variant="secondary" onPress={signOut} />
       </>
     );
   }
