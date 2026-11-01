@@ -63,6 +63,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     letterSpacing: 0.2,
+    // Full width rather than sized to the text: Android can measure bold, letter-spaced text a few
+    // pixels short, which wraps the last word onto a line the button has no room for.
+    alignSelf: 'stretch',
+    textAlign: 'center',
   },
   dimmed: {
     opacity: 0.5,
