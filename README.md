@@ -62,18 +62,21 @@ Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` i
 | Development | `com.hogos.plie.dev` | `backups-dev` |
 | Production | `com.hogos.plie` | `backups-prod` |
 
-There are no accounts. "Turn on backups" in Settings makes a Supabase anonymous user for that install, and its ID names its folder. That keeps friends' data separate from each other's, but the identity lives only on the phone: **reinstalling or losing the phone orphans the backup**, since nothing can prove the new install is the same person.
+There are no passwords. "Turn on backups" in Settings asks for an email, Supabase emails a 6-digit code, and entering it signs in: a new email creates a user, a known one signs back into it. The user's ID names their folder, so the same email on a reinstalled or new phone reaches the same backups. Anyone who controls an inbox can reach that person's backups, so the email is effectively the password.
 
-The publishable key ships in the app, so anyone who extracts it can create anonymous users and upload to their own folders. They can't read or change anyone else's data (the policies check the folder against the user ID), but they could fill the bucket. Bucket limits (50 MB per file, binary only) and Supabase's per-IP rate limit on anonymous sign-ins bound that; watch storage usage in the dashboard. If it's abused, the next step is gating sign-in behind invite codes (an Edge Function that trades a code for a session, with anonymous sign-ins turned off).
+The publishable key ships in the app, so anyone who extracts it can sign up with an inbox they control and upload to their own folder. They can't read or change anyone else's data (the policies check the folder against the user ID), but they could fill the bucket. Bucket limits (50 MB per file, binary only) and Supabase's email rate limits bound that; watch storage usage in the dashboard. If it's abused, the next step is gating sign-up behind invite codes (an Edge Function that trades a code for a session, with sign-ups turned off).
 
-Separate buckets mean a bug that sent the dev build to the production bucket would still only reach its own anonymous user's folder there.
+Separate buckets mean a bug that sent the dev build to the production bucket would still only reach that user's own folder there.
 
-After turning backups on, they stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
+After signing in on a phone, backups stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
 
 ### Setup
 
 1. Create a Supabase project.
-2. Under Authentication, turn on anonymous sign-ins. Leave the per-IP rate limit for them at its default or lower.
+2. Under Authentication:
+   - Turn on new user sign-ups and the email provider, and leave anonymous sign-ins off.
+   - In the "Magic Link" and "Confirm signup" email templates, include the code with `{{ .Token }}`. The app has no deep links, so a link alone can't sign anyone in. Existing emails get the first template, new ones the second.
+   - Supabase's built-in email sender only delivers to members of your Supabase organization. To let friends sign in, set up custom SMTP (Resend, Postmark and SES have free tiers) or invite each friend to the organization.
 3. Run `supabase/setup.sql` in the SQL editor.
 4. Copy `.env.example` to `.env.local` and fill it in, for the dev server.
 5. Add the same two values to EAS for builds and updates, once per variable and value:
@@ -82,7 +85,7 @@ After turning backups on, they stay paused until you choose between restoring an
    npx eas-cli@latest env:set --environment development --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value "..."
    ```
 
-6. Make new builds with `npm run build:dev` and `npm run build:prod`, then turn on backups under Settings.
+6. Make new builds with `npm run build:dev` and `npm run build:prod`, then turn on backups under Settings with your email. Use a different email for dev and prod, or the same: either way each variant has its own bucket.
 
 ## Mobility score and its sources
 

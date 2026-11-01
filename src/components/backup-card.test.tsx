@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { formatDateKey } from '@/lib/dates';
 
@@ -10,6 +10,8 @@ const mockLinkDevice = jest.fn();
 const mockListSnapshots = jest.fn();
 const mockRestoreSnapshot = jest.fn();
 const mockShowDialog = jest.fn();
+const mockSignInWithOtp = jest.fn();
+const mockVerifyOtp = jest.fn();
 const mockState = { linked: false, lastBackupAt: null as string | null, lastError: null as string | null, running: false };
 
 jest.mock('expo', () => ({ ...jest.requireActual('expo'), reloadAppAsync: jest.fn() }));
@@ -23,6 +25,8 @@ jest.mock('@/lib/supabase', () => ({
         callback('INITIAL_SESSION', mockSession.value);
         return { data: { subscription: { unsubscribe: () => {} } } };
       },
+      signInWithOtp: (...args: unknown[]) => mockSignInWithOtp(...args),
+      verifyOtp: (...args: unknown[]) => mockVerifyOtp(...args),
     },
   },
 }));
@@ -47,13 +51,51 @@ describe('BackupCard', () => {
     mockState.lastError = null;
     mockLinkDevice.mockClear();
     mockListSnapshots.mockReset();
+    mockSignInWithOtp.mockReset().mockResolvedValue({ error: null });
+    mockVerifyOtp.mockReset().mockResolvedValue({ error: null });
   });
 
-  it('offers to turn on backups when signed out', async () => {
+  it('asks for an email when signed out', async () => {
     mockSession.value = null;
     await render(<BackupCard />);
     expect(screen.getByText('Turn on backups')).toBeTruthy();
     expect(mockListSnapshots).not.toHaveBeenCalled();
+  });
+
+  it('emails a code, then signs in with it', async () => {
+    mockSession.value = null;
+    await render(<BackupCard />);
+    await fireEvent.changeText(screen.getByLabelText('Email'), ' friend@example.com ');
+    await fireEvent.press(screen.getByRole('button', { name: 'Turn on backups' }));
+    await waitFor(() => expect(screen.getByText('Enter the code we sent to friend@example.com.')).toBeTruthy());
+    expect(mockSignInWithOtp).toHaveBeenCalledWith({ email: 'friend@example.com' });
+
+    await fireEvent.changeText(screen.getByLabelText('Code'), '123456');
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirm' }));
+    await waitFor(() =>
+      expect(mockVerifyOtp).toHaveBeenCalledWith({ email: 'friend@example.com', token: '123456', type: 'email' })
+    );
+  });
+
+  it('stays on the email step when sending the code fails', async () => {
+    mockSession.value = null;
+    mockSignInWithOtp.mockResolvedValue({ error: { message: 'Email rate limit exceeded' } });
+    await render(<BackupCard />);
+    await fireEvent.changeText(screen.getByLabelText('Email'), 'friend@example.com');
+    await fireEvent.press(screen.getByRole('button', { name: 'Turn on backups' }));
+    await waitFor(() => expect(screen.getByText('Email rate limit exceeded')).toBeTruthy());
+    expect(screen.queryByText('Confirm')).toBeNull();
+  });
+
+  it('shows why a code was rejected', async () => {
+    mockSession.value = null;
+    mockVerifyOtp.mockResolvedValue({ error: { message: 'Token has expired or is invalid' } });
+    await render(<BackupCard />);
+    await fireEvent.changeText(screen.getByLabelText('Email'), 'friend@example.com');
+    await fireEvent.press(screen.getByRole('button', { name: 'Turn on backups' }));
+    await fireEvent.changeText(await screen.findByLabelText('Code'), '000000');
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(screen.getByText('Token has expired or is invalid')).toBeTruthy());
   });
 
   it('starts backing up straight away when the account has no backups', async () => {

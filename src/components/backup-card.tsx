@@ -7,6 +7,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
 import { showDialog } from '@/components/dialog';
+import { Field, TextField } from '@/components/field';
 import { IconBadge } from '@/components/icon-badge';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -62,24 +63,79 @@ export function BackupCard() {
   );
 }
 
-/** No account: Supabase makes an anonymous user for this install, whose ID names its bucket folder. */
+/**
+ * Email and a one-time code, no password. A new email gets a new user and an existing one signs
+ * back in, so the same email on a new phone reaches the same backups.
+ */
 function SignIn() {
+  const [email, setEmail] = useState('');
+  const [sentTo, setSentTo] = useState<string>();
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
 
-  const turnOn = async () => {
+  const run = async (action: () => Promise<{ error: { message: string } | null }>) => {
     setLoading(true);
     setError(undefined);
-    const result = await supabase!.auth.signInAnonymously();
-    if (result.error) setError(result.error.message);
+    const result = await action();
     setLoading(false);
+    if (result.error) setError(result.error.message);
+    return !result.error;
   };
+
+  const sendCode = async (address: string) => {
+    if (await run(() => supabase!.auth.signInWithOtp({ email: address }))) {
+      setSentTo(address);
+      setCode('');
+    }
+  };
+
+  const verify = () => run(() => supabase!.auth.verifyOtp({ email: sentTo!, token: code.trim(), type: 'email' }));
+
+  if (sentTo === undefined) {
+    return (
+      <>
+        <ThemedText themeColor="textSecondary">
+          Keep a copy of your data in the cloud. Use the same email on a new phone to get it back.
+        </ThemedText>
+        <Field label="Email">
+          <TextField
+            accessibilityLabel="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+          />
+        </Field>
+        {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+        <Button
+          title="Turn on backups"
+          onPress={() => sendCode(email.trim())}
+          loading={loading}
+          disabled={!email.trim()}
+        />
+      </>
+    );
+  }
 
   return (
     <>
-      <ThemedText themeColor="textSecondary">Keep a copy of your data in the cloud. No account needed.</ThemedText>
+      <ThemedText themeColor="textSecondary">Enter the code we sent to {sentTo}.</ThemedText>
+      <Field label="Code">
+        <TextField
+          accessibilityLabel="Code"
+          value={code}
+          onChangeText={setCode}
+          autoComplete="one-time-code"
+          textContentType="oneTimeCode"
+          keyboardType="number-pad"
+        />
+      </Field>
       {error && <ThemedText themeColor="danger">{error}</ThemedText>}
-      <Button title="Turn on backups" onPress={turnOn} loading={loading} />
+      <Button title="Confirm" onPress={verify} loading={loading} disabled={!code.trim()} />
+      <Button title="Send a new code" variant="secondary" onPress={() => sendCode(sentTo)} disabled={loading} />
+      <Button title="Use a different email" variant="secondary" onPress={() => setSentTo(undefined)} disabled={loading} />
     </>
   );
 }
