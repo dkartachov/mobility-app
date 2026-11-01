@@ -20,7 +20,7 @@ export const FAST_STEP_SECONDS = 5;
 /** 2-minute holds are rarer than 1-minute ones. */
 const TWO_MINUTE_CHANCE = 0.25;
 
-function pickRandom<T>(items: readonly T[]) {
+export function pickRandom<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
 }
 

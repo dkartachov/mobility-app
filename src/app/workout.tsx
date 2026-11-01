@@ -20,16 +20,18 @@ import { promptForReminderIfDue } from '@/components/reminder-prompt';
 import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { TimeoutOverlay } from '@/components/timeout-overlay';
 import { TimerBar } from '@/components/timer-bar';
 import { Elevation, Radius, Spacing } from '@/constants/theme';
 import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
-import { useWorkoutCues, type WorkoutCue } from '@/hooks/use-workout-cues';
+import { useWorkoutCues } from '@/hooks/use-workout-cues';
 import { formatDuration } from '@/lib/dates';
 import { getFastWorkouts } from '@/lib/dev-settings';
 import { milestoneReached } from '@/lib/milestones';
 import { countWorkoutForReminderPrompt } from '@/lib/reminder-prompt';
 import { useColorScheme } from '@/lib/theme-preference';
+import { TIMEOUT_EXTEND_SECONDS, getTimeoutSeconds } from '@/lib/timeout-preference';
 import {
   BUFFER_SECONDS,
   DAILY_MINUTES,
@@ -39,77 +41,9 @@ import {
   formatClock,
   type WorkoutStep,
 } from '@/lib/workout';
-
-/** `buffer` is the get-ready countdown; `finished` only happens after the last exercise. */
-type Phase = 'buffer' | 'active' | 'finished';
-
-type PlayerState = {
-  index: number;
-  phase: Phase;
-  remainingMs: number;
-  paused: boolean;
-  /** Bumped whenever a countdown (re)starts, so the timer bar knows to restart its fill. */
-  countdown: number;
-  /** The latest sound cue. Only set by the timer itself, so skipping around stays quiet. */
-  cue?: { type: WorkoutCue };
-};
-
-type PlayerAction =
-  | { type: 'tick'; deltaMs: number }
-  | { type: 'pause' }
-  | { type: 'resume' }
-  | { type: 'reset' }
-  | { type: 'goTo'; index: number };
+import { createPlayerReducer } from '@/lib/workout-player';
 
 const TICK_MS = 250;
-
-/** When the "10 seconds" cue is spoken. */
-const WARNING_MS = 10_000;
-
-function createReducer(steps: WorkoutStep[], bufferMs: number) {
-  function startStep(state: PlayerState, index: number): PlayerState {
-    return { ...state, index, phase: 'buffer', remainingMs: bufferMs, countdown: state.countdown + 1 };
-  }
-
-  return function reducer(state: PlayerState, action: PlayerAction): PlayerState {
-    switch (action.type) {
-      case 'tick': {
-        if (state.paused || state.phase === 'finished') return state;
-        const remainingMs = state.remainingMs - action.deltaMs;
-        if (remainingMs > 0) {
-          // Holds too short for a real 10 s warning (dev fast mode) get it halfway, so the cue can still be heard.
-          const warningMs = Math.min(WARNING_MS, (steps[state.index].durationSeconds * 1000) / 2);
-          const crossedWarning =
-            state.phase === 'active' && state.remainingMs > warningMs && remainingMs <= warningMs;
-          return { ...state, remainingMs, cue: crossedWarning ? { type: 'tenSeconds' } : state.cue };
-        }
-
-        if (state.phase === 'buffer') {
-          return {
-            ...state,
-            phase: 'active',
-            remainingMs: steps[state.index].durationSeconds * 1000,
-            countdown: state.countdown + 1,
-          };
-        }
-        const next = steps[state.index + 1];
-        if (next) {
-          // Finishing the first side isn't the end of the exercise, so it gets the voice cue instead of the ding.
-          return { ...startStep(state, state.index + 1), cue: { type: next.side === 2 ? 'switchSides' : 'done' } };
-        }
-        return { ...state, phase: 'finished', remainingMs: 0, cue: { type: 'done' } };
-      }
-      case 'pause':
-        return { ...state, paused: true };
-      case 'resume':
-        return { ...state, paused: false };
-      case 'reset':
-        return startStep(state, state.index);
-      case 'goTo':
-        return startStep(state, Math.min(Math.max(action.index, 0), steps.length - 1));
-    }
-  };
-}
 
 function parseMinutes(value: string | undefined) {
   const minutes = Number(value);
@@ -149,7 +83,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const [startedAt] = useState(() => new Date());
-  const [reducer] = useState(() => createReducer(steps, bufferMs));
+  const [reducer] = useState(() => createPlayerReducer(steps, bufferMs));
   const [state, dispatch] = useReducer(reducer, {
     index: 0,
     phase: 'buffer',
@@ -178,9 +112,11 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
     if (cancelled) router.dismissTo('/');
   }, [cancelled]);
 
-  const running = !state.paused && state.phase !== 'finished' && !completing;
+  const onTimeout = state.timeoutMs !== undefined;
+  const running = !state.paused && state.phase !== 'finished' && !completing && !onTimeout;
+  const ticking = running || onTimeout;
   useEffect(() => {
-    if (!running) return;
+    if (!ticking) return;
     // Measure real elapsed time rather than trusting the interval, which drifts and stops in the background.
     let last = Date.now();
     const id = setInterval(() => {
@@ -189,7 +125,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
       last = now;
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [running]);
+  }, [ticking]);
 
   const step = steps[state.index];
   const isLast = state.index === steps.length - 1;
@@ -241,10 +177,16 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
       </Pager>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
-        <View style={styles.timer} accessibilityLiveRegion="polite">
-          <ThemedText type="stat" style={styles.clock}>
-            {formatClock(Math.ceil(state.remainingMs / 1000))}
-          </ThemedText>
+        <View style={styles.timer}>
+          <View style={styles.clockRow}>
+            <ThemedText type="stat" style={styles.clock} accessibilityLiveRegion="polite">
+              {formatClock(Math.ceil(state.remainingMs / 1000))}
+            </ThemedText>
+            <TimeoutButton
+              disabled={!running}
+              onPress={() => dispatch({ type: 'startTimeout', seconds: getTimeoutSeconds() })}
+            />
+          </View>
           <View style={styles.progress}>
             <TimerBar
               totalMs={phaseTotalMs}
@@ -292,6 +234,14 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
           )}
         </View>
       </View>
+
+      {state.timeoutMs !== undefined && (
+        <TimeoutOverlay
+          remainingMs={state.timeoutMs}
+          onExtend={() => dispatch({ type: 'extendTimeout', seconds: TIMEOUT_EXTEND_SECONDS })}
+          onResume={() => dispatch({ type: 'endTimeout' })}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -392,6 +342,28 @@ function ControlButton({ label, icon, onPress, primary, disabled, glow }: Contro
   );
 }
 
+/** Sits beside the clock, so it doesn't crowd the row of controls or get pressed instead of them. */
+function TimeoutButton({ onPress, disabled }: { onPress: () => void; disabled: boolean }) {
+  const theme = useTheme();
+  const scheme = useColorScheme();
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        styles.timeoutButton,
+        { backgroundColor: theme.backgroundElement },
+        Elevation[scheme],
+        disabled && styles.disabled,
+      ]}>
+      <ThemedText type="smallBold">Timeout</ThemedText>
+    </PressableScale>
+  );
+}
+
 /** A small pill label. `highlighted` uses the accent color for the current state. */
 function Tag({ label, highlighted }: { label: string; highlighted?: boolean }) {
   const theme = useTheme();
@@ -476,10 +448,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
   },
+  clockRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   clock: {
     fontSize: 64,
     lineHeight: 72,
     letterSpacing: -2,
+  },
+  timeoutButton: {
+    position: 'absolute',
+    right: 0,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.two + Spacing.one,
+    borderRadius: Radius.full,
   },
   progress: {
     alignSelf: 'stretch',

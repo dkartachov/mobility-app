@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { resetInstructions } from '@/lib/instructions';
 import { resetReminderPrompt } from '@/lib/reminder-prompt';
 
 /** Wipes sessions, goals, flexibility tests, reminders and profile details, back to a fresh install. */
@@ -14,4 +15,5 @@ export async function resetAllData(db: SQLiteDatabase) {
     UPDATE profile SET first_name = '', last_name = '', date_of_birth = NULL, gender = NULL, photo_file = NULL;
   `);
   resetReminderPrompt();
+  resetInstructions();
 }
