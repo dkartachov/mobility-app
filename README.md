@@ -30,13 +30,14 @@ npx tsc --noEmit                        # typecheck
 npm test                                # unit and component tests (Jest)
 npx expo-doctor                         # check dependencies and config
 npm run build:dev                       # new dev build after adding native packages
-npm run build:prod                      # production build (APK)
-npm run update:dev -- --message "..."   # over-the-air update; update:prod for production
+npm run build:preview                   # build to share by install link (APK)
+npm run build:prod                      # store build (AAB)
+npm run update:dev -- --message "..."   # over-the-air update; update:preview and update:prod for the others
 ```
 
 ### App variants
 
-The development and production builds are separate apps ([Expo app variants](https://docs.expo.dev/tutorial/eas/multiple-app-variants/), set up in `app.config.ts`), so both can be installed on one device, each with its own data. Production builds an APK, so it installs from its EAS build page like the dev build:
+The development and production builds are separate apps ([Expo app variants](https://docs.expo.dev/tutorial/eas/multiple-app-variants/), set up in `app.config.ts`), so both can be installed on one device, each with its own data. Production builds an AAB for the store, so it can't be installed directly. The `preview` profile is the production app built as an APK with a shareable install link: same identifier and backup bucket, so it replaces production on a device, with its own update channel:
 
 | Variant | `APP_VARIANT` | Name | Identifier | Scheme |
 |---|---|---|---|---|
@@ -89,7 +90,7 @@ Settings showing the last backup and any error is also how you'd notice the free
    npx eas-cli@latest env:set --environment development --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value "..."
    ```
 
-6. Make new builds with `npm run build:dev` and `npm run build:prod`, then sign in with your email. Use a different email for dev and prod, or the same: either way each variant has its own bucket.
+6. Make new builds with `npm run build:dev` and `npm run build:preview`, then sign in with your email. Use a different email for dev and prod, or the same: either way each variant has its own bucket.
 
 ## Mobility score and its sources
 
