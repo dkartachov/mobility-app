@@ -8,6 +8,7 @@
     "scheme": "plie",
     "userInterfaceStyle": "automatic",
     "android": {
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#0B6A61",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -47,7 +47,7 @@ export function AccountCard() {
         <ThemedText type="smallBold">Account</ThemedText>
       </View>
       {email && <ThemedText themeColor="textSecondary">Signed in as {email}.</ThemedText>}
-      <Button title="Sign out" variant="destructive" onPress={confirmSignOut} loading={signingOut} />
+      <Button title="Sign out" variant="secondary" onPress={confirmSignOut} loading={signingOut} />
     </Card>
   );
 }

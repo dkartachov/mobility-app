@@ -35,12 +35,6 @@ export async function getTotalSeconds(db: SQLiteDatabase) {
   return row?.total ?? 0;
 }
 
-export async function deleteAllSessions(db: SQLiteDatabase) {
-  // The WHERE clause is deliberate: a bare `DELETE FROM` uses SQLite's truncate optimization,
-  // which skips the change hook, so `useDbQuery` screens would never refresh.
-  await db.runAsync('DELETE FROM sessions WHERE id IS NOT NULL');
-}
-
 export async function getStats(db: SQLiteDatabase): Promise<Stats> {
   const row = await db.getFirstAsync<{
     total: number | null;

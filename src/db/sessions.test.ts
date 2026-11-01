@@ -2,14 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { createTestDb } from '@/test-utils/sqlite';
 
-import {
-  deleteAllSessions,
-  getMonthTrainingDays,
-  getStats,
-  getTotalSeconds,
-  getWeekDays,
-  logSession,
-} from './sessions';
+import { getMonthTrainingDays, getStats, getTotalSeconds, getWeekDays, logSession } from './sessions';
 
 describe('session queries', () => {
   let db: SQLiteDatabase;
@@ -96,13 +89,5 @@ describe('session queries', () => {
 
     jest.setSystemTime(new Date(2026, 10, 2, 0, 1));
     expect((await getWeekDays(db)).some((day) => day.trained)).toBe(false);
-  });
-
-  it('deletes all sessions', async () => {
-    await logSession(db, { startedAt: new Date(2026, 9, 28, 8), durationSeconds: 600 });
-
-    await deleteAllSessions(db);
-
-    expect(await getTotalSeconds(db)).toBe(0);
   });
 });

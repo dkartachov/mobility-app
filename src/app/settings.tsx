@@ -1,16 +1,13 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccountCard } from '@/components/account-card';
 import { BackupCard } from '@/components/backup-card';
-import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
 import { DevTools } from '@/components/dev-tools';
-import { showDialog } from '@/components/dialog';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
 import { RemindersCard } from '@/components/reminders-card';
@@ -18,7 +15,6 @@ import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { deleteAllSessions } from '@/db/sessions';
 import { isBackupConfigured } from '@/lib/backup';
 import {
   THEME_PREFERENCES,
@@ -28,7 +24,6 @@ import {
 } from '@/lib/theme-preference';
 
 export default function SettingsScreen() {
-  const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const themePreference = useThemePreference();
   const { section } = useLocalSearchParams<{ section?: 'reminders' }>();
@@ -40,20 +35,6 @@ export default function SettingsScreen() {
     if (section !== 'reminders' || scrolledToSection.current) return;
     scrolledToSection.current = true;
     scrollView.current?.scrollTo({ y: nativeEvent.layout.y - Spacing.three });
-  };
-
-  const confirmDeleteSessions = () => {
-    showDialog({
-      title: 'Delete all sessions?',
-      message: 'This wipes your workout history.',
-      confirm: {
-        label: 'Delete',
-        onPress: async () => {
-          await deleteAllSessions(db);
-          router.back();
-        },
-      },
-    });
   };
 
   return (
@@ -97,21 +78,6 @@ export default function SettingsScreen() {
             Data
           </ThemedText>
           <BackupCard />
-          <Card style={styles.card}>
-            <View style={styles.rowTitle}>
-              <IconBadge
-                name={{ ios: 'trash.fill', android: 'delete' }}
-                color="danger"
-                background="backgroundSelected"
-                size={32}
-              />
-              <ThemedText type="smallBold">Workout history</ThemedText>
-            </View>
-            <ThemedText themeColor="textSecondary">
-              Remove every logged session, including test data. Your profile is kept.
-            </ThemedText>
-            <Button title="Delete all sessions" variant="destructive" onPress={confirmDeleteSessions} />
-          </Card>
         </View>
 
         {isBackupConfigured && (
