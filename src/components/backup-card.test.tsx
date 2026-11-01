@@ -49,10 +49,10 @@ describe('BackupCard', () => {
     mockListSnapshots.mockReset();
   });
 
-  it('asks for an invite code when signed out', async () => {
+  it('asks to sign in when signed out', async () => {
     mockSession.value = null;
     await render(<BackupCard />);
-    expect(screen.getByText('Use invite code')).toBeTruthy();
+    expect(screen.getByText('Sign in')).toBeTruthy();
     expect(mockListSnapshots).not.toHaveBeenCalled();
   });
 

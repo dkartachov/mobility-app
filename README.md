@@ -57,29 +57,20 @@ SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the w
 
 Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` in `src/lib/backup.ts`), so development data stays out of production however the dev server was started. Inside a bucket, each user can only reach a folder named after their user ID (`supabase/setup.sql`):
 
-| Variant | App ID | Bucket |
-|---|---|---|
-| Development | `com.hogos.plie.dev` | `backups-dev` |
-| Production | `com.hogos.plie` | `backups-prod` |
+| Variant | App ID | Bucket | Login |
+|---|---|---|---|
+| Development | `com.hogos.plie.dev` | `backups-dev` | Dev user |
+| Production | `com.hogos.plie` | `backups-prod` | Your real user |
 
-Nobody needs an account. Each person gets an invite code, and the app trades it for a session through the `redeem-invite` Edge Function (`supabase/functions/redeem-invite`). The function checks the code against hashes in the `invites` table, which only it can read, and signs in the user that code belongs to, creating it on first use. Every code is its own user, so reinstalling or switching phones with the same code brings the same backups back, and revoking one person doesn't affect the others. Codes are 80 bits, so they can't be guessed. Treat a code as that person's password: anyone holding it can read and replace their backups, and no one can reach another person's.
+Separate logins aren't required, but they're worth keeping: if a bug ever sent the dev build to the production bucket, the dev login would only reach its own folder there.
 
-Make a separate code for yourself per variant: dev and prod codes are different users, so if a bug ever sent the dev build to the production bucket, it would only reach its own folder there.
-
-After entering a code on a phone, backups stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
+After signing in on a phone, backups stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
 
 ### Setup
 
 1. Create a Supabase project.
-2. Under Authentication, turn off new user sign-ups and leave anonymous sign-ins off, so the invite function is the only way in.
+2. Under Authentication, turn off new user sign-ups, then add a dev user and a real user, both already confirmed.
 3. Run `supabase/setup.sql` in the SQL editor.
-   Then deploy the function and make codes (the query is at the bottom of that file):
-
-   ```bash
-   npx supabase functions deploy redeem-invite --no-verify-jwt --project-ref <ref>
-   ```
-
-   To keep an existing user's backups, set `email` on their invite row to that user's email.
 4. Copy `.env.example` to `.env.local` and fill it in, for the dev server.
 5. Add the same two values to EAS for builds and updates, once per variable and value:
 
@@ -87,7 +78,7 @@ After entering a code on a phone, backups stay paused until you choose between r
    npx eas-cli@latest env:set --environment development --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value "..."
    ```
 
-6. Make new builds with `npm run build:dev` and `npm run build:prod`, then enter a code under Settings.
+6. Make new builds with `npm run build:dev` and `npm run build:prod`, then sign in under Settings.
 
 ## Mobility score and its sources
 
