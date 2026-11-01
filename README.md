@@ -53,7 +53,7 @@ With no reminders set, pressing Done after a workout suggests adding one (`src/l
 
 ## Cloud backups
 
-SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the whole file to a private Supabase Storage bucket, plus the profile photo: about 5 seconds after any change, and when the app opens or goes to the background if an earlier upload didn't finish. Only the latest snapshot is kept, and restoring always uses it. Postgres isn't used, so new tables and columns need no backup changes, and restoring an old snapshot runs the normal migrations.
+SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the whole file to a private Supabase Storage bucket, plus the profile photo: about 5 seconds after any change, and when the app opens or goes to the background if an earlier upload didn't finish. There's one snapshot per day with the last 7 kept, but the app only ever restores the latest. The older ones are a safety net for a bad change that got backed up: download one from the bucket in the Supabase dashboard if you ever need it. Before each upload the app runs SQLite's integrity check, so a damaged database is never backed up over a good one. Profile photos no kept snapshot can show are deleted after each backup. Postgres isn't used, so new tables and columns need no backup changes, and restoring an old snapshot runs the normal migrations.
 
 Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` in `src/lib/backup.ts`), so development data stays out of production however the dev server was started. Inside a bucket, each user can only reach a folder named after their user ID (`supabase/setup.sql`):
 

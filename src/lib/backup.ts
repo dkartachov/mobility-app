@@ -1,6 +1,6 @@
 /**
  * Snapshot backups: SQLite stays the app's only live database, and a copy of the whole file goes
- * to a private Supabase Storage bucket, keeping only the latest, in a folder only that user can reach (see
+ * to a private Supabase Storage bucket, one per day for the last week, in a folder only that user can reach (see
  * `supabase/setup.sql`). Each app variant has its own bucket, picked by the installed app's ID
  * rather than `APP_VARIANT`, so how the dev server was started can't send it to the wrong one.
  *
@@ -16,12 +16,15 @@ import { useSyncExternalStore } from 'react';
 
 import { getProfile } from '@/db/profile';
 import { SCHEMA_VERSION } from '@/db/schema';
-import { todayKey, type DateKey } from '@/lib/dates';
+import { fromDateKey, todayKey, type DateKey } from '@/lib/dates';
 import { profilePhotoFile } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 
-/** Only the latest snapshot is kept: restoring always uses it. */
-export const SNAPSHOTS_TO_KEEP = 1;
+/**
+ * Days of snapshots kept. The app only ever restores the latest; the older ones are a safety net
+ * for a bad change that got backed up, recoverable by hand from the Supabase dashboard.
+ */
+export const SNAPSHOTS_TO_KEEP = 7;
 
 const SNAPSHOT_DIR = 'snapshots';
 const PHOTO_DIR = 'photos';
@@ -145,14 +148,35 @@ async function pruneSnapshots() {
   assertOk(error);
 }
 
-/** Deletes every photo but the one the kept snapshot refers to, or all of them when it has none. */
-async function prunePhotos(userId: string, keep: string | null) {
+/**
+ * Deletes photos no kept snapshot can refer to. A snapshot refers to the newest photo uploaded
+ * before it, so photos from the oldest kept day onwards stay, plus the newest one from before that
+ * day. Photos without a timestamp stay too: keeping one too many is harmless.
+ */
+async function prunePhotos(userId: string, current: string | null) {
+  const oldestKept = (await listSnapshots()).at(-1);
+  if (!oldestKept) return;
+  const cutoff = fromDateKey(oldestKept).getTime();
+
   const { data, error } = await bucket().list(`${userId}/${PHOTO_DIR}`, { limit: 1000 });
   assertOk(error);
-  const expired = (data ?? []).map((file) => file.name).filter((name) => name !== keep);
+  const before = (data ?? [])
+    .map((file) => ({ name: file.name, time: Date.parse(file.updated_at ?? file.created_at ?? '') }))
+    .filter(({ name, time }) => name !== current && time < cutoff)
+    .sort((a, b) => b.time - a.time);
+  // The newest one before the cutoff may be what the oldest kept snapshot shows.
+  const expired = before.slice(1).map(({ name }) => name);
   if (expired.length === 0) return;
   const { error: removeError } = await bucket().remove(expired.map((name) => `${userId}/${PHOTO_DIR}/${name}`));
   assertOk(removeError);
+}
+
+/** Refuses to back up a damaged database, so it can't replace a good snapshot. */
+async function assertHealthy(db: SQLiteDatabase) {
+  const result = await db.getFirstAsync<{ integrity_check: string }>('PRAGMA integrity_check');
+  if (result?.integrity_check !== 'ok') {
+    throw new Error("This phone's data looks damaged, so it wasn't backed up. Your last good backup is safe");
+  }
 }
 
 /**
@@ -185,6 +209,7 @@ async function uploadSnapshot(db: SQLiteDatabase) {
 
     // Cleared first, so a change made during the upload counts as a new change.
     setDirty(false);
+    await assertHealthy(db);
     photoFile = await uploadProfilePhoto(db, userId);
     const snapshot = withRollbackJournalHeader(await db.serializeAsync());
     const { error } = await bucket().upload(`${userId}/${SNAPSHOT_DIR}/${todayKey()}.db`, toArrayBuffer(snapshot), {
@@ -205,7 +230,7 @@ async function uploadSnapshot(db: SQLiteDatabase) {
   }
 
   // The snapshot is safely stored, so failing to tidy up isn't a failed backup.
-  // Photos only once older snapshots are gone, as those may refer to other photos.
+  // Photos after snapshots, since which photos stay depends on which snapshots did.
   await pruneSnapshots()
     .then(() => prunePhotos(userId!, photoFile))
     .catch(console.warn);

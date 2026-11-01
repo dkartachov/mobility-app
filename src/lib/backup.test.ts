@@ -8,6 +8,8 @@ import { createTestDb } from '@/test-utils/sqlite';
 
 // An in-memory bucket standing in for Supabase Storage.
 const mockObjects = new Map<string, ArrayBuffer>();
+/** When an object was last written, as Supabase lists it. Objects without one were written just now. */
+const mockObjectTimes = new Map<string, string>();
 const mockFailUploads = { value: false };
 const SIGNED_IN = { user: { id: 'user-1' } };
 const mockSession = { value: SIGNED_IN as object | null, error: null as { message: string } | null };
@@ -23,13 +25,17 @@ jest.mock('@/lib/supabase', () => ({
         list: async (dir: string) => ({
           data: [...mockObjects.keys()]
             .filter((path) => path.startsWith(`${dir}/`))
-            .map((path) => ({ name: path.slice(dir.length + 1) })),
+            .map((path) => ({
+              name: path.slice(dir.length + 1),
+              updated_at: mockObjectTimes.get(path) ?? new Date().toISOString(),
+            })),
           error: null,
         }),
         upload: async (path: string, body: ArrayBuffer) => {
           mockBucketsUsed.add(bucket);
           if (mockFailUploads.value) return { data: null, error: { message: 'project paused' } };
           mockObjects.set(path, body);
+          mockObjectTimes.delete(path);
           return { data: {}, error: null };
         },
         remove: async (paths: string[]) => {
@@ -120,6 +126,7 @@ describe('backups', () => {
   beforeEach(async () => {
     db = await createDbWithSerialize();
     mockObjects.clear();
+    mockObjectTimes.clear();
     mockLocalFiles.clear();
     mockFailUploads.value = false;
     mockSession.value = SIGNED_IN;
@@ -180,33 +187,71 @@ describe('backups', () => {
     expect(mockObjects.has(oldest)).toBe(false);
   });
 
-  it('deletes photos the kept snapshot no longer refers to', async () => {
+  function addPhoto(name: string, writtenAt: Date, userId = 'user-1') {
+    const path = `${userId}/photos/${name}`;
+    mockObjects.set(path, new ArrayBuffer(1));
+    mockObjectTimes.set(path, writtenAt.toISOString());
+    return path;
+  }
+
+  it('deletes photos no kept snapshot can refer to', async () => {
     const { linkDevice } = loadBackup();
-    mockObjects.set('user-1/photos/avatar-old.jpg', new ArrayBuffer(1));
-    mockObjects.set('user-2/photos/someone-else.jpg', new ArrayBuffer(1));
-    await updateProfilePhoto(db, 'avatar-new.jpg');
-    mockLocalFiles.add('avatar-new.jpg');
+    const oldestKept = new Date(2026, 0, 10);
+    mockObjects.set(`user-1/snapshots/${toDateKey(oldestKept)}.db`, new ArrayBuffer(1));
+    const ancient = addPhoto('ancient.jpg', new Date(2025, 11, 1));
+    const lastBefore = addPhoto('last-before.jpg', new Date(2026, 0, 5));
+    const during = addPhoto('during.jpg', new Date(2026, 0, 12));
+    const otherUser = addPhoto('someone-else.jpg', new Date(2025, 0, 1), 'user-2');
+    await updateProfilePhoto(db, 'current.jpg');
+    mockLocalFiles.add('current.jpg');
 
     await linkDevice(db);
 
-    expect(mockObjects.has('user-1/photos/avatar-new.jpg')).toBe(true);
-    expect(mockObjects.has('user-1/photos/avatar-old.jpg')).toBe(false);
-    expect(mockObjects.has('user-2/photos/someone-else.jpg')).toBe(true);
+    expect(mockObjects.has('user-1/photos/current.jpg')).toBe(true);
+    expect(mockObjects.has(during)).toBe(true);
+    // The oldest kept snapshot may show the newest photo from before its day.
+    expect(mockObjects.has(lastBefore)).toBe(true);
+    expect(mockObjects.has(ancient)).toBe(false);
+    expect(mockObjects.has(otherUser)).toBe(true);
   });
 
-  it('deletes every photo once the profile has none', async () => {
+  it('keeps the current photo however old it is', async () => {
     const { linkDevice } = loadBackup();
-    mockObjects.set('user-1/photos/avatar-old.jpg', new ArrayBuffer(1));
+    mockObjects.set(`user-1/snapshots/${toDateKey(new Date(2026, 0, 10))}.db`, new ArrayBuffer(1));
+    const current = addPhoto('current.jpg', new Date(2025, 0, 1));
+    await updateProfilePhoto(db, 'current.jpg');
+    Storage.setItemSync('backup.uploadedPhoto', 'current.jpg');
+
     await linkDevice(db);
-    expect(mockObjects.has('user-1/photos/avatar-old.jpg')).toBe(false);
+
+    expect(mockObjects.has(current)).toBe(true);
   });
 
   it('keeps photos when the snapshot upload fails', async () => {
     const { linkDevice } = loadBackup();
-    mockObjects.set('user-1/photos/avatar-old.jpg', new ArrayBuffer(1));
+    mockObjects.set(`user-1/snapshots/${toDateKey(new Date(2026, 0, 10))}.db`, new ArrayBuffer(1));
+    const ancient = addPhoto('ancient.jpg', new Date(2025, 0, 1));
+    addPhoto('last-before.jpg', new Date(2026, 0, 5));
     mockFailUploads.value = true;
     await linkDevice(db);
-    expect(mockObjects.has('user-1/photos/avatar-old.jpg')).toBe(true);
+    expect(mockObjects.has(ancient)).toBe(true);
+  });
+
+  it("doesn't back up a damaged database, keeping the last good snapshot", async () => {
+    const { getBackupState, linkDevice } = loadBackup();
+    const good = `user-1/snapshots/${toDateKey(new Date(2026, 0, 10))}.db`;
+    mockObjects.set(good, new ArrayBuffer(1));
+    const getFirstAsync = db.getFirstAsync.bind(db);
+    db.getFirstAsync = (async (sql: string, ...params: never[]) =>
+      sql === 'PRAGMA integrity_check'
+        ? { integrity_check: 'row 3 missing from index' }
+        : getFirstAsync(sql, ...params)) as typeof db.getFirstAsync;
+
+    await linkDevice(db);
+
+    expect(snapshotPaths()).toEqual([good]);
+    expect(getBackupState().lastError).toContain('looks damaged');
+    expect(Storage.getItemSync('backup.dirty')).toBe('true');
   });
 
   it.each([
