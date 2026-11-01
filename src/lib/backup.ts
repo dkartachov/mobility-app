@@ -145,34 +145,47 @@ async function pruneSnapshots() {
   assertOk(error);
 }
 
+/** Deletes every photo but the one the kept snapshot refers to, or all of them when it has none. */
+async function prunePhotos(userId: string, keep: string | null) {
+  const { data, error } = await bucket().list(`${userId}/${PHOTO_DIR}`, { limit: 1000 });
+  assertOk(error);
+  const expired = (data ?? []).map((file) => file.name).filter((name) => name !== keep);
+  if (expired.length === 0) return;
+  const { error: removeError } = await bucket().remove(expired.map((name) => `${userId}/${PHOTO_DIR}/${name}`));
+  assertOk(removeError);
+}
+
 /**
  * Photos go up before the snapshot, so a snapshot never refers to one the bucket doesn't have.
- * Each pick has a unique file name, so old photos stay usable by older snapshots.
+ * Returns the photo the snapshot will refer to, which is the one cleanup keeps.
  */
 async function uploadProfilePhoto(db: SQLiteDatabase, userId: string) {
   const { photoFile } = await getProfile(db);
-  if (!photoFile || Storage.getItemSync(UPLOADED_PHOTO_KEY) === photoFile) return;
+  if (!photoFile || Storage.getItemSync(UPLOADED_PHOTO_KEY) === photoFile) return photoFile;
 
   const file = profilePhotoFile(photoFile);
-  if (!file.exists) return;
+  if (!file.exists) return photoFile;
   const { error } = await bucket().upload(`${userId}/${PHOTO_DIR}/${photoFile}`, toArrayBuffer(await file.bytes()), {
     contentType: 'application/octet-stream',
     upsert: true,
   });
   assertOk(error);
   Storage.setItemSync(UPLOADED_PHOTO_KEY, photoFile);
+  return photoFile;
 }
 
 async function uploadSnapshot(db: SQLiteDatabase) {
   setState({ running: true });
+  let userId: string | null;
+  let photoFile: string | null;
   try {
     // A paused project can fail here, when the session needs refreshing, so this must be reported.
-    const userId = await currentUserId();
+    userId = await currentUserId();
     if (!userId) return;
 
     // Cleared first, so a change made during the upload counts as a new change.
     setDirty(false);
-    await uploadProfilePhoto(db, userId);
+    photoFile = await uploadProfilePhoto(db, userId);
     const snapshot = withRollbackJournalHeader(await db.serializeAsync());
     const { error } = await bucket().upload(`${userId}/${SNAPSHOT_DIR}/${todayKey()}.db`, toArrayBuffer(snapshot), {
       contentType: 'application/octet-stream',
@@ -192,7 +205,10 @@ async function uploadSnapshot(db: SQLiteDatabase) {
   }
 
   // The snapshot is safely stored, so failing to tidy up isn't a failed backup.
-  await pruneSnapshots().catch(console.warn);
+  // Photos only once older snapshots are gone, as those may refer to other photos.
+  await pruneSnapshots()
+    .then(() => prunePhotos(userId!, photoFile))
+    .catch(console.warn);
 }
 
 let inFlight: Promise<void> | null = null;

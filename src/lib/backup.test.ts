@@ -173,13 +173,40 @@ describe('backups', () => {
       const day = new Date(2021, 0, i);
       mockObjects.set(`user-1/snapshots/${toDateKey(day)}.db`, new ArrayBuffer(1));
     }
-    mockObjects.set('user-1/photos/keep-me.jpg', new ArrayBuffer(1));
 
     await linkDevice(db); // today's upload makes SNAPSHOTS_TO_KEEP + 1
 
     expect(snapshotPaths()).toHaveLength(SNAPSHOTS_TO_KEEP);
     expect(mockObjects.has(oldest)).toBe(false);
-    expect(mockObjects.has('user-1/photos/keep-me.jpg')).toBe(true);
+  });
+
+  it('deletes photos the kept snapshot no longer refers to', async () => {
+    const { linkDevice } = loadBackup();
+    mockObjects.set('user-1/photos/avatar-old.jpg', new ArrayBuffer(1));
+    mockObjects.set('user-2/photos/someone-else.jpg', new ArrayBuffer(1));
+    await updateProfilePhoto(db, 'avatar-new.jpg');
+    mockLocalFiles.add('avatar-new.jpg');
+
+    await linkDevice(db);
+
+    expect(mockObjects.has('user-1/photos/avatar-new.jpg')).toBe(true);
+    expect(mockObjects.has('user-1/photos/avatar-old.jpg')).toBe(false);
+    expect(mockObjects.has('user-2/photos/someone-else.jpg')).toBe(true);
+  });
+
+  it('deletes every photo once the profile has none', async () => {
+    const { linkDevice } = loadBackup();
+    mockObjects.set('user-1/photos/avatar-old.jpg', new ArrayBuffer(1));
+    await linkDevice(db);
+    expect(mockObjects.has('user-1/photos/avatar-old.jpg')).toBe(false);
+  });
+
+  it('keeps photos when the snapshot upload fails', async () => {
+    const { linkDevice } = loadBackup();
+    mockObjects.set('user-1/photos/avatar-old.jpg', new ArrayBuffer(1));
+    mockFailUploads.value = true;
+    await linkDevice(db);
+    expect(mockObjects.has('user-1/photos/avatar-old.jpg')).toBe(true);
   });
 
   it.each([
