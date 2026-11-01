@@ -32,7 +32,7 @@ export default function ExerciseScreen() {
     <ThemedView style={styles.screen}>
       <Stack.Screen options={{ title: exercise.name }} />
       {/* The video stays in place while you swipe between the cards below. */}
-      <ExerciseVideo photo={exercise.photo} />
+      <ExerciseVideo photo={exercise.photo} animation={exercise.animation} />
       <Pager>
         <PageScroll>
           <PageHeader

@@ -211,7 +211,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
 
   return (
     <ThemedView style={styles.screen}>
-      <ExerciseVideo photo={step.exercise.photo} />
+      <ExerciseVideo photo={step.exercise.photo} animation={step.exercise.animation} />
 
       <View style={styles.status}>
         <WorkoutProgress count={exerciseCount} current={exerciseNumber} finished={finished} />

@@ -1,5 +1,9 @@
 import type { ImageSource } from 'expo-image';
 
+import type { FigureClip } from '@/lib/figure-rig';
+
+import { CAT_COW, INCHWORM, OPEN_BOOK, PIGEON_STRETCH, SQUAT_TO_STAND } from './exercise-animations';
+
 export type Exercise = {
   id: string;
   name: string;
@@ -7,6 +11,8 @@ export type Exercise = {
   stimulus: string;
   instructions: string[];
   photo?: ImageSource;
+  /** Shown in place of the photo on the exercise and workout screens. */
+  animation?: FigureClip;
   /** Always held for 1 minute in generated workouts, never 2. */
   oneMinuteOnly?: boolean;
   /** Done on each side in turn: 1 minute per side, 2 minutes in total. */
@@ -231,6 +237,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Straighten your legs back up and keep alternating',
     ],
     photo: require('@/assets/images/exercises/squat-to-stand.png'),
+    animation: SQUAT_TO_STAND,
     active: true,
     oneMinuteOnly: true,
   },
@@ -269,6 +276,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Square your hips, fold forward over your front shin and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/pigeon-stretch.png'),
+    animation: PIGEON_STRETCH,
     twoSided: true,
   },
   {
@@ -490,6 +498,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Bring it back and keep repeating, then switch sides',
     ],
     photo: require('@/assets/images/exercises/open-book.png'),
+    animation: OPEN_BOOK,
     twoSided: true,
     active: true,
   },
@@ -503,6 +512,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Let your belly drop and lift your chest and gaze, and keep flowing between the two',
     ],
     photo: require('@/assets/images/exercises/cat-cow.png'),
+    animation: CAT_COW,
     active: true,
     oneMinuteOnly: true,
   },
@@ -807,6 +817,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Walk your feet up to your hands in small steps, stand up and keep repeating',
     ],
     photo: require('@/assets/images/exercises/inchworm.png'),
+    animation: INCHWORM,
     active: true,
     oneMinuteOnly: true,
   },
