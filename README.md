@@ -62,13 +62,17 @@ Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` i
 | Development | `com.hogos.plie.dev` | `backups-dev` |
 | Production | `com.hogos.plie` | `backups-prod` |
 
-There are no passwords. "Turn on backups" in Settings asks for an email, Supabase emails a 6-digit code, and entering it signs in: a new email creates a user, a known one signs back into it. The user's ID names their folder, so the same email on a reinstalled or new phone reaches the same backups. Anyone who controls an inbox can reach that person's backups, so the email is effectively the password.
+The app opens on a login screen (`src/app/login.tsx`) until the phone is signed in, so nothing can be recorded that restoring a backup would then wipe. There are no passwords: Supabase emails a 6-digit code, and entering it signs in. A new email creates a user and a known one signs back into it. The user's ID names their folder, so the same email on a reinstalled or new phone reaches the same backups. Anyone who controls an inbox can reach that person's backups, so the email is effectively the password.
+
+Right after signing in, the app restores the latest backup if there is one, or starts backing up if not, then opens. Only a phone with changes of its own that were never backed up (one that used an older build without signing in, or whose session ended) asks first: restore, or keep the phone's data, which replaces the backup. Once signed in, the session stays on the phone and renews itself, so the login screen doesn't come back and the app works offline. Backups are always on; Settings shows the last one, any error, and buttons to back up now or restore the latest. If Supabase ever ends the session for good (say, the user was deleted), the phone unlinks and returns to the login screen. Builds without Supabase settings, like Expo Go, skip the login screen.
+
+The root layout gates the app with `Stack.Protected`. Expo Router shows any route not listed in the layout to everyone, so every new screen must be added there; `src/routes.test.ts` fails if one is missing.
 
 The publishable key ships in the app, so anyone who extracts it can sign up with an inbox they control and upload to their own folder. They can't read or change anyone else's data (the policies check the folder against the user ID), but they could fill the bucket. Bucket limits (50 MB per file, binary only) and Supabase's email rate limits bound that; watch storage usage in the dashboard. If it's abused, the next step is gating sign-up behind invite codes (an Edge Function that trades a code for a session, with sign-ups turned off).
 
 Separate buckets mean a bug that sent the dev build to the production bucket would still only reach that user's own folder there.
 
-After signing in on a phone, backups stay paused until you choose between restoring the backup and keeping that phone's data (which replaces the backup), so a fresh install can't overwrite a good backup by accident. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
+Settings showing the last backup and any error is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume. A fresh install can't sign in while the project is paused, though, so it stays on the login screen until then.
 
 ### Setup
 
@@ -85,7 +89,7 @@ After signing in on a phone, backups stay paused until you choose between restor
    npx eas-cli@latest env:set --environment development --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value "..."
    ```
 
-6. Make new builds with `npm run build:dev` and `npm run build:prod`, then turn on backups under Settings with your email. Use a different email for dev and prod, or the same: either way each variant has its own bucket.
+6. Make new builds with `npm run build:dev` and `npm run build:prod`, then sign in with your email. Use a different email for dev and prod, or the same: either way each variant has its own bucket.
 
 ## Mobility score and its sources
 

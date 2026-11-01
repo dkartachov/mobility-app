@@ -1,12 +1,13 @@
 /**
  * Snapshot backups: SQLite stays the app's only live database, and a copy of the whole file goes
- * to a private Supabase Storage bucket, one per day for the last week, in a folder only that user can reach (see
- * `supabase/setup.sql`). Each app variant has its own bucket, picked by the installed app's ID
- * rather than `APP_VARIANT`, so how the dev server was started can't send it to the wrong one.
+ * to a private Supabase Storage bucket, one per day for the last week, in a folder only that user
+ * can reach (see `supabase/setup.sql`). Each app variant has its own bucket, picked by the
+ * installed app's ID rather than `APP_VARIANT`, so how the dev server was started can't send it to
+ * the wrong one.
  *
- * A device only backs up once it's linked: after sign-in, if the bucket already has backups, you
- * choose between restoring one and keeping this phone's data. Without that, a fresh install could
- * replace today's good snapshot with an empty database.
+ * A device only backs up once it's linked, which the login screen does right after sign-in by
+ * restoring the latest backup or, if there's none or the user keeps the phone's data, linking it
+ * as is. Without that, a fresh install could replace a good snapshot with an empty database.
  */
 import * as Application from 'expo-application';
 import { File, Paths } from 'expo-file-system';
@@ -87,6 +88,14 @@ function setDirty(dirty: boolean) {
 /** Records that the database has changes the bucket doesn't, surviving an app restart. */
 export function markBackupDirty() {
   setDirty(true);
+}
+
+/**
+ * Whether this phone has changes the bucket doesn't. Changes count from the first launch, before
+ * signing in, so a fresh install has none and can restore without asking.
+ */
+export function hasUnsavedChanges() {
+  return Storage.getItemSync(DIRTY_KEY) === 'true';
 }
 
 function bucket() {
