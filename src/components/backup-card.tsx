@@ -95,7 +95,7 @@ function SignIn() {
     return (
       <>
         <ThemedText themeColor="textSecondary">
-          Keep a copy of your data in the cloud. Use the same email on a new phone to get it back.
+          Verify your email to back up your data. We&apos;ll send a one-time code to the address you enter.
         </ThemedText>
         <Field label="Email">
           <TextField
@@ -252,7 +252,7 @@ function SignedIn() {
       {lastError && <ThemedText themeColor="danger">Last backup failed: {lastError}</ThemedText>}
       <Button title="Back up now" onPress={() => backUp(db)} loading={running} />
       <Button title="Restore backup" variant="secondary" onPress={confirmRestore} disabled={running} />
-      <Button title="Sign out" variant="secondary" onPress={signOut} disabled={running} />
+      <Button title="Turn off backups" variant="secondary" onPress={signOut} disabled={running} />
     </>
   );
 }
