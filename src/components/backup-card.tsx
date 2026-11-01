@@ -5,7 +5,6 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
-import { Chip } from '@/components/chip';
 import { showDialog } from '@/components/dialog';
 import { Field, TextField } from '@/components/field';
 import { IconBadge } from '@/components/icon-badge';
@@ -36,7 +35,7 @@ async function restoreAndReload(db: SQLiteDatabase, date: DateKey) {
   }
 }
 
-/** The Settings card for cloud backups: turn on, see the last backup, back up or restore. */
+/** The Settings card for cloud backups: turn on, see the last backup, back up or restore the latest one. */
 export function BackupCard() {
   const [signedIn, setSignedIn] = useState<boolean>();
 
@@ -140,23 +139,24 @@ function SignIn() {
   );
 }
 
+const KEEP_WARNING = "This phone's data replaces the backup in the cloud, which can't be undone.";
+
 function SignedIn() {
   const db = useSQLiteContext();
   const { linked, lastBackupAt, lastError, running } = useBackupState();
-  const [snapshots, setSnapshots] = useState<DateKey[]>();
+  /** The newest backup's date, `null` when there is none. Only looked up before linking. */
+  const [latest, setLatest] = useState<DateKey | null>();
   const [listError, setListError] = useState<string>();
-  const [showRestore, setShowRestore] = useState(false);
-
   const [listAttempt, setListAttempt] = useState(0);
 
-  // Linked devices list backups when asked to restore; new ones need the answer straight away.
+  // A device that isn't linked yet needs to know straight away whether there's a backup to protect.
   useEffect(() => {
-    if (linked && !showRestore) return;
+    if (linked) return;
     let cancelled = false;
     listSnapshots().then(
       (dates) => {
         if (cancelled) return;
-        setSnapshots(dates);
+        setLatest(dates[0] ?? null);
         setListError(undefined);
       },
       (error) => {
@@ -166,38 +166,50 @@ function SignedIn() {
     return () => {
       cancelled = true;
     };
-  }, [linked, showRestore, listAttempt]);
+  }, [linked, listAttempt]);
 
   // Nothing to overwrite, so there's no decision to ask for.
   useEffect(() => {
-    if (!linked && snapshots?.length === 0) linkDevice(db);
-  }, [linked, snapshots, db]);
+    if (!linked && latest === null) linkDevice(db);
+  }, [linked, latest, db]);
 
-  // Declining leaves the card's choices below: older backups, or keeping this phone's data.
+  // Dismissing leaves the same two choices on the card, with backups paused until one is picked.
   useEffect(() => {
-    const latest = snapshots?.[0];
     if (linked || !latest) return;
     showDialog({
-      title: 'Restore your latest backup?',
-      message: `This account has a backup from ${formatDateKey(latest)}. Restoring replaces everything on this phone with it, then restarts the app.`,
-      cancelLabel: 'Not now',
-      confirm: { label: 'Restore', onPress: () => restoreAndReload(db, latest) },
+      title: 'Restore your backup?',
+      message: `There's a backup from ${formatDateKey(latest)}. Restoring replaces everything on this phone with it, then restarts the app. ${KEEP_WARNING}`,
+      actions: [
+        { label: 'Restore', variant: 'primary', onPress: () => restoreAndReload(db, latest) },
+        { label: "Keep this phone's data", variant: 'secondary', onPress: () => linkDevice(db) },
+      ],
     });
-  }, [linked, snapshots, db]);
+  }, [linked, latest, db]);
 
-  const confirmRestore = (date: DateKey) => {
+  const confirmRestore = async () => {
+    let date: DateKey | undefined;
+    try {
+      date = latest ?? (await listSnapshots())[0];
+    } catch (error) {
+      showDialog({ title: "Couldn't check for a backup", message: errorMessage(error) });
+      return;
+    }
+    if (!date) {
+      showDialog({ title: 'No backup yet', message: 'There is nothing in the cloud to restore.' });
+      return;
+    }
+    const day = date;
     showDialog({
-      title: `Restore ${formatDateKey(date)}?`,
-      message: 'This replaces everything on this phone with that backup, then restarts the app.',
-      confirm: { label: 'Restore', onPress: () => restoreAndReload(db, date) },
+      title: `Restore the backup from ${formatDateKey(day)}?`,
+      message: 'This replaces everything on this phone with it, then restarts the app.',
+      confirm: { label: 'Restore', onPress: () => restoreAndReload(db, day) },
     });
   };
 
   const confirmKeep = () => {
     showDialog({
       title: "Keep this phone's data?",
-      message:
-        "This phone starts backing up, replacing today's backup if there is one. Backups from earlier days stay available for now.",
+      message: `${KEEP_WARNING} Backups start right away.`,
       confirm: { label: 'Keep', onPress: () => linkDevice(db) },
     });
   };
@@ -207,31 +219,23 @@ function SignedIn() {
     unlinkDevice();
   };
 
-  const snapshotChips = (
-    <View style={styles.chips}>
-      {snapshots?.map((date) => (
-        <Chip key={date} label={formatDateKey(date)} selected={false} onPress={() => confirmRestore(date)} />
-      ))}
-    </View>
-  );
-
   if (!linked) {
     return (
       <>
         {listError ? (
           <>
-            <ThemedText themeColor="danger">Couldn&apos;t check for backups: {listError}</ThemedText>
+            <ThemedText themeColor="danger">Couldn&apos;t check for a backup: {listError}</ThemedText>
             <Button title="Try again" variant="secondary" onPress={() => setListAttempt((attempt) => attempt + 1)} />
           </>
-        ) : snapshots === undefined || snapshots.length === 0 ? (
-          <ThemedText themeColor="textSecondary">Checking for backups…</ThemedText>
+        ) : !latest ? (
+          <ThemedText themeColor="textSecondary">Checking for a backup…</ThemedText>
         ) : (
           <>
             <ThemedText themeColor="textSecondary">
-              This account already has backups. Pick one to restore, or keep what&apos;s on this phone. Backups stay
-              paused until you choose.
+              There&apos;s a backup from {formatDateKey(latest)}. Restore it, or keep what&apos;s on this phone. Backups
+              stay paused until you choose.
             </ThemedText>
-            {snapshotChips}
+            <Button title="Restore backup" onPress={confirmRestore} disabled={running} />
             <Button title="Keep this phone's data" variant="secondary" onPress={confirmKeep} disabled={running} />
           </>
         )}
@@ -247,15 +251,7 @@ function SignedIn() {
       </ThemedText>
       {lastError && <ThemedText themeColor="danger">Last backup failed: {lastError}</ThemedText>}
       <Button title="Back up now" onPress={() => backUp(db)} loading={running} />
-      {showRestore ? (
-        <>
-          {listError && <ThemedText themeColor="danger">Couldn&apos;t list backups: {listError}</ThemedText>}
-          {snapshots?.length === 0 && <ThemedText themeColor="textSecondary">No backups to restore yet.</ThemedText>}
-          {snapshotChips}
-        </>
-      ) : (
-        <Button title="Restore a backup" variant="secondary" onPress={() => setShowRestore(true)} disabled={running} />
-      )}
+      <Button title="Restore backup" variant="secondary" onPress={confirmRestore} disabled={running} />
       <Button title="Sign out" variant="secondary" onPress={signOut} disabled={running} />
     </>
   );
@@ -269,10 +265,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two + Spacing.one,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
   },
 });

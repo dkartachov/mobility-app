@@ -111,29 +111,62 @@ describe('BackupCard', () => {
     expect(mockLinkDevice).not.toHaveBeenCalled();
   });
 
-  it('offers to restore the latest backup after signing in', async () => {
+  it('asks whether to restore the latest backup or keep the phone\'s data', async () => {
     mockListSnapshots.mockResolvedValue(['2026-01-02', '2026-01-01']);
     await render(<BackupCard />);
     await waitFor(() => expect(mockShowDialog).toHaveBeenCalledTimes(1));
 
-    const [{ title, message, confirm }] = mockShowDialog.mock.calls[0];
-    expect(title).toBe('Restore your latest backup?');
+    const [{ title, message, actions }] = mockShowDialog.mock.calls[0];
+    expect(title).toBe('Restore your backup?');
     expect(message).toContain(formatDateKey('2026-01-02'));
+    expect(message).toContain('replaces the backup in the cloud');
+    expect(actions.map((action: { label: string }) => action.label)).toEqual(['Restore', "Keep this phone's data"]);
 
-    expect(confirm.label).toBe('Restore');
-    await confirm.onPress();
+    await actions[0].onPress();
     expect(mockRestoreSnapshot).toHaveBeenCalledWith(mockDb, '2026-01-02');
   });
 
-  it("doesn't restore or start backing up when the offer is declined", async () => {
+  it("starts backing up when keeping the phone's data", async () => {
     mockListSnapshots.mockResolvedValue(['2026-01-02']);
     await render(<BackupCard />);
     await waitFor(() => expect(mockShowDialog).toHaveBeenCalledTimes(1));
 
-    expect(mockShowDialog.mock.calls[0][0].cancelLabel).toBe('Not now');
+    await mockShowDialog.mock.calls[0][0].actions[1].onPress();
+    expect(mockLinkDevice).toHaveBeenCalledWith(mockDb);
+    expect(mockRestoreSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('stays paused with both choices on the card when the dialog is dismissed', async () => {
+    mockListSnapshots.mockResolvedValue(['2026-01-02']);
+    await render(<BackupCard />);
+    await waitFor(() => expect(mockShowDialog).toHaveBeenCalledTimes(1));
+
     expect(mockRestoreSnapshot).not.toHaveBeenCalled();
     expect(mockLinkDevice).not.toHaveBeenCalled();
-    expect(screen.getByText("Keep this phone's data")).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Restore backup' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: "Keep this phone's data" })).toBeTruthy();
+  });
+
+  it('restores the latest backup on a linked device after confirming', async () => {
+    mockState.linked = true;
+    mockListSnapshots.mockResolvedValue(['2026-01-02', '2026-01-01']);
+    await render(<BackupCard />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Restore backup' }));
+    await waitFor(() => expect(mockShowDialog).toHaveBeenCalledTimes(1));
+
+    const [{ title, confirm }] = mockShowDialog.mock.calls[0];
+    expect(title).toContain(formatDateKey('2026-01-02'));
+    await confirm.onPress();
+    expect(mockRestoreSnapshot).toHaveBeenCalledWith(mockDb, '2026-01-02');
+  });
+
+  it('says so when a linked device has no backup to restore', async () => {
+    mockState.linked = true;
+    mockListSnapshots.mockResolvedValue([]);
+    await render(<BackupCard />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Restore backup' }));
+    await waitFor(() => expect(mockShowDialog).toHaveBeenCalledWith(expect.objectContaining({ title: 'No backup yet' })));
+    expect(mockRestoreSnapshot).not.toHaveBeenCalled();
   });
 
   it("doesn't offer a restore on a device that's already linked", async () => {

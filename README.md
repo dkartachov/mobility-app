@@ -53,7 +53,7 @@ With no reminders set, pressing Done after a workout suggests adding one (`src/l
 
 ## Cloud backups
 
-SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the whole file to a private Supabase Storage bucket, plus the profile photo: about 5 seconds after any change, and when the app opens or goes to the background if an earlier upload didn't finish. There's one snapshot per day, with the last 30 days kept. Postgres isn't used, so new tables and columns need no backup changes, and restoring an old snapshot runs the normal migrations.
+SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the whole file to a private Supabase Storage bucket, plus the profile photo: about 5 seconds after any change, and when the app opens or goes to the background if an earlier upload didn't finish. Only the latest snapshot is kept, and restoring always uses it. Postgres isn't used, so new tables and columns need no backup changes, and restoring an old snapshot runs the normal migrations.
 
 Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` in `src/lib/backup.ts`), so development data stays out of production however the dev server was started. Inside a bucket, each user can only reach a folder named after their user ID (`supabase/setup.sql`):
 
@@ -68,7 +68,7 @@ The publishable key ships in the app, so anyone who extracts it can sign up with
 
 Separate buckets mean a bug that sent the dev build to the production bucket would still only reach that user's own folder there.
 
-After signing in on a phone, backups stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
+After signing in on a phone, backups stay paused until you choose between restoring the backup and keeping that phone's data (which replaces the backup), so a fresh install can't overwrite a good backup by accident. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
 
 ### Setup
 

@@ -1,6 +1,6 @@
 /**
  * Snapshot backups: SQLite stays the app's only live database, and a copy of the whole file goes
- * to a private Supabase Storage bucket, one per day, in a folder only that user can reach (see
+ * to a private Supabase Storage bucket, keeping only the latest, in a folder only that user can reach (see
  * `supabase/setup.sql`). Each app variant has its own bucket, picked by the installed app's ID
  * rather than `APP_VARIANT`, so how the dev server was started can't send it to the wrong one.
  *
@@ -20,8 +20,8 @@ import { todayKey, type DateKey } from '@/lib/dates';
 import { profilePhotoFile } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 
-/** Days of history kept in the bucket. */
-export const SNAPSHOTS_TO_KEEP = 30;
+/** Only the latest snapshot is kept: restoring always uses it. */
+export const SNAPSHOTS_TO_KEEP = 1;
 
 const SNAPSHOT_DIR = 'snapshots';
 const PHOTO_DIR = 'photos';
