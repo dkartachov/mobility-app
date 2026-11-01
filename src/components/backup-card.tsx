@@ -1,16 +1,15 @@
-import { reloadAppAsync } from 'expo';
-import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { reloadAppAsync } from "expo";
+import { useSQLiteContext, type SQLiteDatabase } from "expo-sqlite";
+import { useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
 
-import { Button } from '@/components/button';
-import { Card } from '@/components/card';
-import { Chip } from '@/components/chip';
-import { showDialog } from '@/components/dialog';
-import { Field, TextField } from '@/components/field';
-import { IconBadge } from '@/components/icon-badge';
-import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Button } from "@/components/button";
+import { Card } from "@/components/card";
+import { Chip } from "@/components/chip";
+import { showDialog } from "@/components/dialog";
+import { IconBadge } from "@/components/icon-badge";
+import { ThemedText } from "@/components/themed-text";
+import { Spacing } from "@/constants/theme";
 import {
   backUp,
   isBackupConfigured,
@@ -19,9 +18,9 @@ import {
   restoreSnapshot,
   unlinkDevice,
   useBackupState,
-} from '@/lib/backup';
-import { formatDateKey, type DateKey } from '@/lib/dates';
-import { supabase } from '@/lib/supabase';
+} from "@/lib/backup";
+import { formatDateKey, type DateKey } from "@/lib/dates";
+import { supabase } from "@/lib/supabase";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -30,30 +29,37 @@ function errorMessage(error: unknown) {
 async function restoreAndReload(db: SQLiteDatabase, date: DateKey) {
   try {
     await restoreSnapshot(db, date);
-    await reloadAppAsync('Restored a backup');
+    await reloadAppAsync("Restored a backup");
   } catch (error) {
-    showDialog({ title: "Couldn't restore this backup", message: errorMessage(error) });
+    showDialog({
+      title: "Couldn't restore this backup",
+      message: errorMessage(error),
+    });
   }
 }
 
-/** The Settings card for cloud backups: sign in, see the last backup, back up or restore. */
+/** The Settings card for cloud backups: turn on, see the last backup, back up or restore. */
 export function BackupCard() {
   const [signedIn, setSignedIn] = useState<boolean>();
 
   useEffect(() => {
     if (!supabase) return;
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(session !== null));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) =>
+      setSignedIn(session !== null),
+    );
     return () => data.subscription.unsubscribe();
   }, []);
 
   return (
     <Card style={styles.card}>
       <View style={styles.rowTitle}>
-        <IconBadge name={{ ios: 'icloud.fill', android: 'cloud' }} size={32} />
+        <IconBadge name={{ ios: "icloud.fill", android: "cloud" }} size={32} />
         <ThemedText type="smallBold">Cloud backup</ThemedText>
       </View>
       {!isBackupConfigured ? (
-        <ThemedText themeColor="textSecondary">Backups aren&apos;t set up in this build.</ThemedText>
+        <ThemedText themeColor="textSecondary">
+          Backups aren&apos;t set up in this build.
+        </ThemedText>
       ) : signedIn === false ? (
         <SignIn />
       ) : signedIn ? (
@@ -63,37 +69,26 @@ export function BackupCard() {
   );
 }
 
+/** No account: Supabase makes an anonymous user for this install, whose ID names its bucket folder. */
 function SignIn() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
 
-  const signIn = async () => {
+  const turnOn = async () => {
     setLoading(true);
     setError(undefined);
-    const result = await supabase!.auth.signInWithPassword({ email: email.trim(), password });
+    const result = await supabase!.auth.signInAnonymously();
     if (result.error) setError(result.error.message);
     setLoading(false);
   };
 
   return (
     <>
-      <ThemedText themeColor="textSecondary">Sign in to keep a copy of your data in the cloud.</ThemedText>
-      <Field label="Email">
-        <TextField
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-        />
-      </Field>
-      <Field label="Password">
-        <TextField value={password} onChangeText={setPassword} autoComplete="current-password" secureTextEntry />
-      </Field>
+      <ThemedText themeColor="textSecondary">
+        Keep a copy of your data in the cloud. No account needed.
+      </ThemedText>
       {error && <ThemedText themeColor="danger">{error}</ThemedText>}
-      <Button title="Sign in" onPress={signIn} loading={loading} disabled={!email.trim() || !password} />
+      <Button title="Turn on backups" onPress={turnOn} loading={loading} />
     </>
   );
 }
@@ -119,7 +114,7 @@ function SignedIn() {
       },
       (error) => {
         if (!cancelled) setListError(errorMessage(error));
-      }
+      },
     );
     return () => {
       cancelled = true;
@@ -136,18 +131,22 @@ function SignedIn() {
     const latest = snapshots?.[0];
     if (linked || !latest) return;
     showDialog({
-      title: 'Restore your latest backup?',
+      title: "Restore your latest backup?",
       message: `This account has a backup from ${formatDateKey(latest)}. Restoring replaces everything on this phone with it, then restarts the app.`,
-      cancelLabel: 'Not now',
-      confirm: { label: 'Restore', onPress: () => restoreAndReload(db, latest) },
+      cancelLabel: "Not now",
+      confirm: {
+        label: "Restore",
+        onPress: () => restoreAndReload(db, latest),
+      },
     });
   }, [linked, snapshots, db]);
 
   const confirmRestore = (date: DateKey) => {
     showDialog({
       title: `Restore ${formatDateKey(date)}?`,
-      message: 'This replaces everything on this phone with that backup, then restarts the app.',
-      confirm: { label: 'Restore', onPress: () => restoreAndReload(db, date) },
+      message:
+        "This replaces everything on this phone with that backup, then restarts the app.",
+      confirm: { label: "Restore", onPress: () => restoreAndReload(db, date) },
     });
   };
 
@@ -156,19 +155,24 @@ function SignedIn() {
       title: "Keep this phone's data?",
       message:
         "This phone starts backing up, replacing today's backup if there is one. Backups from earlier days stay available for now.",
-      confirm: { label: 'Keep', onPress: () => linkDevice(db) },
+      confirm: { label: "Keep", onPress: () => linkDevice(db) },
     });
   };
 
   const signOut = async () => {
-    await supabase!.auth.signOut({ scope: 'local' });
+    await supabase!.auth.signOut({ scope: "local" });
     unlinkDevice();
   };
 
   const snapshotChips = (
     <View style={styles.chips}>
       {snapshots?.map((date) => (
-        <Chip key={date} label={formatDateKey(date)} selected={false} onPress={() => confirmRestore(date)} />
+        <Chip
+          key={date}
+          label={formatDateKey(date)}
+          selected={false}
+          onPress={() => confirmRestore(date)}
+        />
       ))}
     </View>
   );
@@ -178,19 +182,32 @@ function SignedIn() {
       <>
         {listError ? (
           <>
-            <ThemedText themeColor="danger">Couldn&apos;t check for backups: {listError}</ThemedText>
-            <Button title="Try again" variant="secondary" onPress={() => setListAttempt((attempt) => attempt + 1)} />
+            <ThemedText themeColor="danger">
+              Couldn&apos;t check for backups: {listError}
+            </ThemedText>
+            <Button
+              title="Try again"
+              variant="secondary"
+              onPress={() => setListAttempt((attempt) => attempt + 1)}
+            />
           </>
         ) : snapshots === undefined || snapshots.length === 0 ? (
-          <ThemedText themeColor="textSecondary">Checking for backups…</ThemedText>
+          <ThemedText themeColor="textSecondary">
+            Checking for backups…
+          </ThemedText>
         ) : (
           <>
             <ThemedText themeColor="textSecondary">
-              This account already has backups. Pick one to restore, or keep what&apos;s on this phone. Backups stay
-              paused until you choose.
+              This account already has backups. Pick one to restore, or keep
+              what&apos;s on this phone. Backups stay paused until you choose.
             </ThemedText>
             {snapshotChips}
-            <Button title="Keep this phone's data" variant="secondary" onPress={confirmKeep} disabled={running} />
+            <Button
+              title="Keep this phone's data"
+              variant="secondary"
+              onPress={confirmKeep}
+              disabled={running}
+            />
           </>
         )}
         <Button title="Sign out" variant="secondary" onPress={signOut} />
@@ -201,20 +218,48 @@ function SignedIn() {
   return (
     <>
       <ThemedText themeColor="textSecondary">
-        {lastBackupAt ? `Last backup: ${new Date(lastBackupAt).toLocaleString()}` : 'No backups yet.'}
+        {lastBackupAt
+          ? `Last backup: ${new Date(lastBackupAt).toLocaleString()}`
+          : "No backups yet."}
       </ThemedText>
-      {lastError && <ThemedText themeColor="danger">Last backup failed: {lastError}</ThemedText>}
-      <Button title="Back up now" onPress={() => backUp(db)} loading={running} />
+      {lastError && (
+        <ThemedText themeColor="danger">
+          Last backup failed: {lastError}
+        </ThemedText>
+      )}
+      <Button
+        title="Back up now"
+        onPress={() => backUp(db)}
+        loading={running}
+      />
       {showRestore ? (
         <>
-          {listError && <ThemedText themeColor="danger">Couldn&apos;t list backups: {listError}</ThemedText>}
-          {snapshots?.length === 0 && <ThemedText themeColor="textSecondary">No backups to restore yet.</ThemedText>}
+          {listError && (
+            <ThemedText themeColor="danger">
+              Couldn&apos;t list backups: {listError}
+            </ThemedText>
+          )}
+          {snapshots?.length === 0 && (
+            <ThemedText themeColor="textSecondary">
+              No backups to restore yet.
+            </ThemedText>
+          )}
           {snapshotChips}
         </>
       ) : (
-        <Button title="Restore a backup" variant="secondary" onPress={() => setShowRestore(true)} disabled={running} />
+        <Button
+          title="Restore a backup"
+          variant="secondary"
+          onPress={() => setShowRestore(true)}
+          disabled={running}
+        />
       )}
-      <Button title="Sign out" variant="secondary" onPress={signOut} disabled={running} />
+      <Button
+        title="Sign out"
+        variant="secondary"
+        onPress={signOut}
+        disabled={running}
+      />
     </>
   );
 }
@@ -224,13 +269,13 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   rowTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two + Spacing.one,
   },
   chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.two,
   },
 });

@@ -57,19 +57,23 @@ SQLite stays the only live database. `src/lib/backup.ts` uploads a copy of the w
 
 Each variant has its own bucket, chosen from the installed app's ID (`BUCKETS` in `src/lib/backup.ts`), so development data stays out of production however the dev server was started. Inside a bucket, each user can only reach a folder named after their user ID (`supabase/setup.sql`):
 
-| Variant | App ID | Bucket | Login |
-|---|---|---|---|
-| Development | `com.hogos.plie.dev` | `backups-dev` | Dev user |
-| Production | `com.hogos.plie` | `backups-prod` | Your real user |
+| Variant | App ID | Bucket |
+|---|---|---|
+| Development | `com.hogos.plie.dev` | `backups-dev` |
+| Production | `com.hogos.plie` | `backups-prod` |
 
-Separate logins aren't required, but they're worth keeping: if a bug ever sent the dev build to the production bucket, the dev login would only reach its own folder there.
+There are no accounts. "Turn on backups" in Settings makes a Supabase anonymous user for that install, and its ID names its folder. That keeps friends' data separate from each other's, but the identity lives only on the phone: **reinstalling or losing the phone orphans the backup**, since nothing can prove the new install is the same person.
 
-After signing in on a phone, backups stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
+The publishable key ships in the app, so anyone who extracts it can create anonymous users and upload to their own folders. They can't read or change anyone else's data (the policies check the folder against the user ID), but they could fill the bucket. Bucket limits (50 MB per file, binary only) and Supabase's per-IP rate limit on anonymous sign-ins bound that; watch storage usage in the dashboard. If it's abused, the next step is gating sign-in behind invite codes (an Edge Function that trades a code for a session, with anonymous sign-ins turned off).
+
+Separate buckets mean a bug that sent the dev build to the production bucket would still only reach its own anonymous user's folder there.
+
+After turning backups on, they stay paused until you choose between restoring an existing backup and keeping that phone's data, so a fresh install can't overwrite a good backup. Settings shows the last backup and any error, which is also how you'd notice the free project being paused after a week of inactivity. The app keeps working locally if so; restore the project from the dashboard and backups resume.
 
 ### Setup
 
 1. Create a Supabase project.
-2. Under Authentication, turn off new user sign-ups, then add a dev user and a real user, both already confirmed.
+2. Under Authentication, turn on anonymous sign-ins. Leave the per-IP rate limit for them at its default or lower.
 3. Run `supabase/setup.sql` in the SQL editor.
 4. Copy `.env.example` to `.env.local` and fill it in, for the dev server.
 5. Add the same two values to EAS for builds and updates, once per variable and value:
@@ -78,7 +82,7 @@ After signing in on a phone, backups stay paused until you choose between restor
    npx eas-cli@latest env:set --environment development --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value "..."
    ```
 
-6. Make new builds with `npm run build:dev` and `npm run build:prod`, then sign in under Settings.
+6. Make new builds with `npm run build:dev` and `npm run build:prod`, then turn on backups under Settings.
 
 ## Mobility score and its sources
 

@@ -49,10 +49,10 @@ describe('BackupCard', () => {
     mockListSnapshots.mockReset();
   });
 
-  it('asks to sign in when signed out', async () => {
+  it('offers to turn on backups when signed out', async () => {
     mockSession.value = null;
     await render(<BackupCard />);
-    expect(screen.getByText('Sign in')).toBeTruthy();
+    expect(screen.getByText('Turn on backups')).toBeTruthy();
     expect(mockListSnapshots).not.toHaveBeenCalled();
   });
 
