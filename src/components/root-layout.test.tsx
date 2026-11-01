@@ -41,6 +41,7 @@ jest.mock('@/components/auto-backup', () => ({ AutoBackup: () => null }));
 jest.mock('@/components/dialog', () => ({ DialogHost: () => null }));
 jest.mock('@/components/reminder-scheduler', () => ({ ReminderScheduler: () => null }));
 jest.mock('@/components/stack-header', () => ({ StackHeader: () => null }));
+jest.mock('@/components/update-prompt', () => ({ UpdatePrompt: () => null }));
 jest.mock('@/components/welcome-overlay', () => {
   const { Text } = jest.requireActual('react-native');
   return { WelcomeOverlay: ({ greeting }: { greeting: string }) => <Text>Greeting: {greeting}</Text> };

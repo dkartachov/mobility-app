@@ -47,6 +47,11 @@ function closeDialog() {
   setState({ ...state, visible: false });
 }
 
+/** Whether a dialog is showing, for anything about to show one unprompted. */
+export function useDialogOpen() {
+  return useSyncExternalStore(subscribe, () => getState().visible);
+}
+
 /**
  * Renders the dialog from `showDialog`. Lives in the root layout, under which iOS can't present it
  * over a `presentation: 'modal'` screen, so don't show dialogs from those.
