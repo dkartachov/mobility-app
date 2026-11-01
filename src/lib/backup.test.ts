@@ -215,16 +215,19 @@ describe('backups', () => {
     expect(mockObjects.has(otherUser)).toBe(true);
   });
 
-  it('keeps the current photo however old it is', async () => {
+  it('keeps only the current photo when it predates every kept snapshot', async () => {
     const { linkDevice } = loadBackup();
     mockObjects.set(`user-1/snapshots/${toDateKey(new Date(2026, 0, 10))}.db`, new ArrayBuffer(1));
+    const previous = addPhoto('previous.jpg', new Date(2024, 0, 1));
     const current = addPhoto('current.jpg', new Date(2025, 0, 1));
     await updateProfilePhoto(db, 'current.jpg');
     Storage.setItemSync('backup.uploadedPhoto', 'current.jpg');
 
     await linkDevice(db);
 
+    // Every kept snapshot shows the current photo, so it's the only one left.
     expect(mockObjects.has(current)).toBe(true);
+    expect(mockObjects.has(previous)).toBe(false);
   });
 
   it('keeps photos when the snapshot upload fails', async () => {

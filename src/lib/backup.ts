@@ -162,10 +162,13 @@ async function prunePhotos(userId: string, current: string | null) {
   assertOk(error);
   const before = (data ?? [])
     .map((file) => ({ name: file.name, time: Date.parse(file.updated_at ?? file.created_at ?? '') }))
-    .filter(({ name, time }) => name !== current && time < cutoff)
+    .filter(({ time }) => time < cutoff)
     .sort((a, b) => b.time - a.time);
   // The newest one before the cutoff may be what the oldest kept snapshot shows.
-  const expired = before.slice(1).map(({ name }) => name);
+  const expired = before
+    .slice(1)
+    .map(({ name }) => name)
+    .filter((name) => name !== current);
   if (expired.length === 0) return;
   const { error: removeError } = await bucket().remove(expired.map((name) => `${userId}/${PHOTO_DIR}/${name}`));
   assertOk(removeError);
