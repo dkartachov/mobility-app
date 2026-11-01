@@ -1,3 +1,4 @@
+import { reloadAppAsync } from 'expo';
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { StyleSheet, Switch, View } from 'react-native';
 
@@ -43,12 +44,18 @@ export function DevTools() {
   const nextHours = stats ? milestoneProgress(stats.totalSeconds).nextHours : null;
 
   // Signing out unlinks this phone (see `lib/auth`), which closes the login gate in the root layout.
+  // The open screens don't always give way to the login screen on their own, so reload to land on it.
+  const turnOffBackups = async () => {
+    await supabase!.auth.signOut({ scope: 'local' });
+    await reloadAppAsync('Turned off backups');
+  };
+
   const confirmTurnOffBackups = () => {
     showDialog({
       title: 'Turn off backups?',
       message:
         "Signs out and goes back to the login screen. This phone's data stays. Signing in again restores the backup, or asks first if this phone has changes it hasn't backed up.",
-      confirm: { label: 'Turn off', onPress: () => supabase!.auth.signOut({ scope: 'local' }) },
+      confirm: { label: 'Turn off', onPress: turnOffBackups },
     });
   };
 

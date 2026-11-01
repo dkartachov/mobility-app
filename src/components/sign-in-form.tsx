@@ -38,7 +38,7 @@ export function SignInForm() {
     return (
       <>
         <ThemedText themeColor="textSecondary">
-          Verify your email to back up your data. We&apos;ll send a one-time code to the address you enter.
+          We&apos;ll send a one-time code to the address you enter.
         </ThemedText>
         <Field label="Email">
           <TextField
