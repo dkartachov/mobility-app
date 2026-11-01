@@ -13,7 +13,6 @@ const mockState = { linked: true, lastBackupAt: null as string | null, lastError
 jest.mock('expo', () => ({ ...jest.requireActual('expo'), reloadAppAsync: jest.fn() }));
 jest.mock('expo-sqlite', () => ({ useSQLiteContext: () => mockDb }));
 jest.mock('@/components/dialog', () => ({ showDialog: (...args: unknown[]) => mockShowDialog(...args) }));
-jest.mock('@/lib/auth', () => ({ useAuthState: () => ({ signedIn: true, email: 'me@example.com' }) }));
 jest.mock('@/lib/backup', () => ({
   isBackupConfigured: true,
   backUp: jest.fn(),
@@ -31,9 +30,9 @@ describe('BackupCard', () => {
     mockState.lastError = null;
   });
 
-  it('shows the account and that nothing is backed up yet', async () => {
+  it('shows that nothing is backed up yet', async () => {
     await render(<BackupCard />);
-    expect(screen.getByText('No backups yet. Backing up to me@example.com.')).toBeTruthy();
+    expect(screen.getByText('No backups yet.')).toBeTruthy();
   });
 
   it("can't be turned off", async () => {

@@ -72,8 +72,7 @@ export type ScoreWithBaseline = MobilityScore & {
  * compared with people of the profile's sex and the age the person was on the day of each test.
  */
 export async function getMobilityScore(db: SQLiteDatabase): Promise<ScoreWithBaseline | null> {
-  const { gender, dateOfBirth } = await getProfile(db);
-  const sex = gender === 'male' || gender === 'female' ? gender : null;
+  const { sex, dateOfBirth } = await getProfile(db);
   const tests = await db.getAllAsync<{ id: number; local_date: DateKey }>(
     `SELECT t.id, t.local_date FROM mobility_tests t
      WHERE EXISTS (SELECT 1 FROM mobility_test_results r WHERE r.mobility_test_id = t.id)

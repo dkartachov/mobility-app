@@ -9,7 +9,8 @@ function rootRoutes() {
   const routes = new Set<string>();
   for (const entry of readdirSync(APP_DIR, { withFileTypes: true, recursive: true })) {
     if (!entry.isFile() || !/\.tsx$/.test(entry.name) || /\.test\./.test(entry.name)) continue;
-    const path = relative(APP_DIR, join(entry.parentPath, entry.name)).replace(/\.tsx$/, '');
+    // Route names use forward slashes, whatever the path separator on this machine.
+    const path = relative(APP_DIR, join(entry.parentPath, entry.name)).replaceAll('\\', '/').replace(/\.tsx$/, '');
     if (path === '_layout') continue;
     const [first] = path.split('/');
     // A group is one screen with its own layout; other folders hold their routes directly.

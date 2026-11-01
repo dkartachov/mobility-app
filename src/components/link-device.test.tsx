@@ -12,10 +12,19 @@ const mockListSnapshots = jest.fn();
 const mockRestoreSnapshot = jest.fn();
 const mockShowDialog = jest.fn();
 const mockSignOut = jest.fn();
+const mockSetGreeting = jest.fn();
+const mockLocalName = { value: '' };
 
 jest.mock('expo', () => ({ ...jest.requireActual('expo'), reloadAppAsync: jest.fn() }));
 jest.mock('expo-sqlite', () => ({ useSQLiteContext: () => mockDb }));
+jest.mock('react-native-safe-area-context', () => jest.requireActual('react-native-safe-area-context/jest/mock').default);
 jest.mock('@/components/dialog', () => ({ showDialog: (...args: unknown[]) => mockShowDialog(...args) }));
+jest.mock('@/db/profile', () => ({
+  ...jest.requireActual('@/db/profile'),
+  getProfile: async () => ({ firstName: mockLocalName.value }),
+}));
+jest.mock('@/lib/auth', () => ({ syncDisplayName: jest.fn() }));
+jest.mock('@/lib/greeting', () => ({ setGreeting: (...args: unknown[]) => mockSetGreeting(...args) }));
 jest.mock('@/lib/supabase', () => ({ supabase: { auth: { signOut: (...args: unknown[]) => mockSignOut(...args) } } }));
 jest.mock('@/lib/backup', () => ({
   hasUnsavedChanges: () => mockUnsaved.value,
@@ -32,14 +41,33 @@ describe('LinkDevice', () => {
     mockRestoreSnapshot.mockReset().mockResolvedValue(undefined);
     mockShowDialog.mockClear();
     mockSignOut.mockClear();
+    mockSetGreeting.mockClear();
+    mockLocalName.value = '';
     jest.mocked(reloadAppAsync).mockClear();
   });
 
-  it('starts backing up when there is no backup', async () => {
+  it('asks a new user for a profile before linking', async () => {
+    mockListSnapshots.mockResolvedValue([]);
+    await render(<LinkDevice />);
+    expect(await screen.findByText('Create your profile')).toBeTruthy();
+    expect(mockLinkDevice).not.toHaveBeenCalled();
+    expect(mockRestoreSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('starts backing up, greeting them back, when the phone already has a name but there is no backup', async () => {
+    mockLocalName.value = 'Ada';
     mockListSnapshots.mockResolvedValue([]);
     await render(<LinkDevice />);
     await waitFor(() => expect(mockLinkDevice).toHaveBeenCalledWith(mockDb));
-    expect(mockRestoreSnapshot).not.toHaveBeenCalled();
+    expect(mockSetGreeting).toHaveBeenCalledWith('returning');
+    expect(screen.queryByText('Create your profile')).toBeNull();
+  });
+
+  it('shows no words while it checks for a backup', async () => {
+    mockListSnapshots.mockReturnValue(new Promise(() => {}));
+    await render(<LinkDevice />);
+    expect(screen.getByLabelText('Loading')).toBeTruthy();
+    expect(screen.queryByText(/backup/i)).toBeNull();
   });
 
   it('restores the latest backup without asking on a fresh install', async () => {
@@ -48,6 +76,7 @@ describe('LinkDevice', () => {
     await waitFor(() => expect(reloadAppAsync).toHaveBeenCalled());
     expect(mockRestoreSnapshot).toHaveBeenCalledTimes(1);
     expect(mockRestoreSnapshot).toHaveBeenCalledWith(mockDb, '2026-01-02');
+    expect(mockSetGreeting).toHaveBeenCalledWith('returning');
     expect(mockShowDialog).not.toHaveBeenCalled();
     expect(mockLinkDevice).not.toHaveBeenCalled();
   });
@@ -83,9 +112,11 @@ describe('LinkDevice', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Start without it' })).toBeTruthy();
     expect(mockLinkDevice).not.toHaveBeenCalled();
+    expect(mockSetGreeting).not.toHaveBeenCalled();
   });
 
   it("stays locked when it can't check for a backup", async () => {
+    mockLocalName.value = 'Ada';
     mockListSnapshots.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
     await render(<LinkDevice />);
     await fireEvent.press(await screen.findByRole('button', { name: 'Try again' }));

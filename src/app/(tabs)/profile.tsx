@@ -9,7 +9,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { GENDER_LABELS, useProfile } from '@/db/profile';
+import { SEX_LABELS, useProfile } from '@/db/profile';
 import { useTheme } from '@/hooks/use-theme';
 import { ageFromDateKey } from '@/lib/dates';
 
@@ -23,7 +23,7 @@ export default function ProfileScreen() {
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase();
   const details = [
     profile.dateOfBirth && `${ageFromDateKey(profile.dateOfBirth)} years old`,
-    profile.gender && profile.gender !== 'prefer_not_to_say' && GENDER_LABELS[profile.gender],
+    profile.sex && SEX_LABELS[profile.sex],
   ].filter(Boolean);
 
   return (

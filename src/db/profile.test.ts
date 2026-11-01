@@ -10,9 +10,16 @@ describe('profile', () => {
       firstName: '',
       lastName: '',
       dateOfBirth: null,
-      gender: null,
+      sex: null,
       photoFile: null,
     });
+  });
+
+  it('treats the old gender options as not set', async () => {
+    const db = await createTestDb();
+    await db.runAsync("UPDATE profile SET gender = 'prefer_not_to_say' WHERE id = 1");
+
+    expect((await getProfile(db)).sex).toBeNull();
   });
 
   it('saves the profile, trimming names', async () => {
@@ -21,7 +28,7 @@ describe('profile', () => {
       firstName: '  Ada ',
       lastName: ' Lovelace  ',
       dateOfBirth: '1990-12-10',
-      gender: 'female',
+      sex: 'female',
       photoFile: 'photo.jpg',
     };
 

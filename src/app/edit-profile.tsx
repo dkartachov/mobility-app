@@ -5,25 +5,15 @@ import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
-import { Chip } from '@/components/chip';
-import { DateField } from '@/components/date-field';
 import { Field, TextField } from '@/components/field';
 import { FormScreen } from '@/components/form-screen';
 import { PageHeader } from '@/components/page-header';
+import { BirthDateField, SexField } from '@/components/profile-fields';
 import { Radius, Spacing } from '@/constants/theme';
-import {
-  GENDER_LABELS,
-  GENDERS,
-  updateProfile,
-  updateProfilePhoto,
-  useProfile,
-  type Profile,
-} from '@/db/profile';
+import { updateProfile, updateProfilePhoto, useProfile, type Profile } from '@/db/profile';
 import { useTheme } from '@/hooks/use-theme';
+import { syncDisplayName } from '@/lib/auth';
 import { deleteProfilePhoto, pickProfilePhoto } from '@/lib/profile-photo';
-
-const MIN_BIRTH_DATE = new Date(1900, 0, 1);
-const DEFAULT_BIRTH_DATE = new Date(1990, 0, 1);
 
 export default function EditProfileScreen() {
   const profile = useProfile();
@@ -56,6 +46,7 @@ function ProfileForm({ initial }: { initial: Profile }) {
     setSaving(true);
     try {
       await updateProfile(db, form);
+      if (form.firstName !== initial.firstName || form.lastName !== initial.lastName) syncDisplayName(form);
       router.back();
     } finally {
       setSaving(false);
@@ -102,28 +93,9 @@ function ProfileForm({ initial }: { initial: Profile }) {
         />
       </Field>
 
-      <Field label="Date of birth">
-        <DateField
-          value={form.dateOfBirth}
-          onChange={(value) => set('dateOfBirth', value)}
-          defaultDate={DEFAULT_BIRTH_DATE}
-          minimumDate={MIN_BIRTH_DATE}
-          maximumDate={new Date()}
-        />
-      </Field>
+      <BirthDateField value={form.dateOfBirth} onChange={(value) => set('dateOfBirth', value)} />
 
-      <Field label="Gender">
-        <View accessibilityRole="radiogroup" style={styles.chips}>
-          {GENDERS.map((gender) => (
-            <Chip
-              key={gender}
-              label={GENDER_LABELS[gender]}
-              selected={form.gender === gender}
-              onPress={() => set('gender', form.gender === gender ? null : gender)}
-            />
-          ))}
-        </View>
-      </Field>
+      <SexField value={form.sex} onChange={(value) => set('sex', value)} />
 
       <Button title="Save" onPress={save} loading={saving} />
     </FormScreen>
@@ -142,11 +114,6 @@ const styles = StyleSheet.create({
   },
   photoButtons: {
     flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.two,
   },
 });

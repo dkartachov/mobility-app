@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import Storage from 'expo-sqlite/kv-store';
 
-import { updateProfilePhoto } from '@/db/profile';
+import { getProfile, updateProfile, updateProfilePhoto } from '@/db/profile';
 import { SCHEMA_VERSION } from '@/db/schema';
 import { toDateKey, todayKey } from '@/lib/dates';
 import { createTestDb } from '@/test-utils/sqlite';
@@ -15,11 +15,15 @@ const SIGNED_IN = { user: { id: 'user-1' } };
 const mockSession = { value: SIGNED_IN as object | null, error: null as { message: string } | null };
 const mockApp = { id: 'com.hogos.plie.dev' };
 const mockBucketsUsed = new Set<string>();
+const mockSignOut = jest.fn();
 const mockDownloads: { bytes: Uint8Array; deleted: boolean } = { bytes: new Uint8Array(), deleted: false };
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
-    auth: { getSession: async () => ({ data: { session: mockSession.value }, error: mockSession.error }) },
+    auth: {
+      getSession: async () => ({ data: { session: mockSession.value }, error: mockSession.error }),
+      signOut: (...args: unknown[]) => mockSignOut(...args),
+    },
     storage: {
       from: (bucket: string) => ({
         list: async (dir: string) => ({
@@ -137,6 +141,7 @@ describe('backups', () => {
     mockDownloads.deleted = false;
     mockBackupDatabaseAsync.mockClear();
     mockDeserialize.mockReset();
+    mockSignOut.mockReset().mockResolvedValue({ error: null });
     Storage.clearSync();
   });
 
@@ -308,12 +313,83 @@ describe('backups', () => {
   });
 
   it('skips uploading without a session, keeping changes for later', async () => {
-    const { linkDevice, markBackupDirty } = loadBackup();
+    const { backUp, linkDevice, markBackupDirty } = loadBackup();
     mockSession.value = null;
-    markBackupDirty();
     await linkDevice(db);
+    markBackupDirty();
+    await backUp(db);
     expect(snapshotPaths()).toEqual([]);
     expect(Storage.getItemSync('backup.dirty')).toBe('true');
+  });
+
+  it("doesn't count changes made before the device is linked", () => {
+    const { hasUnsavedChanges, markBackupDirty } = loadBackup();
+    markBackupDirty();
+    expect(hasUnsavedChanges()).toBe(false);
+  });
+
+  describe('signing out', () => {
+    it('uploads a final backup, signs out, and leaves the erasing for the next launch', async () => {
+      const { eraseIfPending, linkDevice, signOutAndErase } = loadBackup();
+      await linkDevice(db);
+      mockObjects.clear();
+      await updateProfile(db, { ...(await getProfile(db)), firstName: 'Ada' });
+
+      await signOutAndErase(db);
+
+      expect(snapshotPaths()).toHaveLength(1);
+      expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+      expect((await getProfile(db)).firstName).toBe('Ada');
+
+      await eraseIfPending(db);
+      expect((await getProfile(db)).firstName).toBe('');
+      expect(Storage.getItemSync('backup.erasePending')).toBeNull();
+      expect(Storage.getItemSync('backup.dirty')).toBe('false');
+    });
+
+    it('deletes the profile photo from the phone', async () => {
+      const { eraseIfPending } = loadBackup();
+      await updateProfilePhoto(db, 'me.jpg');
+      mockLocalFiles.add('me.jpg');
+      Storage.setItemSync('backup.erasePending', 'true');
+
+      await eraseIfPending(db);
+
+      expect(mockDownloads.deleted).toBe(true);
+      expect((await getProfile(db)).photoFile).toBeNull();
+    });
+
+    it('stays signed in with everything intact when the final backup fails', async () => {
+      const { eraseIfPending, linkDevice, signOutAndErase } = loadBackup();
+      await linkDevice(db);
+      await updateProfile(db, { ...(await getProfile(db)), firstName: 'Ada' });
+      mockFailUploads.value = true;
+
+      await expect(signOutAndErase(db)).rejects.toThrow('project paused');
+
+      expect(mockSignOut).not.toHaveBeenCalled();
+      await eraseIfPending(db);
+      expect((await getProfile(db)).firstName).toBe('Ada');
+    });
+
+    it("doesn't erase when signing out fails, so the phone can't lose data while signed in", async () => {
+      const { eraseIfPending, linkDevice, signOutAndErase } = loadBackup();
+      await linkDevice(db);
+      await updateProfile(db, { ...(await getProfile(db)), firstName: 'Ada' });
+      mockSignOut.mockResolvedValueOnce({ error: { message: 'offline' } });
+
+      await expect(signOutAndErase(db)).rejects.toThrow('offline');
+
+      await eraseIfPending(db);
+      expect((await getProfile(db)).firstName).toBe('Ada');
+    });
+
+    it('leaves the data alone on a normal launch', async () => {
+      const { eraseIfPending } = loadBackup();
+      await updateProfile(db, { ...(await getProfile(db)), firstName: 'Ada' });
+      await eraseIfPending(db);
+      expect((await getProfile(db)).firstName).toBe('Ada');
+    });
   });
 
   it('reports a failure to refresh the session, as a paused project causes', async () => {

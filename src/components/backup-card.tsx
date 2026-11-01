@@ -8,7 +8,6 @@ import { showDialog } from '@/components/dialog';
 import { IconBadge } from '@/components/icon-badge';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { useAuthState } from '@/lib/auth';
 import { backUp, isBackupConfigured, listSnapshots, restoreSnapshot, useBackupState } from '@/lib/backup';
 import { formatDateKey, type DateKey } from '@/lib/dates';
 
@@ -38,7 +37,6 @@ export function BackupCard() {
 
 function BackupStatus() {
   const db = useSQLiteContext();
-  const { email } = useAuthState();
   const { lastBackupAt, lastError, running } = useBackupState();
 
   const restore = async (date: DateKey) => {
@@ -74,7 +72,6 @@ function BackupStatus() {
     <>
       <ThemedText themeColor="textSecondary">
         {lastBackupAt ? `Last backup: ${new Date(lastBackupAt).toLocaleString()}` : 'No backups yet.'}
-        {email ? ` Backing up to ${email}.` : ''}
       </ThemedText>
       {lastError && <ThemedText themeColor="danger">Last backup failed: {lastError}</ThemedText>}
       <Button title="Back up now" onPress={() => backUp(db)} loading={running} />

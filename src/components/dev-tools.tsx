@@ -1,4 +1,3 @@
-import { reloadAppAsync } from 'expo';
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { StyleSheet, Switch, View } from 'react-native';
 
@@ -12,12 +11,11 @@ import {
   clearDevSessions,
   jumpToNextMilestone,
   makeDevTestDue,
-  resetAllData,
 } from '@/db/dev';
 import { RETEST_INTERVAL_DAYS } from '@/db/mobility-tests';
+import { resetAllData } from '@/db/reset';
 import { useStats } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
-import { isBackupConfigured } from '@/lib/backup';
 import { formatDuration } from '@/lib/dates';
 import {
   setFastWorkouts,
@@ -26,7 +24,6 @@ import {
   useSkipTestMeasurements,
 } from '@/lib/dev-settings';
 import { milestoneProgress } from '@/lib/milestones';
-import { supabase } from '@/lib/supabase';
 import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
 
 import { Button } from './button';
@@ -42,22 +39,6 @@ export function DevTools() {
   const fastWorkouts = useFastWorkouts();
   const skipTestMeasurements = useSkipTestMeasurements();
   const nextHours = stats ? milestoneProgress(stats.totalSeconds).nextHours : null;
-
-  // Signing out unlinks this phone (see `lib/auth`), which closes the login gate in the root layout.
-  // The open screens don't always give way to the login screen on their own, so reload to land on it.
-  const turnOffBackups = async () => {
-    await supabase!.auth.signOut({ scope: 'local' });
-    await reloadAppAsync('Turned off backups');
-  };
-
-  const confirmTurnOffBackups = () => {
-    showDialog({
-      title: 'Turn off backups?',
-      message:
-        "Signs out and goes back to the login screen. This phone's data stays. Signing in again restores the backup, or asks first if this phone has changes it hasn't backed up.",
-      confirm: { label: 'Turn off', onPress: turnOffBackups },
-    });
-  };
 
   const confirm = (title: string, message: string, action: (db: SQLiteDatabase) => Promise<void>) => {
     showDialog({ title, message, confirm: { label: 'Delete', onPress: () => action(db) } });
@@ -122,12 +103,6 @@ export function DevTools() {
         </ThemedText>
         <Button title="Make today test day" variant="secondary" onPress={() => makeDevTestDue(db)} />
       </Card>
-      {isBackupConfigured && (
-        <Card style={styles.card}>
-          <ThemedText type="smallBold">Backups</ThemedText>
-          <Button title="Turn off backups" variant="destructive" onPress={confirmTurnOffBackups} />
-        </Card>
-      )}
       <Card style={styles.card}>
         <ThemedText type="smallBold">Clear data</ThemedText>
         <Button

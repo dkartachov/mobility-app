@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { unlinkDevice } from '@/lib/backup';
+import { clearGreeting } from '@/lib/greeting';
 import { supabase } from '@/lib/supabase';
 
 export type AuthState = {
@@ -32,7 +33,25 @@ export function useAuthState() {
 
 supabase?.auth.onAuthStateChange((event, session) => {
   // Whoever signs in next may be someone else, so this phone must ask again before uploading.
-  if (event === 'SIGNED_OUT') unlinkDevice();
+  if (event === 'SIGNED_OUT') {
+    unlinkDevice();
+    clearGreeting();
+  }
   state = { signedIn: session !== null, email: session?.user.email ?? null };
   listeners.forEach((listener) => listener());
 });
+
+/**
+ * Copies the name to the user's Supabase account, for the Display name column in the dashboard.
+ * Nothing in the app reads it back, so failing (offline, say) only gets logged.
+ */
+export function syncDisplayName({ firstName, lastName }: { firstName: string; lastName: string }) {
+  const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
+  if (!supabase || !displayName) return;
+  supabase.auth
+    .updateUser({ data: { display_name: displayName } })
+    .then(({ error }) => {
+      if (error) console.warn(error.message);
+    })
+    .catch(console.warn);
+}

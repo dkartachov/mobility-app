@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountCard } from '@/components/account-card';
 import { BackupCard } from '@/components/backup-card';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
@@ -18,6 +19,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { deleteAllSessions } from '@/db/sessions';
+import { isBackupConfigured } from '@/lib/backup';
 import {
   THEME_PREFERENCES,
   THEME_PREFERENCE_LABELS,
@@ -111,6 +113,15 @@ export default function SettingsScreen() {
             <Button title="Delete all sessions" variant="destructive" onPress={confirmDeleteSessions} />
           </Card>
         </View>
+
+        {isBackupConfigured && (
+          <View style={styles.section}>
+            <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
+              Account
+            </ThemedText>
+            <AccountCard />
+          </View>
+        )}
 
         {__DEV__ && <DevTools />}
       </ScrollView>

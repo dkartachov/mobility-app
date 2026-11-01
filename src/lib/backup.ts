@@ -16,9 +16,10 @@ import Storage from 'expo-sqlite/kv-store';
 import { useSyncExternalStore } from 'react';
 
 import { getProfile } from '@/db/profile';
+import { resetAllData } from '@/db/reset';
 import { SCHEMA_VERSION } from '@/db/schema';
 import { fromDateKey, todayKey, type DateKey } from '@/lib/dates';
-import { profilePhotoFile } from '@/lib/profile-photo';
+import { deleteProfilePhoto, profilePhotoFile } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -35,6 +36,7 @@ const LINKED_KEY = 'backup.linked';
 const DIRTY_KEY = 'backup.dirty';
 const LAST_BACKUP_KEY = 'backup.lastBackupAt';
 const UPLOADED_PHOTO_KEY = 'backup.uploadedPhoto';
+const ERASE_PENDING_KEY = 'backup.erasePending';
 
 const BUCKETS: Record<string, string> = {
   'com.hogos.plie': 'backups-prod',
@@ -85,14 +87,18 @@ function setDirty(dirty: boolean) {
   Storage.setItemSync(DIRTY_KEY, String(dirty));
 }
 
-/** Records that the database has changes the bucket doesn't, surviving an app restart. */
+/**
+ * Records that the database has changes the bucket doesn't, surviving an app restart. Only a linked
+ * phone's changes count: before that, writes like erasing after sign-out or saving a new profile
+ * have no backup to fall behind, and counting them could offer to keep an empty phone over a backup.
+ */
 export function markBackupDirty() {
-  setDirty(true);
+  if (state.linked) setDirty(true);
 }
 
 /**
- * Whether this phone has changes the bucket doesn't. Changes count from the first launch, before
- * signing in, so a fresh install has none and can restore without asking.
+ * Whether this phone has changes the bucket doesn't, so a fresh install has none and can restore
+ * without asking.
  */
 export function hasUnsavedChanges() {
   return Storage.getItemSync(DIRTY_KEY) === 'true';
@@ -287,6 +293,33 @@ export function unlinkDevice() {
   setState({ linked: false, lastBackupAt: null, lastError: null });
 }
 
+/**
+ * Uploads a final backup and signs out, rejecting without signing out if either fails, so nothing
+ * unsaved can be lost. The caller must reload the app, which then erases this phone's data. That
+ * waits for the reload so no screen or backup is running while the data goes.
+ */
+export async function signOutAndErase(db: SQLiteDatabase) {
+  // An upload in progress may have started before the latest change.
+  if (inFlight) await inFlight;
+  await backUp(db);
+  if (state.lastError) throw new Error(state.lastError);
+
+  const { error } = await supabase!.auth.signOut({ scope: 'local' });
+  assertOk(error);
+  // Saved only once signed out: erasing a phone that's still signed in would look like lost data.
+  Storage.setItemSync(ERASE_PENDING_KEY, 'true');
+}
+
+/** Finishes `signOutAndErase` on the next launch, before anything reads the database. */
+export async function eraseIfPending(db: SQLiteDatabase) {
+  if (Storage.getItemSync(ERASE_PENDING_KEY) !== 'true') return;
+  const { photoFile } = await getProfile(db);
+  await resetAllData(db);
+  deleteProfilePhoto(photoFile);
+  setDirty(false);
+  Storage.removeItemSync(ERASE_PENDING_KEY);
+}
+
 /** Rejects anything that isn't a healthy database this version of the app can migrate. */
 async function assertRestorable(source: SQLiteDatabase) {
   const integrity = await source.getFirstAsync<{ integrity_check: string }>('PRAGMA integrity_check');
@@ -316,7 +349,8 @@ async function restoreProfilePhoto(source: SQLiteDatabase, userId: string) {
 /**
  * Replaces everything in `db` with one day's snapshot, after checking it on an in-memory copy so a
  * bad download can't touch your data. Change listeners don't fire for this and the snapshot may
- * need migrating, so the caller must reload the app afterwards.
+ * need migrating, so the caller must reload the app afterwards. The link is only saved, taking
+ * effect on that reload, so the app doesn't open for a moment before it.
  */
 export async function restoreSnapshot(db: SQLiteDatabase, date: DateKey) {
   setState({ running: true });
@@ -335,7 +369,7 @@ export async function restoreSnapshot(db: SQLiteDatabase, date: DateKey) {
     }
     setDirty(false);
     Storage.setItemSync(LINKED_KEY, 'true');
-    setState({ linked: true, lastError: null });
+    setState({ lastError: null });
   } finally {
     if (download.exists) download.delete();
     setState({ running: false });
