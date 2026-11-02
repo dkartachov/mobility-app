@@ -88,7 +88,6 @@ describe('poseAt', () => {
 describe('exercise animations', () => {
   it('covers every active exercise, apart from the ones left as photos', () => {
     expect(EXERCISES.filter((e) => e.active && !e.animation).map((e) => e.id)).toEqual([
-      '90-to-90-rotation',
       'reverse-scorpion',
       'thread-the-needle',
     ]);

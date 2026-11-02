@@ -788,9 +788,9 @@ export const FLOOR_ANGELS: FigureClip = {
   ],
 };
 
-// --- Windshield wipers: from the front, feet planted wide, both knees tip side to side ---
+// --- 90 to 90 rotations: from the front, feet planted wide, both knees tip side to side ---
 
-const WIPERS_BASE = {
+const ROTATIONS_BASE = {
   hip: [480, 400],
   torso: 90,
   arch: 0,
@@ -801,41 +801,41 @@ const WIPERS_BASE = {
   farFoot: [590, 470, 0],
 } satisfies Partial<Pose>;
 
-const WIPERS_RIGHT: Pose = {
-  ...WIPERS_BASE,
+const ROTATIONS_RIGHT: Pose = {
+  ...ROTATIONS_BASE,
   knees: [
     [500, 400],
     [620, 430],
   ],
 };
-const WIPERS_UP: Pose = {
-  ...WIPERS_BASE,
+const ROTATIONS_UP: Pose = {
+  ...ROTATIONS_BASE,
   knees: [
     [410, 320],
     [550, 320],
   ],
 };
-const WIPERS_LEFT: Pose = {
-  ...WIPERS_BASE,
+const ROTATIONS_LEFT: Pose = {
+  ...ROTATIONS_BASE,
   knees: [
     [340, 430],
     [460, 400],
   ],
 };
 
-export const WINDSHIELD_WIPERS: FigureClip = {
+export const NINETY_TO_NINETY_ROTATIONS: FigureClip = {
   view: 'above',
   widths: { shoulder: 28, hip: 16 },
   armBends: [-1, 1],
   stillFrame: 0,
   keyframes: [
-    { ms: 0, pose: WIPERS_RIGHT },
-    { ms: 1000, pose: WIPERS_UP, ease: 'in' },
-    { ms: 1000, pose: WIPERS_LEFT, ease: 'out' },
-    { ms: 300, pose: WIPERS_LEFT },
-    { ms: 1000, pose: WIPERS_UP, ease: 'in' },
-    { ms: 1000, pose: WIPERS_RIGHT, ease: 'out' },
-    { ms: 300, pose: WIPERS_RIGHT },
+    { ms: 0, pose: ROTATIONS_RIGHT },
+    { ms: 1000, pose: ROTATIONS_UP, ease: 'in' },
+    { ms: 1000, pose: ROTATIONS_LEFT, ease: 'out' },
+    { ms: 300, pose: ROTATIONS_LEFT },
+    { ms: 1000, pose: ROTATIONS_UP, ease: 'in' },
+    { ms: 1000, pose: ROTATIONS_RIGHT, ease: 'out' },
+    { ms: 300, pose: ROTATIONS_RIGHT },
   ],
 };
 
@@ -1094,5 +1094,56 @@ export const ELEPHANT_WALK: FigureClip = {
     { ms: 200, pose: ELEPHANT_FAR_BENT },
     { ms: 1100, pose: ELEPHANT_NEAR_BENT },
     { ms: 200, pose: ELEPHANT_NEAR_BENT },
+  ],
+};
+
+// --- Arm swings: straight arms pass each other in front of the body, one rising as the other goes back ---
+
+const armSwing = (near: number, far: number): Pose => ({
+  ...STANDING_TALL,
+  nearHand: armAt(STANDING_SHOULDER, near),
+  farHand: armAt(STANDING_SHOULDER, far),
+});
+const ARM_SWING_NEAR_FORWARD = armSwing(-40, 160);
+const ARM_SWING_PASSING = armSwing(60, 60);
+const ARM_SWING_FAR_FORWARD = armSwing(160, -40);
+
+export const ARM_SWINGS: FigureClip = {
+  view: 'side',
+  straightArms: true,
+  zoom: 0.8,
+  stillFrame: 0,
+  keyframes: [
+    { ms: 0, pose: ARM_SWING_NEAR_FORWARD },
+    { ms: 800, pose: ARM_SWING_PASSING, swing: true, ease: 'in' },
+    { ms: 800, pose: ARM_SWING_FAR_FORWARD, swing: true, ease: 'out' },
+    { ms: 800, pose: ARM_SWING_PASSING, swing: true, ease: 'in' },
+    { ms: 800, pose: ARM_SWING_NEAR_FORWARD, swing: true, ease: 'out' },
+  ],
+};
+
+// --- Leg swings: standing tall on the far leg, the near leg swings from the hip, just clearing the floor ---
+
+const legSwing = (degrees: number): Pose => {
+  const radians = (degrees * Math.PI) / 180;
+  const [hipX, hipY] = STANDING_TALL.hip;
+  return {
+    ...STANDING_TALL,
+    nearFoot: [hipX + 196 * Math.cos(radians), hipY + 196 * Math.sin(radians), 90 - degrees],
+  };
+};
+const LEG_SWING_BACK = legSwing(125);
+const LEG_SWING_PASSING = legSwing(80);
+const LEG_SWING_FORWARD = legSwing(35);
+
+export const LEG_SWINGS: FigureClip = {
+  view: 'side',
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: LEG_SWING_BACK },
+    { ms: 800, pose: LEG_SWING_PASSING, swing: true, ease: 'in' },
+    { ms: 800, pose: LEG_SWING_FORWARD, swing: true, ease: 'out' },
+    { ms: 800, pose: LEG_SWING_PASSING, swing: true, ease: 'in' },
+    { ms: 800, pose: LEG_SWING_BACK, swing: true, ease: 'out' },
   ],
 };
