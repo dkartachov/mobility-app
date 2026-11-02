@@ -1,9 +1,9 @@
 import { Image, type ImageSource } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
-import type { FigureClip } from '@/lib/figure-rig';
+import type { ExerciseAnimation } from '@/lib/figure-rig';
 
-import { ExerciseFigure } from './exercise-figure';
+import { ExerciseFigure, ExerciseHand } from './exercise-figure';
 import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
@@ -11,11 +11,11 @@ import { ThemedText } from './themed-text';
  * The exercise's looping figure animation if it has one, then its photo, otherwise a "coming soon"
  * panel. Once videos exist, swap this for an autoplaying, looping `VideoView` from `expo-video`.
  */
-export function ExerciseVideo({ photo, animation }: { photo?: ImageSource; animation?: FigureClip }) {
+export function ExerciseVideo({ photo, animation }: { photo?: ImageSource; animation?: ExerciseAnimation }) {
   if (animation) {
     return (
       <View style={styles.video}>
-        <ExerciseFigure clip={animation} />
+        {animation.view === 'hand' ? <ExerciseHand clip={animation} /> : <ExerciseFigure clip={animation} />}
       </View>
     );
   }

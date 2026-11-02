@@ -3,18 +3,25 @@ import { EXERCISES } from '@/data/exercises';
 import {
   BONES,
   clipDuration,
+  figureViewBox,
+  FINGER,
   keyframeTime,
   opacityAt,
   poseAt,
+  limbRoots,
   SCENE,
-  shoulderOf,
   solveFigure,
+  solveFinger,
   solveJoint,
   type FigureClip,
+  type HandClip,
   type Pose,
 } from './figure-rig';
 
-const animated = EXERCISES.filter((e): e is typeof e & { animation: FigureClip } => !!e.animation);
+const animated = EXERCISES.flatMap((e) =>
+  e.animation && e.animation.view !== 'hand' ? [{ id: e.id, animation: e.animation }] : []
+);
+const hands = EXERCISES.flatMap((e) => (e.animation?.view === 'hand' ? [{ id: e.id, animation: e.animation }] : []));
 const ARM_REACH = BONES.upperArm + BONES.forearm;
 const LEG_REACH = BONES.thigh + BONES.shin;
 
@@ -79,22 +86,23 @@ describe('poseAt', () => {
 });
 
 describe('exercise animations', () => {
-  it('covers the first set of exercises', () => {
-    expect(animated.map((e) => e.id).sort()).toEqual([
-      'cat-cow',
-      'inchworm',
-      'open-book',
-      'pigeon-stretch',
-      'squat-to-stand',
+  it('covers every active exercise, apart from the ones left as photos', () => {
+    expect(EXERCISES.filter((e) => e.active && !e.animation).map((e) => e.id)).toEqual([
+      '90-to-90-rotation',
+      'reverse-scorpion',
+      'thread-the-needle',
     ]);
   });
 
   describe.each(animated.map((e) => [e.id, e.animation] as const))('%s', (_, clip) => {
     it('never stretches a bone', () => {
       for (const pose of samples(clip)) {
-        const paths = solveFigure(pose, clip.straightArms);
-        for (const leg of [paths.nearLeg, paths.farLeg]) {
-          expect(segmentLengths(leg).map((l) => Math.round(l))).toEqual([BONES.thigh, BONES.shin, BONES.foot]);
+        const paths = solveFigure(pose, clip);
+        // Placed knees are for legs seen foreshortened, so only solved ones keep their full length.
+        if (!pose.knees) {
+          for (const leg of [paths.nearLeg, paths.farLeg]) {
+            expect(segmentLengths(leg).map((l) => Math.round(l))).toEqual([BONES.thigh, BONES.shin, BONES.foot]);
+          }
         }
         if (clip.straightArms) continue;
         for (const arm of [paths.nearArm, paths.farArm]) {
@@ -108,14 +116,15 @@ describe('exercise animations', () => {
       clip.keyframes.forEach((frame, i) => {
         for (const limb of limbs) {
           const isHand = limb.endsWith('Hand');
-          if (isHand && clip.straightArms) continue;
+          if (isHand ? clip.straightArms : frame.pose.knees) continue;
           const held = clip.keyframes[i - 1]?.pose[limb].join() === frame.pose[limb].join();
           // Between keyframes as well when it isn't going anywhere; a hand on its way somewhere can trail.
           const start = i === 0 ? 0 : keyframeTime(clip, i - 1);
           const end = keyframeTime(clip, i);
           for (let t = held ? start : end; t <= end; t += 50) {
             const pose = poseAt(clip, t);
-            const root = isHand ? shoulderOf(pose) : pose.hip;
+            const roots = limbRoots(pose, clip);
+            const root = { nearHand: roots.nearShoulder, farHand: roots.farShoulder, nearFoot: roots.nearHip, farFoot: roots.farHip }[limb];
             const target = pose[limb];
             expect(Math.hypot(target[0] - root[0], target[1] - root[1])).toBeLessThanOrEqual(isHand ? ARM_REACH : LEG_REACH);
           }
@@ -126,28 +135,26 @@ describe('exercise animations', () => {
     it('keeps every joint above the floor', () => {
       if (clip.view !== 'side') return;
       for (const pose of samples(clip)) {
-        const shoulder = shoulderOf(pose);
-        const joints = [
-          solveJoint(pose.hip, [pose.nearFoot[0], pose.nearFoot[1]], BONES.thigh, BONES.shin, 1),
-          solveJoint(pose.hip, [pose.farFoot[0], pose.farFoot[1]], BONES.thigh, BONES.shin, 1),
-          solveJoint(shoulder, [pose.nearHand[0], pose.nearHand[1]], BONES.upperArm, BONES.forearm, -1),
-          solveJoint(shoulder, [pose.farHand[0], pose.farHand[1]], BONES.upperArm, BONES.forearm, -1),
-          [pose.nearFoot[0], pose.nearFoot[1]],
-          [pose.farFoot[0], pose.farFoot[1]],
-          [pose.nearHand[0], pose.nearHand[1]],
-          [pose.farHand[0], pose.farHand[1]],
-        ];
-        for (const [, y] of joints) expect(y).toBeLessThanOrEqual(SCENE.floorY);
+        const paths = solveFigure(pose, clip);
+        for (const path of [paths.nearArm, paths.farArm, paths.nearLeg, paths.farLeg]) {
+          for (const [, y] of pathPoints(path)) expect(y).toBeLessThanOrEqual(SCENE.floorY);
+        }
+        // The head and spine are thick, so their centers stay further off the floor than joints do.
+        expect(paths.headY).toBeLessThanOrEqual(SCENE.floorY - 28);
       }
     });
 
     it('stays inside the frame', () => {
+      const [left, top, width, height] = figureViewBox(clip).split(' ').map(Number);
       for (const pose of samples(clip)) {
-        const { headX, headY } = solveFigure(pose, clip.straightArms);
-        expect(headX).toBeGreaterThan(0);
-        expect(headX).toBeLessThan(SCENE.width);
-        expect(headY).toBeGreaterThan(0);
-        expect(headY).toBeLessThan(SCENE.height);
+        const paths = solveFigure(pose, clip);
+        const points = [paths.nearArm, paths.farArm, paths.nearLeg, paths.farLeg, paths.neck].flatMap(pathPoints);
+        for (const [x, y] of points) {
+          expect(x).toBeGreaterThan(left);
+          expect(x).toBeLessThan(left + width);
+          expect(y).toBeGreaterThan(top);
+          expect(y).toBeLessThan(top + height);
+        }
       }
     });
 
@@ -168,7 +175,35 @@ describe('exercise animations', () => {
   });
 });
 
+describe.each(hands.map((e) => [e.id, e.animation] as const))('hand animation %s', (_, clip: HandClip) => {
+  it('never stretches a finger bone', () => {
+    for (let t = 0; t <= clipDuration(clip); t += 50) {
+      expect(segmentLengths(solveFinger(clip, t)).map((l) => Math.round(l))).toEqual(FINGER.bones);
+    }
+  });
+
+  it('loops without a jump', () => {
+    const frames = clip.keyframes;
+    expect(frames[frames.length - 1].joints).toEqual(frames[0].joints);
+  });
+
+  it('stays inside the frame', () => {
+    for (let t = 0; t <= clipDuration(clip); t += 50) {
+      for (const [x, y] of pathPoints(solveFinger(clip, t))) {
+        expect(x).toBeGreaterThan(0);
+        expect(x).toBeLessThan(SCENE.width);
+        expect(y).toBeGreaterThan(0);
+        expect(y).toBeLessThan(SCENE.height);
+      }
+    }
+  });
+});
+
+function pathPoints(path: string): number[][] {
+  return [...path.matchAll(/[ML](-?[\d.e-]+) (-?[\d.e-]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+}
+
 function segmentLengths(path: string): number[] {
-  const points = [...path.matchAll(/[ML](-?[\d.e-]+) (-?[\d.e-]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  const points = pathPoints(path);
   return points.slice(1).map(([x, y], i) => Math.hypot(x - points[i][0], y - points[i][1]));
 }

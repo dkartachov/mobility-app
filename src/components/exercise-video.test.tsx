@@ -1,12 +1,17 @@
 import { render, screen } from '@testing-library/react-native';
 
-import { CAT_COW } from '@/data/exercise-animations';
+import { CAT_COW, FINGER_TENDON_GLIDES } from '@/data/exercise-animations';
 
 import { ExerciseVideo } from './exercise-video';
 
 describe('ExerciseVideo', () => {
   it('shows the animation when the exercise has one', async () => {
     await render(<ExerciseVideo photo={{ uri: 'photo.png' }} animation={CAT_COW} />);
+    expect(screen.getByLabelText('Animated demonstration')).toBeTruthy();
+  });
+
+  it('shows a hand animation the same way', async () => {
+    await render(<ExerciseVideo photo={{ uri: 'photo.png' }} animation={FINGER_TENDON_GLIDES} />);
     expect(screen.getByLabelText('Animated demonstration')).toBeTruthy();
   });
 

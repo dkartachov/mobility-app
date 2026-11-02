@@ -25,6 +25,8 @@ export type Point = readonly [x: number, y: number];
 /** A wrist or ankle, and the angle its hand or foot points in. */
 export type Extremity = readonly [x: number, y: number, angle: number];
 
+export type Bend = 1 | -1;
+
 export type Pose = {
   hip: Point;
   /** Direction of the spine, from the hips to the shoulders. */
@@ -33,10 +35,17 @@ export type Pose = {
   arch: number;
   /** Direction of the head from the shoulders. */
   neck: number;
+  /** A shorter spine than `BONES.torso`, for a torso leaning toward the camera. */
+  torsoLength?: number;
   nearHand: Extremity;
   farHand: Extremity;
   nearFoot: Extremity;
   farFoot: Extremity;
+  /**
+   * Places the knees rather than solving them, for legs pointing partly at the camera, which look
+   * shorter than they are. Give it in every pose of a clip or in none.
+   */
+  knees?: readonly [near: Point, far: Point];
 };
 
 export type Keyframe = {
@@ -45,6 +54,14 @@ export type Keyframe = {
   pose: Pose;
   /** Hands and feet that move on the way here lift and step, rather than sliding along the floor. */
   step?: boolean;
+  /** Hands and feet that move on the way here circle their shoulder or hip instead of cutting straight across. */
+  swing?: boolean;
+  /**
+   * Eases in and out by default, which stops at every keyframe. To pass through one without
+   * stopping, ease `in` to it and `out` of it at the same speed, or hold a steady speed with `none`.
+   * An `in` or `out` ends twice as fast as `none` over the same time, so give it twice as long.
+   */
+  ease?: 'in' | 'out' | 'none';
 };
 
 export type FigureClip = {
@@ -52,7 +69,7 @@ export type FigureClip = {
   keyframes: readonly Keyframe[];
   /** Index of the keyframe to show, unmoving, when reduced motion is on. */
   stillFrame: number;
-  /** The floor seen from the side, or a mat seen from directly above. */
+  /** On the floor, seen from the side or the front, or on a mat seen from above. */
   view: 'side' | 'above';
   /**
    * Arms stay straight rather than bending at the elbow to reach their target. From above, an arm
@@ -61,7 +78,29 @@ export type FigureClip = {
   straightArms?: boolean;
   /** Fade over this long at both ends of the loop, for clips that travel and don't end where they start. */
   fadeMs?: number;
+  /**
+   * How far each shoulder and hip sits from the spine, for views that face the width of the body.
+   * Near limbs attach on the left of the spine, looking from the hips to the head; far on the right.
+   */
+  widths?: { shoulder: number; hip: number };
+  /** Which side [near, far] elbows stick out on. Backward from the spine by default. */
+  armBends?: readonly [near: Bend, far: Bend];
+  /** Which side [near, far] knees stick out on. Forward from the spine by default. */
+  legBends?: readonly [near: Bend, far: Bend];
+  /** Below 1 pulls the camera back around the middle of the floor, to fit an arm overhead. */
+  zoom?: number;
 };
+
+/** A single finger, seen from the side, bending at its three joints. Angles are in degrees of flexion. */
+export type HandPose = readonly [knuckle: number, middle: number, tip: number];
+
+export type HandClip = {
+  view: 'hand';
+  keyframes: readonly { ms: number; joints: HandPose }[];
+  stillFrame: number;
+};
+
+export type ExerciseAnimation = FigureClip | HandClip;
 
 export type FigurePaths = {
   nearArm: string;
@@ -74,7 +113,9 @@ export type FigurePaths = {
   headY: number;
 };
 
-export function clipDuration(clip: FigureClip): number {
+type Timed = { keyframes: readonly { ms: number }[] };
+
+export function clipDuration(clip: Timed): number {
   'worklet';
   let total = 0;
   for (let i = 1; i < clip.keyframes.length; i++) total += clip.keyframes[i].ms;
@@ -82,10 +123,37 @@ export function clipDuration(clip: FigureClip): number {
 }
 
 /** The time at which a clip arrives at its nth keyframe. */
-export function keyframeTime(clip: FigureClip, index: number): number {
+export function keyframeTime(clip: Timed, index: number): number {
   let total = 0;
   for (let i = 1; i <= index; i++) total += clip.keyframes[i].ms;
   return total;
+}
+
+// Worklets capture what they call when they're defined, so unlike ordinary functions these aren't
+// hoisted: everything here has to be defined above whatever uses it.
+
+function along(from: Point, angle: number, length: number): Point {
+  'worklet';
+  const radians = (angle * Math.PI) / 180;
+  return [from[0] + length * Math.cos(radians), from[1] - length * Math.sin(radians)];
+}
+
+export function shoulderOf(pose: Pose): Point {
+  'worklet';
+  return along(pose.hip, pose.torso, pose.torsoLength ?? BONES.torso);
+}
+
+/** Where each limb attaches to the body. */
+export function limbRoots(pose: Pose, clip: FigureClip) {
+  'worklet';
+  const shoulder = shoulderOf(pose);
+  const widths = clip.widths ?? { shoulder: 0, hip: 0 };
+  return {
+    nearShoulder: along(shoulder, pose.torso + 90, widths.shoulder),
+    farShoulder: along(shoulder, pose.torso - 90, widths.shoulder),
+    nearHip: along(pose.hip, pose.torso + 90, widths.hip),
+    farHip: along(pose.hip, pose.torso - 90, widths.hip),
+  };
 }
 
 /** How high a step lifts, as a fraction of how far it travels. */
@@ -96,33 +164,89 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+function eased(linear: number, ease: Keyframe['ease']): number {
+  'worklet';
+  if (ease === 'none') return linear;
+  if (ease === 'in') return linear * linear;
+  if (ease === 'out') return 1 - (1 - linear) * (1 - linear);
+  return linear * linear * (3 - 2 * linear);
+}
+
 function lerpExtremity(a: Extremity, b: Extremity, t: number, step: boolean): Extremity {
   'worklet';
   const lift = step ? Math.sin(t * Math.PI) * Math.abs(b[0] - a[0]) * STEP_HEIGHT : 0;
   return [lerp(a[0], b[0], t), lerp(a[1], b[1], t) - lift, lerp(a[2], b[2], t)];
 }
 
-/** The clip's pose at a time in `[0, clipDuration]`, easing in and out of every keyframe. */
+/** Moves between two extremities around their limb's root, the short way round. */
+function swingExtremity(a: Extremity, b: Extremity, rootA: Point, rootB: Point, root: Point, t: number): Extremity {
+  'worklet';
+  const dxA = a[0] - rootA[0];
+  const dyA = a[1] - rootA[1];
+  const dxB = b[0] - rootB[0];
+  const dyB = b[1] - rootB[1];
+  const fromAngle = Math.atan2(dyA, dxA);
+  let delta = Math.atan2(dyB, dxB) - fromAngle;
+  if (delta > Math.PI) delta -= 2 * Math.PI;
+  if (delta < -Math.PI) delta += 2 * Math.PI;
+  const angle = fromAngle + delta * t;
+  const radius = lerp(Math.hypot(dxA, dyA), Math.hypot(dxB, dyB), t);
+  return [root[0] + radius * Math.cos(angle), root[1] + radius * Math.sin(angle), lerp(a[2], b[2], t)];
+}
+
+function sameExtremity(a: Extremity, b: Extremity): boolean {
+  'worklet';
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+/** The clip's pose at a time in `[0, clipDuration]`. */
 export function poseAt(clip: FigureClip, timeMs: number): Pose {
   'worklet';
   const frames = clip.keyframes;
   let elapsed = 0;
   for (let i = 1; i < frames.length; i++) {
-    const { ms, step = false } = frames[i];
+    const { ms, step = false, swing = false, ease } = frames[i];
     if (timeMs <= elapsed + ms) {
-      const linear = ms === 0 ? 1 : (timeMs - elapsed) / ms;
-      const t = linear * linear * (3 - 2 * linear);
+      const t = eased(ms === 0 ? 1 : (timeMs - elapsed) / ms, ease);
       const a = frames[i - 1].pose;
       const b = frames[i].pose;
-      return {
+      const body: Pose = {
         hip: [lerp(a.hip[0], b.hip[0], t), lerp(a.hip[1], b.hip[1], t)],
         torso: lerp(a.torso, b.torso, t),
         arch: lerp(a.arch, b.arch, t),
         neck: lerp(a.neck, b.neck, t),
+        torsoLength: lerp(a.torsoLength ?? BONES.torso, b.torsoLength ?? BONES.torso, t),
         nearHand: lerpExtremity(a.nearHand, b.nearHand, t, step),
         farHand: lerpExtremity(a.farHand, b.farHand, t, step),
         nearFoot: lerpExtremity(a.nearFoot, b.nearFoot, t, step),
         farFoot: lerpExtremity(a.farFoot, b.farFoot, t, step),
+        knees:
+          a.knees && b.knees
+            ? [
+                [lerp(a.knees[0][0], b.knees[0][0], t), lerp(a.knees[0][1], b.knees[0][1], t)],
+                [lerp(a.knees[1][0], b.knees[1][0], t), lerp(a.knees[1][1], b.knees[1][1], t)],
+              ]
+            : undefined,
+      };
+      if (!swing) return body;
+
+      const rootsA = limbRoots(a, clip);
+      const rootsB = limbRoots(b, clip);
+      const roots = limbRoots(body, clip);
+      return {
+        ...body,
+        nearHand: sameExtremity(a.nearHand, b.nearHand)
+          ? body.nearHand
+          : swingExtremity(a.nearHand, b.nearHand, rootsA.nearShoulder, rootsB.nearShoulder, roots.nearShoulder, t),
+        farHand: sameExtremity(a.farHand, b.farHand)
+          ? body.farHand
+          : swingExtremity(a.farHand, b.farHand, rootsA.farShoulder, rootsB.farShoulder, roots.farShoulder, t),
+        nearFoot: sameExtremity(a.nearFoot, b.nearFoot)
+          ? body.nearFoot
+          : swingExtremity(a.nearFoot, b.nearFoot, rootsA.nearHip, rootsB.nearHip, roots.nearHip, t),
+        farFoot: sameExtremity(a.farFoot, b.farFoot)
+          ? body.farFoot
+          : swingExtremity(a.farFoot, b.farFoot, rootsA.farHip, rootsB.farHip, roots.farHip, t),
       };
     }
     elapsed += ms;
@@ -136,12 +260,6 @@ export function opacityAt(clip: FigureClip, timeMs: number): number {
   if (!clip.fadeMs) return 1;
   const fromEnd = Math.min(timeMs, clipDuration(clip) - timeMs);
   return Math.max(0, Math.min(1, fromEnd / clip.fadeMs));
-}
-
-function along(from: Point, angle: number, length: number): Point {
-  'worklet';
-  const radians = (angle * Math.PI) / 180;
-  return [from[0] + length * Math.cos(radians), from[1] - length * Math.sin(radians)];
 }
 
 /** The target itself, or as far toward it as a limb of this length can get. */
@@ -159,7 +277,7 @@ function withinReach(root: Point, target: Extremity, reach: number): Extremity {
  * Where the middle joint goes in a two-bone limb. `bend` picks the side it sticks out on: 1 is to
  * the limb's left, looking from its root to its tip. A target out of reach just straightens the limb.
  */
-export function solveJoint(root: Point, tip: Point, first: number, second: number, bend: 1 | -1): Point {
+export function solveJoint(root: Point, tip: Point, first: number, second: number, bend: Bend): Point {
   'worklet';
   const dx = tip[0] - root[0];
   const dy = tip[1] - root[1];
@@ -173,7 +291,7 @@ export function solveJoint(root: Point, tip: Point, first: number, second: numbe
 }
 
 /** A two-bone limb with a hand or foot on the end. Bones never stretch to reach a far target. */
-function limbPath(root: Point, target: Extremity, first: number, second: number, bend: 1 | -1, endLength: number): string {
+function limbPath(root: Point, target: Extremity, first: number, second: number, bend: Bend, endLength: number): string {
   'worklet';
   const end = withinReach(root, target, first + second);
   const joint = solveJoint(root, [end[0], end[1]], first, second, bend);
@@ -181,30 +299,32 @@ function limbPath(root: Point, target: Extremity, first: number, second: number,
   return `M${root[0]} ${root[1]}L${joint[0]} ${joint[1]}L${end[0]} ${end[1]}L${tip[0]} ${tip[1]}`;
 }
 
-export function shoulderOf(pose: Pose): Point {
-  'worklet';
-  return along(pose.hip, pose.torso, BONES.torso);
-}
-
 /** Traces the figure in the given pose. */
-export function solveFigure(pose: Pose, straightArms = false): FigurePaths {
+export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
   'worklet';
-  const { hip, nearHand, farHand, nearFoot, farFoot } = pose;
+  const { hip, nearHand, farHand, nearFoot, farFoot, knees } = pose;
   const shoulder = shoulderOf(pose);
   const head = along(shoulder, pose.neck, BONES.neck);
+  const { nearShoulder, farShoulder, nearHip, farHip } = limbRoots(pose, clip);
+  const armBends = clip.armBends ?? [-1, -1];
+  const legBends = clip.legBends ?? [1, 1];
 
   // Knees bend forward and elbows backward, whichever way the limb is pointing.
-  const arm = (hand: Extremity): string => {
-    if (straightArms) {
+  const arm = (root: Point, hand: Extremity, bend: Bend): string => {
+    if (clip.straightArms) {
       // The hand shortens along with the rest of the arm as it swings toward the camera.
       const scale = 1 + BONES.hand / (BONES.upperArm + BONES.forearm);
-      const tipX = shoulder[0] + (hand[0] - shoulder[0]) * scale;
-      const tipY = shoulder[1] + (hand[1] - shoulder[1]) * scale;
-      return `M${shoulder[0]} ${shoulder[1]}L${tipX} ${tipY}`;
+      const tipX = root[0] + (hand[0] - root[0]) * scale;
+      const tipY = root[1] + (hand[1] - root[1]) * scale;
+      return `M${root[0]} ${root[1]}L${tipX} ${tipY}`;
     }
-    return limbPath(shoulder, hand, BONES.upperArm, BONES.forearm, -1, BONES.hand);
+    return limbPath(root, hand, BONES.upperArm, BONES.forearm, bend, BONES.hand);
   };
-  const leg = (foot: Extremity): string => limbPath(hip, foot, BONES.thigh, BONES.shin, 1, BONES.foot);
+  const leg = (root: Point, foot: Extremity, bend: Bend, knee?: Point): string => {
+    if (!knee) return limbPath(root, foot, BONES.thigh, BONES.shin, bend, BONES.foot);
+    const toe = along([foot[0], foot[1]], foot[2], BONES.foot);
+    return `M${root[0]} ${root[1]}L${knee[0]} ${knee[1]}L${foot[0]} ${foot[1]}L${toe[0]} ${toe[1]}`;
+  };
 
   // The spine bows off the middle of the straight line from hips to shoulders.
   const spine = along(
@@ -212,15 +332,54 @@ export function solveFigure(pose: Pose, straightArms = false): FigurePaths {
     pose.torso + 90,
     pose.arch * 2
   );
+  const girdles = clip.widths
+    ? `M${nearShoulder[0]} ${nearShoulder[1]}L${farShoulder[0]} ${farShoulder[1]}M${nearHip[0]} ${nearHip[1]}L${farHip[0]} ${farHip[1]}`
+    : '';
 
   return {
-    nearArm: arm(nearHand),
-    farArm: arm(farHand),
-    nearLeg: leg(nearFoot),
-    farLeg: leg(farFoot),
-    torso: `M${hip[0]} ${hip[1]}Q${spine[0]} ${spine[1]} ${shoulder[0]} ${shoulder[1]}`,
+    nearArm: arm(nearShoulder, nearHand, armBends[0]),
+    farArm: arm(farShoulder, farHand, armBends[1]),
+    nearLeg: leg(nearHip, nearFoot, legBends[0], knees?.[0]),
+    farLeg: leg(farHip, farFoot, legBends[1], knees?.[1]),
+    torso: `M${hip[0]} ${hip[1]}Q${spine[0]} ${spine[1]} ${shoulder[0]} ${shoulder[1]}${girdles}`,
     neck: `M${shoulder[0]} ${shoulder[1]}L${head[0]} ${head[1]}`,
     headX: head[0],
     headY: head[1],
   };
+}
+
+/** The part of the scene to show, pulled back around the middle of the floor for a `zoom` below 1. */
+export function figureViewBox(clip: FigureClip): string {
+  const zoom = clip.zoom ?? 1;
+  const width = SCENE.width / zoom;
+  const height = SCENE.height / zoom;
+  const left = (SCENE.width - width) / 2;
+  const top = SCENE.floorY - SCENE.floorY / zoom;
+  return `${left} ${top} ${width} ${height}`;
+}
+
+export const FINGER = { knuckle: [400, 300] as Point, wrist: [400, 480] as Point, bones: [85, 60, 45] };
+
+/** Traces the finger from its knuckle, curling from straight up toward the palm side, on the right. */
+export function solveFinger(clip: HandClip, timeMs: number): string {
+  'worklet';
+  const frames = clip.keyframes;
+  let joints = frames[frames.length - 1].joints;
+  let elapsed = 0;
+  for (let i = 1; i < frames.length; i++) {
+    const { ms } = frames[i];
+    if (timeMs <= elapsed + ms) {
+      const t = eased(ms === 0 ? 1 : (timeMs - elapsed) / ms, undefined);
+      const a = frames[i - 1].joints;
+      const b = frames[i].joints;
+      joints = [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+      break;
+    }
+    elapsed += ms;
+  }
+  const [first, second, third] = FINGER.bones;
+  const middle = along(FINGER.knuckle, 90 - joints[0], first);
+  const end = along(middle, 90 - joints[0] - joints[1], second);
+  const tip = along(end, 90 - joints[0] - joints[1] - joints[2], third);
+  return `M${FINGER.knuckle[0]} ${FINGER.knuckle[1]}L${middle[0]} ${middle[1]}L${end[0]} ${end[1]}L${tip[0]} ${tip[1]}`;
 }
