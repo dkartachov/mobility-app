@@ -12,7 +12,6 @@ import { ReminderScheduler } from '@/components/reminder-scheduler';
 import { StackHeader } from '@/components/stack-header';
 import { UpdatePrompt } from '@/components/update-prompt';
 import { WelcomeOverlay } from '@/components/welcome-overlay';
-import { WhatsNew } from '@/components/whats-new';
 import { Colors, DISPLAY_FONT_FACES } from '@/constants/theme';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 import { useAuthState } from '@/lib/auth';
@@ -88,7 +87,6 @@ function RootNavigator() {
       <ReminderScheduler />
       {/* Not while locked, where a restart could cut off signing in or restoring a backup. */}
       {unlocked && <UpdatePrompt />}
-      {unlocked && <WhatsNew />}
       <ThemeProvider value={navigationTheme}>
         <StatusBar style="auto" />
         <Stack screenOptions={{ header: (props) => <StackHeader {...props} /> }}>
