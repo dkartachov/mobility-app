@@ -8,10 +8,11 @@ import { Chip } from '@/components/chip';
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/page-header';
 import { PressableScale } from '@/components/pressable-scale';
+import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Elevation, Radius, Spacing } from '@/constants/theme';
-import { EQUIPMENT, EQUIPMENT_LABELS, POSITION_LABELS, POSITIONS } from '@/data/exercises';
+import { EQUIPMENT, EQUIPMENT_LABELS, EXERCISE_TYPE_LABELS, EXERCISE_TYPES, POSITION_LABELS, POSITIONS } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
 import { useColorScheme } from '@/lib/theme-preference';
 import { DAILY_MINUTES } from '@/lib/workout';
@@ -24,9 +25,10 @@ function toggled<T>(items: readonly T[], item: T) {
   return items.includes(item) ? items.filter((other) => other !== item) : [...items, item];
 }
 
-function startTitle(minutes: number | null, hasPosition: boolean) {
+function startTitle(minutes: number | null, hasPosition: boolean, hasType: boolean) {
   if (minutes === null) return 'Pick a time';
   if (!hasPosition) return 'Pick a position';
+  if (!hasType) return 'Pick a type';
   return `Start ${minutes} min routine`;
 }
 
@@ -35,10 +37,11 @@ export default function DailyScreen() {
   const [minutes, setMinutes] = useState<number | null>(null);
   const filters = useWorkoutFilters();
   const hasPosition = filters.positions.length > 0;
+  const hasType = filters.types.length > 0;
 
   return (
-    <ThemedView style={[styles.screen, { paddingBottom: insets.bottom + Spacing.three }]}>
-      <View style={styles.content}>
+    <ThemedView style={styles.screen}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <PageHeader eyebrow="Daily routine" title="How much time do you have?" />
         <View style={styles.options} accessibilityRole="radiogroup">
           {DAILY_MINUTES.map((value, i) => (
@@ -83,17 +86,35 @@ export default function DailyScreen() {
             ))}
           </View>
         </View>
+        <View style={styles.filter}>
+          <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
+            Type
+          </ThemedText>
+          <View style={styles.chips}>
+            {EXERCISE_TYPES.map((type) => (
+              <Chip
+                key={type}
+                multiSelect
+                label={EXERCISE_TYPE_LABELS[type]}
+                selected={filters.types.includes(type)}
+                onPress={() => setWorkoutFilters({ ...filters, types: toggled(filters.types, type) })}
+              />
+            ))}
+          </View>
+        </View>
         <ThemedText type="small" themeColor="textSecondary">
           Exercises are picked for you and change every time.
         </ThemedText>
-      </View>
+      </ScrollView>
 
       {/* Always laid out, so picking a time doesn't make the screen jump. */}
-      <Button
-        title={startTitle(minutes, hasPosition)}
-        disabled={minutes === null || !hasPosition}
-        onPress={() => router.push({ pathname: '/workout', params: { minutes: minutes ?? DAILY_MINUTES[0] } })}
-      />
+      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
+        <Button
+          title={startTitle(minutes, hasPosition, hasType)}
+          disabled={minutes === null || !hasPosition || !hasType}
+          onPress={() => router.push({ pathname: '/workout', params: { minutes: minutes ?? DAILY_MINUTES[0] } })}
+        />
+      </View>
     </ThemedView>
   );
 }
@@ -144,11 +165,16 @@ function TimeOption({ minutes, label, selected, onPress }: TimeOptionProps) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    padding: Spacing.three,
-    justifyContent: 'space-between',
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
+    padding: Spacing.three,
     gap: Spacing.four,
+  },
+  footer: {
+    paddingHorizontal: Spacing.three,
   },
   options: {
     flexDirection: 'row',

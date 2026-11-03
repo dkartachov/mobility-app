@@ -5,11 +5,12 @@
 import Storage from 'expo-sqlite/kv-store';
 import { useSyncExternalStore } from 'react';
 
-import { EQUIPMENT, POSITIONS, type Equipment, type Position } from '@/data/exercises';
+import { EQUIPMENT, EXERCISE_TYPES, POSITIONS, type Equipment, type ExerciseType, type Position } from '@/data/exercises';
 
 export type WorkoutFilters = {
   positions: Position[];
   equipment: Equipment[];
+  types: ExerciseType[];
 };
 
 const STORAGE_KEY = 'workoutFilters';
@@ -20,10 +21,12 @@ function readStoredFilters(): WorkoutFilters {
     return {
       positions: POSITIONS.filter((position) => stored.positions.includes(position)),
       equipment: EQUIPMENT.filter((equipment) => stored.equipment.includes(equipment)),
+      // Selections saved before types existed don't have any: keep the rest of them, with both types.
+      types: EXERCISE_TYPES.filter((type) => (stored.types ?? EXERCISE_TYPES).includes(type)),
     };
   } catch {
     // Never saved, or unreadable: everything is selected.
-    return { positions: [...POSITIONS], equipment: [...EQUIPMENT] };
+    return { positions: [...POSITIONS], equipment: [...EQUIPMENT], types: [...EXERCISE_TYPES] };
   }
 }
 

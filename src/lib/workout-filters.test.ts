@@ -1,6 +1,6 @@
 import Storage from 'expo-sqlite/kv-store';
 
-import { EQUIPMENT, POSITIONS } from '@/data/exercises';
+import { EQUIPMENT, EXERCISE_TYPES, POSITIONS } from '@/data/exercises';
 
 import type * as WorkoutFiltersModule from './workout-filters';
 
@@ -19,11 +19,15 @@ describe('workout filters', () => {
   });
 
   it('has everything selected the first time', () => {
-    expect(load().getWorkoutFilters()).toEqual({ positions: [...POSITIONS], equipment: [...EQUIPMENT] });
+    expect(load().getWorkoutFilters()).toEqual({
+      positions: [...POSITIONS],
+      equipment: [...EQUIPMENT],
+      types: [...EXERCISE_TYPES],
+    });
   });
 
   it('remembers the selection, including nothing selected', () => {
-    const selection = { positions: ['standing' as const], equipment: [] };
+    const selection = { positions: ['standing' as const], equipment: [], types: ['passive' as const] };
     load().setWorkoutFilters(selection);
 
     expect(load().getWorkoutFilters()).toEqual(selection);
@@ -31,7 +35,7 @@ describe('workout filters', () => {
 
   it('updates the current value right away', () => {
     const { getWorkoutFilters, setWorkoutFilters } = load();
-    const selection = { positions: [], equipment: ['wall' as const] };
+    const selection = { positions: [], equipment: ['wall' as const], types: [] };
     setWorkoutFilters(selection);
 
     expect(getWorkoutFilters()).toBe(selection);
@@ -40,12 +44,29 @@ describe('workout filters', () => {
   it('falls back to everything when the saved value is unreadable', () => {
     Storage.setItemSync('workoutFilters', 'not json');
 
-    expect(load().getWorkoutFilters()).toEqual({ positions: [...POSITIONS], equipment: [...EQUIPMENT] });
+    expect(load().getWorkoutFilters()).toEqual({
+      positions: [...POSITIONS],
+      equipment: [...EQUIPMENT],
+      types: [...EXERCISE_TYPES],
+    });
   });
 
   it('drops saved values that no longer exist', () => {
-    Storage.setItemSync('workoutFilters', JSON.stringify({ positions: ['standing', 'upside-down'], equipment: ['rope'] }));
+    Storage.setItemSync(
+      'workoutFilters',
+      JSON.stringify({ positions: ['standing', 'upside-down'], equipment: ['rope'], types: ['active', 'explosive'] })
+    );
 
-    expect(load().getWorkoutFilters()).toEqual({ positions: ['standing'], equipment: [] });
+    expect(load().getWorkoutFilters()).toEqual({ positions: ['standing'], equipment: [], types: ['active'] });
+  });
+
+  it('keeps a selection saved before types existed, with both types', () => {
+    Storage.setItemSync('workoutFilters', JSON.stringify({ positions: ['seated'], equipment: ['band'] }));
+
+    expect(load().getWorkoutFilters()).toEqual({
+      positions: ['seated'],
+      equipment: ['band'],
+      types: [...EXERCISE_TYPES],
+    });
   });
 });

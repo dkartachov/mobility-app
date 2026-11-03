@@ -48,6 +48,14 @@ export const EQUIPMENT_LABELS: Record<Equipment, string> = {
   wall: 'Wall',
 };
 
+export const EXERCISE_TYPES = ['active', 'passive'] as const;
+export type ExerciseType = (typeof EXERCISE_TYPES)[number];
+
+export const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
+  active: 'Active',
+  passive: 'Passive',
+};
+
 export type Exercise = {
   id: string;
   name: string;

@@ -26,12 +26,13 @@ export function pickRandom<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-/** The exercises that fit the selected positions and can be done with the selected equipment. */
-export function filterExercises({ positions, equipment }: WorkoutFilters) {
+/** The exercises that fit the selected positions and types, and can be done with the selected equipment. */
+export function filterExercises({ positions, equipment, types }: WorkoutFilters) {
   return EXERCISES.filter((exercise) => {
     const positionFits =
       exercise.position === 'either' ? positions.length > 0 : positions.includes(exercise.position);
-    return positionFits && (exercise.equipment ?? []).every((needed) => equipment.includes(needed));
+    const typeFits = types.includes(exercise.active ? 'active' : 'passive');
+    return positionFits && typeFits && (exercise.equipment ?? []).every((needed) => equipment.includes(needed));
   });
 }
 

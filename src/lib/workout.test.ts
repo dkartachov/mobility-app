@@ -1,4 +1,12 @@
-import { EQUIPMENT, EXERCISES, POSITIONS, type Equipment, type Position } from '@/data/exercises';
+import {
+  EQUIPMENT,
+  EXERCISE_TYPES,
+  EXERCISES,
+  POSITIONS,
+  type Equipment,
+  type ExerciseType,
+  type Position,
+} from '@/data/exercises';
 
 import { buildWorkout, DAILY_MINUTES, filterExercises, formatClock, type WorkoutStep } from './workout';
 
@@ -74,10 +82,31 @@ describe('buildWorkout', () => {
 });
 
 describe('filterExercises', () => {
-  const ids = (positions: Position[], equipment: Equipment[]) => filterExercises({ positions, equipment }).map((e) => e.id);
+  const ids = (positions: Position[], equipment: Equipment[], types: ExerciseType[] = [...EXERCISE_TYPES]) =>
+    filterExercises({ positions, equipment, types }).map((e) => e.id);
 
   it('includes everything when everything is selected', () => {
-    expect(filterExercises({ positions: [...POSITIONS], equipment: [...EQUIPMENT] })).toEqual(EXERCISES);
+    expect(filterExercises({ positions: [...POSITIONS], equipment: [...EQUIPMENT], types: [...EXERCISE_TYPES] })).toEqual(
+      EXERCISES
+    );
+  });
+
+  it('keeps only exercises of the selected type', () => {
+    const everything = { positions: [...POSITIONS], equipment: [...EQUIPMENT] };
+
+    const active = filterExercises({ ...everything, types: ['active'] });
+    expect(active.length).toBeGreaterThan(0);
+    expect(active.every((e) => e.active)).toBe(true);
+
+    const passive = filterExercises({ ...everything, types: ['passive'] });
+    expect(passive.length).toBeGreaterThan(0);
+    expect(passive.every((e) => !e.active)).toBe(true);
+
+    expect(active.length + passive.length).toBe(EXERCISES.length);
+  });
+
+  it('is empty when no type is selected', () => {
+    expect(ids([...POSITIONS], [...EQUIPMENT], [])).toEqual([]);
   });
 
   it('keeps only exercises done without a mat, including squats and kneeling, and those that can be done either way', () => {
@@ -115,9 +144,11 @@ describe('filterExercises', () => {
     expect(ids([], [...EQUIPMENT])).toEqual([]);
   });
 
-  // The narrowest selections the daily screen allows: one position and no equipment.
-  it.each(POSITIONS)('fills every daily length with only %s and no equipment', (position) => {
-    const library = filterExercises({ positions: [position], equipment: [] });
+  // The narrowest selections the daily screen allows: one position, one type and no equipment.
+  it.each(
+    POSITIONS.flatMap((position) => EXERCISE_TYPES.map((type) => [position, type] as const))
+  )('fills every daily length with only %s, %s and no equipment', (position, type) => {
+    const library = filterExercises({ positions: [position], equipment: [], types: [type] });
     for (const minutes of DAILY_MINUTES) {
       for (let i = 0; i < 200; i++) {
         expect(totalMinutes(buildWorkout(minutes, library))).toBe(minutes);
