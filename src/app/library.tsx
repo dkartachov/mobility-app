@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/card';
+import { Chip } from '@/components/chip';
 import { ExercisePhoto } from '@/components/exercise-photo';
 import { TextField } from '@/components/field';
 import { Icon } from '@/components/icon';
@@ -12,15 +13,30 @@ import { PressableScale } from '@/components/pressable-scale';
 import { FlatList } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
-import { EXERCISES, searchExercises, type Exercise } from '@/data/exercises';
+import {
+  EXERCISE_TYPE_LABELS,
+  EXERCISE_TYPES,
+  EXERCISES,
+  searchExercises,
+  type Exercise,
+  type ExerciseType,
+} from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
+
+const typeOf = (exercise: Exercise): ExerciseType => (exercise.active ? 'active' : 'passive');
 
 export default function LibraryScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const results = searchExercises(query);
+  /** Null shows every type. */
+  const [type, setType] = useState<ExerciseType | null>(null);
+  const results = searchExercises(query).filter((exercise) => type === null || typeOf(exercise) === type);
+  const filtered = query.trim() !== '' || type !== null;
   const total = `${EXERCISES.length} ${EXERCISES.length === 1 ? 'exercise' : 'exercises'}`;
+  const empty = query.trim()
+    ? `No ${type ? `${EXERCISE_TYPE_LABELS[type].toLowerCase()} ` : ''}exercises match "${query.trim()}".`
+    : 'No exercises of this type.';
 
   return (
     <FlatList
@@ -33,7 +49,7 @@ export default function LibraryScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <PageHeader
-            eyebrow={query.trim() ? `${results.length} of ${total}` : total}
+            eyebrow={filtered ? `${results.length} of ${total}` : total}
             eyebrowColor="textSecondary"
             title="Library"
           />
@@ -52,11 +68,20 @@ export default function LibraryScreen() {
               <Icon name={{ ios: 'magnifyingglass', android: 'search' }} color="textSecondary" size={18} />
             </View>
           </View>
+          <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Exercise type">
+            <Chip label="All" selected={type === null} onPress={() => setType(null)} />
+            {EXERCISE_TYPES.map((option) => (
+              <Chip
+                key={option}
+                label={EXERCISE_TYPE_LABELS[option]}
+                selected={type === option}
+                onPress={() => setType(option)}
+              />
+            ))}
+          </View>
         </View>
       }
-      ListEmptyComponent={
-        <ThemedText themeColor="textSecondary">No exercises match &quot;{query.trim()}&quot;.</ThemedText>
-      }
+      ListEmptyComponent={<ThemedText themeColor="textSecondary">{empty}</ThemedText>}
       renderItem={({ item }) => <ExerciseTile exercise={item} />}
     />
   );
@@ -111,6 +136,11 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     justifyContent: 'center',
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
   tile: {
     flexDirection: 'row',
