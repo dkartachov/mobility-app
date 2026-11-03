@@ -998,6 +998,57 @@ const ALL_EXERCISES: Exercise[] = [
     photo: require('@/assets/images/exercises/lying-knee-hug.png'),
     twoSided: true,
   },
+  {
+    id: 'horse-stance',
+    name: 'Horse stance',
+    stimulus: 'Inner thighs, groin, hips and quads',
+    position: 'standing',
+    instructions: [
+      'Stand with your feet about twice shoulder-width apart, toes turned slightly out',
+      'Sink your hips down, try to bring your thighs parallel to the floor',
+      'Keep your chest up, push your knees out over your toes and hold',
+    ],
+    photo: require('@/assets/images/exercises/horse-stance.png'),
+  },
+  {
+    id: 'belly-down-foot-splay',
+    name: 'Belly down foot splay',
+    stimulus: 'Hip internal rotation and deep hip rotators',
+    position: 'seated',
+    instructions: [
+      'Lie face down and bend your knees to 90° so your feet point up, with a block or pillow between your knees if you have one',
+      'Let your feet fall out to the sides, keeping your knees together',
+      'Relax and let gravity lower your shins, and hold',
+    ],
+    photo: require('@/assets/images/exercises/belly-down-foot-splay.png'),
+  },
+  {
+    id: 'lying-windshield-wiper-hold',
+    name: 'Lying windshield wiper hold',
+    stimulus: 'Hip internal and external rotation and glutes',
+    position: 'seated',
+    instructions: [
+      'Lie on your back with knees bent and feet flat, a bit wider than your hips',
+      'Keep your feet down and let both knees fall to one side',
+      'For more stretch, cross the outside ankle over the inside knee, then hold and switch sides',
+    ],
+    photo: require('@/assets/images/exercises/lying-windshield-wiper-hold.png'),
+    twoSided: true,
+  },
+  {
+    id: 'back-lying-reverse-pigeon',
+    name: 'Back lying reverse pigeon',
+    stimulus: 'Hip internal rotation and outer hip',
+    position: 'seated',
+    equipment: ['band'],
+    instructions: [
+      'Lie on your back, pull one knee up toward your chest and loop a band around that foot',
+      'Keeping the knee in place at 90°, use the band to pull the foot out to the side',
+      'Let the thigh rotate inward and hold, then switch sides',
+    ],
+    photo: require('@/assets/images/exercises/back-lying-reverse-pigeon.png'),
+    twoSided: true,
+  },
 ];
 
 /** All exercises, ordered alphabetically by name. */
