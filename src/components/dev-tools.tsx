@@ -9,6 +9,7 @@ import {
   addDevTrainingDays,
   clearDevMobilityTests,
   clearDevSessions,
+  clearDevTodaySessions,
   jumpToNextMilestone,
   makeDevTestDue,
   reachAllMilestones,
@@ -25,6 +26,7 @@ import {
   useSkipTestMeasurements,
 } from '@/lib/dev-settings';
 import { milestoneProgress } from '@/lib/milestones';
+import { resetCelebration } from '@/lib/training-celebration';
 import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
 
 import { Button } from './button';
@@ -38,6 +40,11 @@ export function DevTools() {
   const theme = useTheme();
   const stats = useStats();
   const fastWorkouts = useFastWorkouts();
+
+  const addTodaySession = (seconds: number) => {
+    resetCelebration();
+    addDevSession(db, seconds);
+  };
   const skipTestMeasurements = useSkipTestMeasurements();
   const nextHours = stats ? milestoneProgress(stats.totalSeconds).nextHours : null;
 
@@ -84,8 +91,9 @@ export function DevTools() {
             accessibilityLabel="Skip test measurements"
           />
         </View>
-        <Button title="Add 10 min session" variant="secondary" onPress={() => addDevSession(db, 10 * 60)} />
-        <Button title="Add 1 h session" variant="secondary" onPress={() => addDevSession(db, 3600)} />
+        {/* Today's session replays the Dashboard's celebration, even if it already played. */}
+        <Button title="Add 10 min session" variant="secondary" onPress={() => addTodaySession(10 * 60)} />
+        <Button title="Add 1 h session" variant="secondary" onPress={() => addTodaySession(3600)} />
         <Button
           title="Jump to 2 min before next milestone"
           variant="secondary"
@@ -121,6 +129,16 @@ export function DevTools() {
               'Deletes every flexibility test and its results, so a test is due right away.',
               clearDevMobilityTests
             )
+          }
+        />
+        <Button
+          title="Clear today's training"
+          variant="destructive"
+          onPress={() =>
+            confirm("Clear today's training?", "Deletes today's sessions, so today isn't trained yet.", async (db) => {
+              resetCelebration();
+              await clearDevTodaySessions(db);
+            })
           }
         />
         <Button

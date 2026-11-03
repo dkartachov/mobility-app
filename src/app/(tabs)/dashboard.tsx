@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Card } from '@/components/card';
@@ -16,8 +16,9 @@ import { formatScoreChange, NO_AREA_SCORES, scoreChange } from '@/data/mobility-
 import { useMobilityScore } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
 import { useStats, useWeekDays } from '@/db/sessions';
-import { formatDuration } from '@/lib/dates';
+import { formatDuration, todayKey } from '@/lib/dates';
 import { milestoneProgress } from '@/lib/milestones';
+import { markCelebrated, wasCelebrated } from '@/lib/training-celebration';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Matches the side padding of `Screen`. */
@@ -41,11 +42,24 @@ export default function DashboardScreen() {
   // Native tabs all mount when the app loads, with Start showing. Waiting for the first time this
   // tab is opened means the cards' animations play when they can be seen.
   const [opened, setOpened] = useState(false);
+  const [focused, setFocused] = useState(false);
   useFocusEffect(
     useCallback(() => {
       setOpened(true);
+      setFocused(true);
+      return () => setFocused(false);
     }, [])
   );
+
+  // Plays on the first look at the Dashboard after training today, which can be well after the
+  // session. Until then today's dot waits empty, since this tab stays mounted in the background.
+  // Read from the week rather than `stats` so it matches the dots, whichever query updates first.
+  const today = todayKey();
+  const trainedToday = weekDays?.some((day) => day.date === today && day.trained) ?? false;
+  const celebration = trainedToday && !wasCelebrated(today) ? (focused ? 'play' : 'pending') : undefined;
+  useEffect(() => {
+    if (celebration === 'play') markCelebrated(today);
+  }, [celebration, today]);
 
   if (!stats || !opened) return null;
 
@@ -82,7 +96,7 @@ export default function DashboardScreen() {
             </ThemedText>
             <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={14} />
           </View>
-          {weekDays && <WeekStrip days={weekDays} />}
+          {weekDays && <WeekStrip days={weekDays} celebration={celebration} delayMs={ANIMATION_DELAY_MS + 150} />}
         </Card>
       </PressableScale>
 

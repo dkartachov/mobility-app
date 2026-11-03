@@ -144,3 +144,8 @@ export async function clearDevMobilityTests(db: SQLiteDatabase) {
 export async function clearDevSessions(db: SQLiteDatabase) {
   await db.runAsync('DELETE FROM sessions WHERE id IS NOT NULL');
 }
+
+/** Removes today's sessions, so today goes back to untrained. */
+export async function clearDevTodaySessions(db: SQLiteDatabase) {
+  await db.runAsync('DELETE FROM sessions WHERE local_date = ?', todayKey());
+}
