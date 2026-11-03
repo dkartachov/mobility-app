@@ -4,7 +4,21 @@
  */
 import Storage from 'expo-sqlite/kv-store';
 
-import { RELEASES, type Release } from '@/data/whats-new';
+import releaseNotes from '../../release-notes.json';
+
+/**
+ * A release with something to announce, from `release-notes.json` at the root of the repo. It ships
+ * inside the update itself, so after both Play Store and over-the-air updates the notes are always
+ * the ones for the code running. `scripts/confirm-release-notes.js` checks the file before publishing.
+ */
+export type Release = {
+  /** Only ever goes up. Not the app version, because updates over the air keep that the same. */
+  id: number;
+  /** Short lines, one per feature or fix, shown as a bulleted list. */
+  notes: string[];
+};
+
+const RELEASES: Release[] = releaseNotes;
 
 const LAST_SEEN_KEY = 'whatsNew.lastSeen';
 

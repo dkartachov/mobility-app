@@ -9,12 +9,10 @@ import { clearGreeting, setGreeting } from '@/lib/greeting';
 import { DialogHost, showDialog } from './dialog';
 import { WhatsNew } from './whats-new';
 
-jest.mock('@/data/whats-new', () => ({
-  RELEASES: [
-    { id: 2, notes: ['Hip flexibility test'] },
-    { id: 1, notes: ['Workout reminders'] },
-  ],
-}));
+jest.mock('../../release-notes.json', () => [
+  { id: 2, notes: ['Hip flexibility test'] },
+  { id: 1, notes: ['Workout reminders'] },
+]);
 
 const Screen = () => <Text>screen</Text>;
 
