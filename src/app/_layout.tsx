@@ -96,6 +96,7 @@ function RootNavigator() {
             <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
             <Stack.Screen name="exercise/[id]" />
             <Stack.Screen name="library" />
+            <Stack.Screen name="milestone-badge" />
             <Stack.Screen name="milestone-reached" options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="mobility-score" />
             <Stack.Screen name="mobility-test" />

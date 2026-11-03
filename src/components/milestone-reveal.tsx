@@ -1,8 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
-  cancelAnimation,
   css,
   Easing,
   FadeIn,
@@ -18,10 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { badgeLook } from '@/lib/badge-looks';
 
+import { BadgeCoin, useBadgeSpin } from './badge-coin';
 import { Button } from './button';
-import { BadgeShape } from './milestone-badges';
+import { BadgeAura } from './milestone-badges';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -31,16 +31,6 @@ const SPIN_TURNS = 5;
 const SPIN_MS = 3000;
 const BURST_DOTS = 16;
 const BURST_MS = 900;
-/** How far the badge turns per point dragged across it. */
-const DEGREES_PER_POINT = 0.8;
-/** Faster flings would strobe rather than read as spinning. */
-const MAX_SPIN_SPEED = 3600;
-/** Slower than this, letting go just settles it back flat. */
-const MIN_SPIN_SPEED = 200;
-/** What a tap gives it, in degrees per second. */
-const TAP_SPIN_SPEED = 1440;
-/** Roughly how long a fling coasts, in seconds, before it's rounded to land flat. */
-const COAST_S = 1;
 
 type MilestoneRevealProps = {
   hours: number;
@@ -49,7 +39,7 @@ type MilestoneRevealProps = {
 
 /** Celebrates a milestone: its badge spins in like a coin, lands flat on its number and bursts. */
 export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
-  const theme = useTheme();
+  const look = badgeLook(hours);
   const insets = useSafeAreaInsets();
   const [landed, setLanded] = useState(false);
   const rotation = useSharedValue(0);
@@ -72,48 +62,8 @@ export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
     );
   }, [burst, rotation, scale]);
 
-  // Once landed, it can be dragged round, flung or tapped to spin again, always coming to rest flat.
-  const [spinner] = useState(() => {
-    let startRotation = 0;
-    const release = (speed: number) => {
-      scale.set(withSpring(1, { damping: 8, stiffness: 180 }));
-      const current = rotation.get();
-      const clamped = Math.max(-MAX_SPIN_SPEED, Math.min(MAX_SPIN_SPEED, speed));
-      if (Math.abs(clamped) < MIN_SPIN_SPEED) {
-        rotation.set(withSpring(Math.round(current / 360) * 360, { damping: 12, stiffness: 120 }));
-        return;
-      }
-      // An ease-out starts at three times its average speed, so this duration carries on at the fling's.
-      const coasted = (current + clamped * COAST_S) / 360;
-      const target = (clamped > 0 ? Math.ceil(coasted) : Math.floor(coasted)) * 360;
-      const duration = ((3 * Math.abs(target - current)) / Math.abs(clamped)) * 1000;
-      rotation.set(withTiming(target, { duration, easing: Easing.out(Easing.cubic) }));
-    };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        cancelAnimation(rotation);
-        startRotation = rotation.get();
-        scale.set(withSpring(0.94, { damping: 15, stiffness: 300 }));
-      },
-      onPanResponderMove: (_, { dx }) => rotation.set(startRotation + dx * DEGREES_PER_POINT),
-      onPanResponderRelease: (_, { dx, vx }) =>
-        release(Math.abs(dx) < 4 ? TAP_SPIN_SPEED : vx * 1000 * DEGREES_PER_POINT),
-      onPanResponderTerminate: () => release(0),
-    });
-  });
-
-  const badgeStyle = useAnimatedStyle(() => ({
-    transform: [{ perspective: 800 }, { rotateY: `${rotation.value}deg` }, { scale: scale.value }],
-  }));
-  // Mirrored from behind, so the number only shows on the front. The shape looks the same either way.
-  const numberStyle = useAnimatedStyle(() => ({
-    opacity: Math.cos((rotation.value * Math.PI) / 180) > 0 ? 1 : 0,
-  }));
-  // Darkens as the badge turns away from the light, which is what makes it read as turning in 3D.
-  const shadeStyle = useAnimatedStyle(() => ({
-    opacity: Math.abs(Math.sin((rotation.value * Math.PI) / 180)) * 0.35,
-  }));
+  // Once landed, it can be dragged round, flung or tapped to spin again.
+  const spinner = useBadgeSpin(rotation, scale);
 
   return (
     <ThemedView style={[styles.screen, { paddingBottom: insets.bottom + Spacing.three }]}>
@@ -129,21 +79,12 @@ export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
           accessibilityLabel={`${hours} ${hours === 1 ? 'hour' : 'hours'} milestone badge`}
           style={styles.stage}
           {...(landed ? spinner.panHandlers : {})}>
-          {landed && <Animated.View style={[cssStyles.halo, { backgroundColor: theme.tint }]} />}
+          {landed && <Animated.View style={[cssStyles.halo, { backgroundColor: look.accent }]} />}
+          {landed && <BadgeAura hours={hours} size={BADGE_SIZE} />}
           {Array.from({ length: BURST_DOTS }, (_, i) => (
-            <BurstDot key={i} index={i} progress={burst} color={theme.tint} />
+            <BurstDot key={i} index={i} progress={burst} color={look.accent} />
           ))}
-          <Animated.View style={badgeStyle}>
-            <BadgeShape hours={hours} size={BADGE_SIZE} color={theme.tint} />
-            <Animated.View style={[styles.layer, shadeStyle]}>
-              <BadgeShape hours={hours} size={BADGE_SIZE} color="#000000" />
-            </Animated.View>
-            <Animated.View style={[styles.layer, styles.number, numberStyle]}>
-              <ThemedText type="stat" themeColor="onTint" style={styles.numberText}>
-                {hours}
-              </ThemedText>
-            </Animated.View>
-          </Animated.View>
+          <BadgeCoin hours={hours} size={BADGE_SIZE} rotation={rotation} scale={scale} />
         </View>
 
         {/* Reserves the line, so nothing moves when it appears. */}
@@ -201,17 +142,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: BADGE_SIZE,
     height: BADGE_SIZE,
-  },
-  layer: {
-    ...StyleSheet.absoluteFill,
-  },
-  number: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  numberText: {
-    fontSize: 64,
-    lineHeight: 72,
   },
   dot: {
     position: 'absolute',

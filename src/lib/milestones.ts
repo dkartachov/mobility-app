@@ -1,6 +1,12 @@
 /** Lifetime mobility-time milestones, in hours. Append to this list to add more. */
 export const MILESTONE_HOURS = [1, 3, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 175, 200];
 
+/** A milestone from a route param, falling back to the first one for anything unknown. */
+export function parseMilestoneHours(value: string | undefined) {
+  const hours = Number(value);
+  return MILESTONE_HOURS.includes(hours) ? hours : MILESTONE_HOURS[0];
+}
+
 export type MilestoneProgress = {
   /** The milestone already reached, or 0 before the first one. */
   previousHours: number;

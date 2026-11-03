@@ -2,12 +2,7 @@ import { router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { MilestoneReveal } from '@/components/milestone-reveal';
-import { MILESTONE_HOURS } from '@/lib/milestones';
-
-function parseHours(value: string | undefined) {
-  const hours = Number(value);
-  return MILESTONE_HOURS.includes(hours) ? hours : MILESTONE_HOURS[0];
-}
+import { parseMilestoneHours } from '@/lib/milestones';
 
 export default function MilestoneReachedScreen() {
   const { hours } = useLocalSearchParams<{ hours: string }>();
@@ -20,5 +15,5 @@ export default function MilestoneReachedScreen() {
     if (done) router.back();
   }, [done]);
 
-  return <MilestoneReveal hours={parseHours(hours)} onDone={() => setDone(true)} />;
+  return <MilestoneReveal hours={parseMilestoneHours(hours)} onDone={() => setDone(true)} />;
 }

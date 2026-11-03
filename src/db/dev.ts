@@ -7,7 +7,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { expectedResult } from '@/data/mobility-score';
 import { METHOD_UNITS, TEST_STEPS } from '@/data/mobility-tests';
 import { addDays, daysBetween, todayKey } from '@/lib/dates';
-import { milestoneProgress } from '@/lib/milestones';
+import { MILESTONE_HOURS, milestoneProgress } from '@/lib/milestones';
 
 import { getTestSchedule, logMobilityTest, RETEST_INTERVAL_DAYS } from './mobility-tests';
 import { getTotalSeconds, logSession } from './sessions';
@@ -24,6 +24,12 @@ export async function jumpToNextMilestone(db: SQLiteDatabase, secondsShort: numb
   const { nextHours } = milestoneProgress(total);
   if (nextHours === null) return;
   const gap = nextHours * 3600 - secondsShort - total;
+  if (gap > 0) await addDevSession(db, gap);
+}
+
+/** Logs whatever is missing to reach the last milestone, so every badge is earned. */
+export async function reachAllMilestones(db: SQLiteDatabase) {
+  const gap = MILESTONE_HOURS.at(-1)! * 3600 - (await getTotalSeconds(db));
   if (gap > 0) await addDevSession(db, gap);
 }
 

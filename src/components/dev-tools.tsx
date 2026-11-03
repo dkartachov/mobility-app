@@ -11,6 +11,7 @@ import {
   clearDevSessions,
   jumpToNextMilestone,
   makeDevTestDue,
+  reachAllMilestones,
 } from '@/db/dev';
 import { RETEST_INTERVAL_DAYS } from '@/db/mobility-tests';
 import { resetAllData } from '@/db/reset';
@@ -90,6 +91,12 @@ export function DevTools() {
           variant="secondary"
           disabled={nextHours === null}
           onPress={() => jumpToNextMilestone(db, 2 * 60)}
+        />
+        <Button
+          title="Reach every milestone"
+          variant="secondary"
+          disabled={nextHours === null}
+          onPress={() => reachAllMilestones(db)}
         />
         <Button title="Add 7 training days" variant="secondary" onPress={() => addDevTrainingDays(db, 7)} />
         <Button title="Log flexibility test today" variant="secondary" onPress={() => addDevMobilityTest(db)} />
