@@ -2,6 +2,7 @@ import { StyleSheet } from 'react-native';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { haptic } from '@/lib/haptics';
 
 import { PressableScale } from './pressable-scale';
 import { ThemedText } from './themed-text';
@@ -21,7 +22,10 @@ export function Chip({ label, selected, onPress, multiSelect }: ChipProps) {
     <PressableScale
       accessibilityRole={multiSelect ? 'checkbox' : 'radio'}
       accessibilityState={multiSelect ? { checked: selected } : { selected }}
-      onPress={onPress}
+      onPress={() => {
+        haptic.select();
+        onPress();
+      }}
       style={[
         styles.chip,
         {

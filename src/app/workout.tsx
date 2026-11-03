@@ -27,6 +27,7 @@ import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkoutCues } from '@/hooks/use-workout-cues';
 import { formatDuration } from '@/lib/dates';
+import { haptic } from '@/lib/haptics';
 import { getFastWorkouts } from '@/lib/dev-settings';
 import { milestoneReached } from '@/lib/milestones';
 import { countWorkoutForReminderPrompt } from '@/lib/reminder-prompt';
@@ -241,6 +242,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
               icon={{ ios: 'checkmark', android: 'check' }}
               primary
               glow={finished}
+              finishes
               disabled={completing}
               onPress={complete}
             />
@@ -357,9 +359,11 @@ type ControlButtonProps = {
   disabled?: boolean;
   /** Pulses a halo around the button to draw attention to it. */
   glow?: boolean;
+  /** Completes the workout, so it gets the success haptic instead of a tap. */
+  finishes?: boolean;
 };
 
-function ControlButton({ label, icon, onPress, primary, disabled, glow }: ControlButtonProps) {
+function ControlButton({ label, icon, onPress, primary, disabled, glow, finishes }: ControlButtonProps) {
   const theme = useTheme();
   const scheme = useColorScheme();
 
@@ -371,8 +375,12 @@ function ControlButton({ label, icon, onPress, primary, disabled, glow }: Contro
         accessibilityLabel={label}
         accessibilityState={{ disabled }}
         disabled={disabled}
-        onPress={onPress}
         pressedScale={0.9}
+        onPress={() => {
+          if (finishes) haptic.success();
+          else haptic.tap();
+          onPress();
+        }}
         style={[
           styles.control,
           primary
@@ -396,7 +404,10 @@ function TimeoutButton({ onPress, disabled }: { onPress: () => void; disabled: b
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={() => {
+        haptic.tap();
+        onPress();
+      }}
       style={[
         styles.timeoutButton,
         { backgroundColor: theme.backgroundElement },

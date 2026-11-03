@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Elevation, Radius, Spacing } from '@/constants/theme';
 import { EQUIPMENT, EQUIPMENT_LABELS, EXERCISE_TYPE_LABELS, EXERCISE_TYPES, POSITION_LABELS, POSITIONS } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
+import { haptic } from '@/lib/haptics';
 import { useColorScheme } from '@/lib/theme-preference';
 import { DAILY_MINUTES } from '@/lib/workout';
 import { setWorkoutFilters, useWorkoutFilters } from '@/lib/workout-filters';
@@ -50,7 +51,10 @@ export default function DailyScreen() {
               minutes={value}
               label={OPTION_LABELS[i]}
               selected={minutes === value}
-              onPress={() => setMinutes(value)}
+              onPress={() => {
+                haptic.select();
+                setMinutes(value);
+              }}
             />
           ))}
         </View>
