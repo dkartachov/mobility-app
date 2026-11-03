@@ -19,4 +19,10 @@ describe('Chip', () => {
 
     expect(screen.getByRole('radio', { name: '8 min' })).not.toBeSelected();
   });
+
+  it('is a checkbox when several can be selected', async () => {
+    await render(<Chip label="Wall" selected multiSelect onPress={jest.fn()} />);
+
+    expect(screen.getByRole('checkbox', { name: 'Wall' })).toBeChecked();
+  });
 });

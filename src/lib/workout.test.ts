@@ -1,6 +1,6 @@
-import { EXERCISES } from '@/data/exercises';
+import { EQUIPMENT, EXERCISES, POSITIONS, type Equipment, type Position } from '@/data/exercises';
 
-import { buildWorkout, DAILY_MINUTES, formatClock, type WorkoutStep } from './workout';
+import { buildWorkout, DAILY_MINUTES, filterExercises, formatClock, type WorkoutStep } from './workout';
 
 function totalMinutes(steps: WorkoutStep[]) {
   return steps.reduce((sum, step) => sum + step.durationSeconds, 0) / 60;
@@ -63,6 +63,66 @@ describe('buildWorkout', () => {
 
   it('returns no steps for 0 minutes', () => {
     expect(buildWorkout(0)).toEqual([]);
+  });
+
+  it('only picks from the given library', () => {
+    const library = EXERCISES.slice(0, 5);
+    for (let i = 0; i < RUNS; i++) {
+      for (const step of buildWorkout(22, library)) expect(library).toContain(step.exercise);
+    }
+  });
+});
+
+describe('filterExercises', () => {
+  const ids = (positions: Position[], equipment: Equipment[]) => filterExercises({ positions, equipment }).map((e) => e.id);
+
+  it('includes everything when everything is selected', () => {
+    expect(filterExercises({ positions: [...POSITIONS], equipment: [...EQUIPMENT] })).toEqual(EXERCISES);
+  });
+
+  it('keeps only exercises done without a mat, including squats and kneeling, and those that can be done either way', () => {
+    const standing = ids(['standing'], [...EQUIPMENT]);
+
+    expect(standing).toEqual(expect.arrayContaining(['standing-forward-fold', 'bottom-squat', 'knight-stretch']));
+    expect(standing).toContain('neck-side-stretch');
+    expect(standing).not.toContain('seated-pike-stretch');
+    expect(standing).not.toContain('happy-baby');
+    expect(standing).not.toContain('cat-cow');
+  });
+
+  it('keeps only exercises done on a mat, and those that can be done either way', () => {
+    const seated = ids(['seated'], [...EQUIPMENT]);
+
+    expect(seated).toEqual(expect.arrayContaining(['seated-pike-stretch', 'happy-baby', 'blackburn', 'cat-cow']));
+    expect(seated).toContain('neck-side-stretch');
+    expect(seated).not.toContain('standing-forward-fold');
+    expect(seated).not.toContain('knight-stretch');
+  });
+
+  it('leaves out exercises needing equipment that is not selected', () => {
+    const noWall = ids([...POSITIONS], ['band']);
+    expect(noWall).not.toContain('couch-stretch');
+    expect(noWall).not.toContain('leg-swings');
+    expect(noWall).toContain('shoulder-pass-throughs');
+
+    const noBand = ids([...POSITIONS], ['wall']);
+    expect(noBand).not.toContain('shoulder-pass-throughs');
+    expect(noBand).not.toContain('lying-hamstring-stretch');
+    expect(noBand).toContain('couch-stretch');
+  });
+
+  it('is empty when no position is selected', () => {
+    expect(ids([], [...EQUIPMENT])).toEqual([]);
+  });
+
+  // The narrowest selections the daily screen allows: one position and no equipment.
+  it.each(POSITIONS)('fills every daily length with only %s and no equipment', (position) => {
+    const library = filterExercises({ positions: [position], equipment: [] });
+    for (const minutes of DAILY_MINUTES) {
+      for (let i = 0; i < 200; i++) {
+        expect(totalMinutes(buildWorkout(minutes, library))).toBe(minutes);
+      }
+    }
   });
 });
 

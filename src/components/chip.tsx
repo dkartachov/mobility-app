@@ -10,15 +10,17 @@ type ChipProps = {
   label: string;
   selected: boolean;
   onPress: () => void;
+  /** One of several that can be selected together, rather than one of a group of options. */
+  multiSelect?: boolean;
 };
 
-export function Chip({ label, selected, onPress }: ChipProps) {
+export function Chip({ label, selected, onPress, multiSelect }: ChipProps) {
   const theme = useTheme();
 
   return (
     <PressableScale
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityRole={multiSelect ? 'checkbox' : 'radio'}
+      accessibilityState={multiSelect ? { checked: selected } : { selected }}
       onPress={onPress}
       style={[
         styles.chip,

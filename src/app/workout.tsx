@@ -38,9 +38,11 @@ import {
   FAST_BUFFER_SECONDS,
   FAST_STEP_SECONDS,
   buildWorkout,
+  filterExercises,
   formatClock,
   type WorkoutStep,
 } from '@/lib/workout';
+import { getWorkoutFilters } from '@/lib/workout-filters';
 import { createPlayerReducer } from '@/lib/workout-player';
 
 const TICK_MS = 250;
@@ -56,7 +58,7 @@ export default function WorkoutScreen() {
   // Read once: toggling fast mode mid-workout shouldn't change the running workout.
   const [fast] = useState(getFastWorkouts);
   const [steps] = useState(() => {
-    const built = buildWorkout(totalMinutes);
+    const built = buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
     return fast ? built.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : built;
   });
 

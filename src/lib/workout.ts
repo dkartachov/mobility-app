@@ -1,5 +1,7 @@
 import { EXERCISES, type Exercise } from '@/data/exercises';
 
+import type { WorkoutFilters } from './workout-filters';
+
 /** One timed hold. Two-sided exercises become two consecutive steps, one per side. */
 export type WorkoutStep = {
   exercise: Exercise;
@@ -24,26 +26,35 @@ export function pickRandom<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
+/** The exercises that fit the selected positions and can be done with the selected equipment. */
+export function filterExercises({ positions, equipment }: WorkoutFilters) {
+  return EXERCISES.filter((exercise) => {
+    const positionFits =
+      exercise.position === 'either' ? positions.length > 0 : positions.includes(exercise.position);
+    return positionFits && (exercise.equipment ?? []).every((needed) => equipment.includes(needed));
+  });
+}
+
 /**
- * Fills `minutes` with random exercises, each 1 or 2 minutes long (always 1 for exercises marked
- * `oneMinuteOnly`). Two-sided exercises always take 2 minutes: 1 minute per side. No exercise
- * repeats until the whole library has been used, and the same exercise never appears twice in a
- * row (unless the library only has one).
+ * Fills `minutes` with random exercises from `library`, each 1 or 2 minutes long (always 1 for
+ * exercises marked `oneMinuteOnly`). Two-sided exercises always take 2 minutes: 1 minute per side.
+ * No exercise repeats until the whole library has been used, and the same exercise never appears
+ * twice in a row (unless the library only has one).
  */
-export function buildWorkout(minutes: number): WorkoutStep[] {
+export function buildWorkout(minutes: number, library: readonly Exercise[] = EXERCISES): WorkoutStep[] {
   const steps: WorkoutStep[] = [];
-  let unused = [...EXERCISES];
+  let unused = [...library];
   let remaining = minutes;
 
   while (remaining > 0) {
     const previous = steps.at(-1)?.exercise;
-    if (unused.length === 0) unused = [...EXERCISES];
-    const notPrevious = (pool: Exercise[]) => (pool.length > 1 ? pool.filter((e) => e !== previous) : pool);
+    if (unused.length === 0) unused = [...library];
+    const notPrevious = (pool: readonly Exercise[]) => (pool.length > 1 ? pool.filter((e) => e !== previous) : [...pool]);
     let candidates = notPrevious(unused);
     if (remaining < 2) {
       // Prefer an unused one-minute exercise, then a reused one, rather than overshooting the time.
       const oneMinute = candidates.filter((e) => !e.twoSided);
-      const anyOneMinute = notPrevious(EXERCISES).filter((e) => !e.twoSided);
+      const anyOneMinute = notPrevious(library).filter((e) => !e.twoSided);
       if (oneMinute.length > 0) candidates = oneMinute;
       else if (anyOneMinute.length > 0) candidates = anyOneMinute;
     }
