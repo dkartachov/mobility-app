@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import type { ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type TimerBarProps = {
@@ -16,13 +17,15 @@ type TimerBarProps = {
   running: boolean;
   /** Changes whenever a new countdown starts (next step, reset), jumping the bar to its start. */
   countdown: number;
+  /** The fill's color, e.g. muted for the get-ready countdown. */
+  color?: ThemeColor;
 };
 
 /**
  * Countdown progress that fills smoothly on the UI thread instead of stepping with each timer
  * tick. Only the start, pause and resume of a countdown are synced from JS.
  */
-export function TimerBar({ totalMs, remainingMs, running, countdown }: TimerBarProps) {
+export function TimerBar({ totalMs, remainingMs, running, countdown, color = 'tint' }: TimerBarProps) {
   const theme = useTheme();
   const progress = useSharedValue(1 - remainingMs / totalMs);
 
@@ -51,7 +54,7 @@ export function TimerBar({ totalMs, remainingMs, running, countdown }: TimerBarP
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: Math.round((1 - remainingMs / totalMs) * 100) }}
       style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
-      <Animated.View style={[styles.fill, { backgroundColor: theme.tint }, fillStyle]} />
+      <Animated.View style={[styles.fill, { backgroundColor: theme[color] }, fillStyle]} />
     </View>
   );
 }

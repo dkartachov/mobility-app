@@ -142,6 +142,8 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
   // A two-sided exercise spans two steps but counts as one exercise.
   const exerciseCount = steps.filter((s) => s.side !== 2).length;
   const exerciseNumber = steps.slice(0, state.index + 1).filter((s) => s.side !== 2).length;
+  const gettingReady = state.phase === 'buffer';
+  const timerLabel = finished ? 'Done' : state.paused ? 'Paused' : gettingReady ? 'Get ready' : '';
 
   const complete = async () => {
     setCompleting(true);
@@ -155,7 +157,11 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
 
   return (
     <ThemedView style={styles.screen}>
-      <ExerciseVideo photo={step.exercise.photo} animation={step.exercise.animation} />
+      <View>
+        <ExerciseVideo photo={step.exercise.photo} animation={step.exercise.animation} />
+        {/* Dims slightly while getting ready, so it's clear the hold hasn't started. */}
+        <Animated.View pointerEvents="none" style={[cssStyles.dim, { opacity: gettingReady ? 1 : 0 }]} />
+      </View>
 
       <View style={styles.status}>
         <WorkoutProgress count={exerciseCount} current={exerciseNumber} finished={finished} />
@@ -186,6 +192,10 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
         <View style={styles.timer}>
+          {/* Always laid out, so the clock doesn't move when the label comes and goes. */}
+          <ThemedText type="eyebrow" themeColor="textSecondary" style={styles.timerLabel}>
+            {timerLabel}
+          </ThemedText>
           <View style={styles.clockRow}>
             <ThemedText type="stat" style={styles.clock} accessibilityLiveRegion="polite">
               {formatClock(Math.ceil(state.remainingMs / 1000))}
@@ -201,6 +211,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
               remainingMs={state.remainingMs}
               running={running}
               countdown={state.countdown}
+              color={gettingReady ? 'textSecondary' : 'tint'}
             />
           </View>
         </View>
@@ -481,6 +492,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
   },
+  timerLabel: {
+    height: 16,
+    marginBottom: -Spacing.two,
+  },
   clockRow: {
     alignSelf: 'stretch',
     flexDirection: 'row',
@@ -556,6 +571,12 @@ const styles = StyleSheet.create({
 
 /** Reanimated CSS animations, which React Native's `StyleSheet.create` doesn't type. */
 const cssStyles = css.create({
+  dim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    transitionProperty: 'opacity',
+    transitionDuration: 300,
+  },
   glow: {
     ...StyleSheet.absoluteFill,
     borderRadius: 32,
