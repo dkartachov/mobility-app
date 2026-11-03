@@ -28,6 +28,15 @@ describe('MilestoneReveal', () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
+  it('can only be spun again once the badge has landed', async () => {
+    await render(<MilestoneReveal hours={10} onDone={jest.fn()} />);
+    const badge = screen.getByLabelText('10 hours milestone badge');
+    expect(badge.props.onResponderGrant).toBeUndefined();
+
+    await act(async () => jest.advanceTimersByTime(4000));
+    expect(screen.getByLabelText('10 hours milestone badge').props.onResponderGrant).toEqual(expect.any(Function));
+  });
+
   it('uses the singular for the first milestone', async () => {
     await render(<MilestoneReveal hours={1} onDone={jest.fn()} />);
     await act(async () => jest.advanceTimersByTime(4000));
