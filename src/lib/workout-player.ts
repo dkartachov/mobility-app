@@ -64,7 +64,7 @@ export function createPlayerReducer(steps: WorkoutStep[], bufferMs: number) {
         }
         const next = steps[state.index + 1];
         if (next) {
-          // Finishing the first side isn't the end of the exercise, so it gets the voice cue instead of the ding.
+          // Finishing the first side isn't the end of the exercise, so the ding is followed by a voice cue.
           return { ...startStep(state, state.index + 1), cue: { type: next.side === 2 ? 'switchSides' : 'done' } };
         }
         return { ...state, phase: 'finished', remainingMs: 0, cue: { type: 'done' } };

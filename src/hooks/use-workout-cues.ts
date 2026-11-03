@@ -1,4 +1,4 @@
-import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
+import { type AudioPlayer, setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useEffect } from 'react';
 
 export type WorkoutCue = 'tenSeconds' | 'switchSides' | 'done';
@@ -19,9 +19,23 @@ export function useWorkoutCues(cue: { type: WorkoutCue } | undefined) {
     setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'duckOthers' });
   }, []);
 
-  const player = cue && players[cue.type];
   useEffect(() => {
-    if (!player) return;
-    player.seekTo(0).then(() => player.play());
-  }, [cue, player]);
+    if (!cue) return;
+    if (cue.type !== 'switchSides') {
+      replay(players[cue.type]);
+      return;
+    }
+    // The ding first marks the end of the side, then the voice says what to do next.
+    replay(players.done);
+    const timer = setTimeout(() => replay(players.switchSides), SWITCH_SIDES_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new cue should trigger playback
+  }, [cue]);
+}
+
+/** How long after the ding starts the "switch sides" voice comes in, once the ding has rung out. */
+const SWITCH_SIDES_DELAY_MS = 900;
+
+function replay(player: AudioPlayer) {
+  player.seekTo(0).then(() => player.play());
 }
