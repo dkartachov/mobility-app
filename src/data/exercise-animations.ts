@@ -1097,31 +1097,6 @@ export const ELEPHANT_WALK: FigureClip = {
   ],
 };
 
-// --- Arm swings: straight arms pass each other in front of the body, one rising as the other goes back ---
-
-const armSwing = (near: number, far: number): Pose => ({
-  ...STANDING_TALL,
-  nearHand: armAt(STANDING_SHOULDER, near),
-  farHand: armAt(STANDING_SHOULDER, far),
-});
-const ARM_SWING_NEAR_FORWARD = armSwing(-40, 160);
-const ARM_SWING_PASSING = armSwing(60, 60);
-const ARM_SWING_FAR_FORWARD = armSwing(160, -40);
-
-export const ARM_SWINGS: FigureClip = {
-  view: 'side',
-  straightArms: true,
-  zoom: 0.8,
-  stillFrame: 0,
-  keyframes: [
-    { ms: 0, pose: ARM_SWING_NEAR_FORWARD },
-    { ms: 800, pose: ARM_SWING_PASSING, swing: true, ease: 'in' },
-    { ms: 800, pose: ARM_SWING_FAR_FORWARD, swing: true, ease: 'out' },
-    { ms: 800, pose: ARM_SWING_PASSING, swing: true, ease: 'in' },
-    { ms: 800, pose: ARM_SWING_NEAR_FORWARD, swing: true, ease: 'out' },
-  ],
-};
-
 // --- Leg swings: standing tall on the far leg, the near leg swings from the hip, just clearing the floor ---
 
 const legSwing = (degrees: number): Pose => {
