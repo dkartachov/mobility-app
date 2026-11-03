@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { AutoBackup } from '@/components/auto-backup';
+import { DevVariantLabel } from '@/components/dev-variant-label';
 import { DialogHost } from '@/components/dialog';
 import { ReminderScheduler } from '@/components/reminder-scheduler';
 import { StackHeader } from '@/components/stack-header';
@@ -107,6 +108,7 @@ function RootNavigator() {
         </Stack>
         {unlocked && greeting && <WelcomeOverlay greeting={greeting} />}
         <DialogHost />
+        <DevVariantLabel />
       </ThemeProvider>
     </>
   );
