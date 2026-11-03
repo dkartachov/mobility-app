@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
+import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { profilePhotoUri } from '@/lib/profile-photo';
 
@@ -23,7 +24,7 @@ export function Avatar({ photoFile, initials, size = 96 }: AvatarProps) {
 
   return (
     <View style={[styles.placeholder, shape, { backgroundColor: theme.tintSoft }]}>
-      <ThemedText themeColor="tint" style={{ fontSize: size * 0.38, lineHeight: size * 0.46, fontWeight: 700 }}>
+      <ThemedText themeColor="tint" style={{ fontFamily: Fonts.display, fontSize: size * 0.38, lineHeight: size * 0.46, fontWeight: 700 }}>
         {initials || '?'}
       </ThemedText>
     </View>

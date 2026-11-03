@@ -37,21 +37,23 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+/**
+ * Nunito for titles and numbers; body text stays in the system font. Loaded at runtime in the root
+ * layout (so it ships by OTA update), with only the 700 and 800 faces, so pair it with those weights.
+ */
+export const Fonts = {
+  display: 'Nunito',
+} as const;
+
+export const DISPLAY_FONT_FACES = [
+  {
+    fontFamily: Fonts.display,
+    fontDefinitions: [
+      { path: require('@/assets/fonts/Nunito_700Bold.ttf'), weight: 700 },
+      { path: require('@/assets/fonts/Nunito_800ExtraBold.ttf'), weight: 800 },
+    ],
   },
-  default: {
-    sans: 'normal',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-});
+];
 
 export const Spacing = {
   half: 2,

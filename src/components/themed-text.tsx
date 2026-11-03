@@ -31,19 +31,21 @@ const styles = StyleSheet.create({
     fontWeight: 500,
   },
   title: {
+    fontFamily: Fonts.display,
     fontSize: 32,
     lineHeight: 38,
     fontWeight: 800,
     letterSpacing: -0.6,
   },
   subtitle: {
+    fontFamily: Fonts.display,
     fontSize: 20,
     lineHeight: 26,
     fontWeight: 700,
     letterSpacing: -0.2,
   },
   stat: {
-    fontFamily: Fonts?.rounded,
+    fontFamily: Fonts.display,
     fontSize: 32,
     lineHeight: 38,
     fontWeight: 800,

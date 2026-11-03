@@ -1,3 +1,4 @@
+import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
@@ -11,7 +12,7 @@ import { ReminderScheduler } from '@/components/reminder-scheduler';
 import { StackHeader } from '@/components/stack-header';
 import { UpdatePrompt } from '@/components/update-prompt';
 import { WelcomeOverlay } from '@/components/welcome-overlay';
-import { Colors } from '@/constants/theme';
+import { Colors, DISPLAY_FONT_FACES } from '@/constants/theme';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 import { useAuthState } from '@/lib/auth';
 import { eraseIfPending, isBackupConfigured, useBackupState } from '@/lib/backup';
@@ -30,15 +31,18 @@ async function initDatabase(db: SQLiteDatabase) {
 
 export default function RootLayout() {
   const { signedIn } = useAuthState();
+  // On error the text falls back to the system font rather than blocking the app.
+  const [fontsLoaded, fontError] = useFonts(DISPLAY_FONT_FACES);
 
   // Builds without backups (Expo Go, no Supabase settings) have nothing to sign in to.
   const sessionKnown = !isBackupConfigured || signedIn !== undefined;
+  const ready = sessionKnown && (fontsLoaded || fontError !== null);
 
   useEffect(() => {
-    if (sessionKnown) SplashScreen.hide();
-  }, [sessionKnown]);
+    if (ready) SplashScreen.hide();
+  }, [ready]);
 
-  if (!sessionKnown) return null;
+  if (!ready) return null;
 
   return (
     <SQLiteProvider
