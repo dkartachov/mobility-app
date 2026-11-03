@@ -86,11 +86,8 @@ describe('poseAt', () => {
 });
 
 describe('exercise animations', () => {
-  it('covers every active exercise, apart from the ones left as photos', () => {
-    expect(EXERCISES.filter((e) => e.active && !e.animation).map((e) => e.id)).toEqual([
-      'reverse-scorpion',
-      'thread-the-needle',
-    ]);
+  it('covers every active exercise', () => {
+    expect(EXERCISES.filter((e) => e.active && !e.animation).map((e) => e.id)).toEqual([]);
   });
 
   describe.each(animated.map((e) => [e.id, e.animation] as const))('%s', (_, clip) => {
@@ -104,9 +101,12 @@ describe('exercise animations', () => {
           }
         }
         if (clip.straightArms) continue;
-        for (const arm of [paths.nearArm, paths.farArm]) {
-          expect(segmentLengths(arm).map((l) => Math.round(l))).toEqual([BONES.upperArm, BONES.forearm, BONES.hand]);
-        }
+        // Arms pointing into the screen look shorter, but in proportion.
+        [paths.nearArm, paths.farArm].forEach((arm, side) => {
+          const scale = pose.armLengths?.[side] ?? 1;
+          const lengths = segmentLengths(arm);
+          [BONES.upperArm, BONES.forearm, BONES.hand].forEach((bone, i) => expect(lengths[i]).toBeCloseTo(bone * scale, 1));
+        });
       }
     });
 
@@ -125,7 +125,10 @@ describe('exercise animations', () => {
             const roots = limbRoots(pose, clip);
             const root = { nearHand: roots.nearShoulder, farHand: roots.farShoulder, nearFoot: roots.nearHip, farFoot: roots.farHip }[limb];
             const target = pose[limb];
-            expect(Math.hypot(target[0] - root[0], target[1] - root[1])).toBeLessThanOrEqual(isHand ? ARM_REACH : LEG_REACH);
+            const armLength = pose.armLengths?.[limb === 'nearHand' ? 0 : 1] ?? 1;
+            // A hair of slack for the rounding where a shortened arm is exactly straight.
+            const reach = isHand ? ARM_REACH * armLength + 0.01 : LEG_REACH;
+            expect(Math.hypot(target[0] - root[0], target[1] - root[1])).toBeLessThanOrEqual(reach);
           }
         }
       });

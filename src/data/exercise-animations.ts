@@ -448,7 +448,7 @@ const V_SIT_UP: Pose = {
 const V_SIT_FOLDED: Pose = {
   ...V_SIT_UP,
   torsoLength: 55,
-  neck: -90,
+  neckLength: 8,
   nearHand: [440, 495, -90],
   farHand: [520, 495, -90],
 };
@@ -1293,6 +1293,127 @@ export const BACK_LYING_REVERSE_PIGEON: FigureClip = {
     { ms: 3500, pose: REVERSE_PIGEON_OUT },
     { ms: 1000, pose: REVERSE_PIGEON_TURNING, ease: 'in' },
     { ms: 1000, pose: REVERSE_PIGEON_IN, ease: 'out' },
+  ],
+};
+
+// --- Thread the needle: on all fours, one arm reaches for the ceiling, then threads under the other ---
+
+/**
+ * The hips sit back toward the heels, the knees closed past 90° but not sitting down. The planted
+ * hand stays out ahead of the shoulder the whole time, leaving room under its armpit.
+ */
+const NEEDLE_REACH: Pose = {
+  ...ALL_FOURS,
+  hip: [338, 374],
+  torso: 15,
+  neck: 60,
+  nearHand: [466, 192, 92],
+  farHand: [560, WRIST_Y, 0],
+};
+/** Sweeping past the mat on the way under, already turning to point into the screen. */
+const NEEDLE_PASSING: Pose = {
+  ...NEEDLE_REACH,
+  torso: 0,
+  arch: 4,
+  neck: -10,
+  armLengths: [0.55, 1],
+  nearHand: [510, 440, -55],
+};
+/**
+ * The shoulder and the side of the head come down to rest on the mat, with the threaded arm lying
+ * flat under the planted arm's armpit, pointing straight into the screen and out of sight. The
+ * chest has turned, so the planted arm points partly into the screen too.
+ */
+const NEEDLE_THREAD: Pose = {
+  ...NEEDLE_REACH,
+  torso: -26,
+  arch: 8,
+  neck: -10,
+  armLengths: [0.13, 0.76],
+  nearHand: [440, 444, -120],
+};
+
+export const THREAD_THE_NEEDLE: FigureClip = {
+  view: 'side',
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: NEEDLE_REACH },
+    { ms: 1300, pose: NEEDLE_PASSING, swing: true, ease: 'in' },
+    { ms: 900, pose: NEEDLE_THREAD, swing: true, ease: 'out' },
+    { ms: 900, pose: NEEDLE_THREAD },
+    { ms: 900, pose: NEEDLE_PASSING, swing: true, ease: 'in' },
+    { ms: 1300, pose: NEEDLE_REACH, swing: true, ease: 'out' },
+    { ms: 600, pose: NEEDLE_REACH },
+  ],
+};
+
+// --- Reverse scorpion: from above, face down in a T; one bent leg at a time reaches across the body ---
+
+const SCORPION_BASE = { ...FACE_DOWN, nearHand: [515, 102, 90], farHand: [515, 438, -90] } satisfies Pose;
+
+const SCORPION_FLAT: Pose = {
+  ...SCORPION_BASE,
+  nearFoot: [191, 256, 180],
+  farFoot: [191, 284, 180],
+  knees: [
+    [290, 256],
+    [290, 284],
+  ],
+};
+/** The knee bends and the foot rises toward the ceiling, on its way over. */
+const SCORPION_NEAR_RISING: Pose = {
+  ...SCORPION_FLAT,
+  nearFoot: [282, 270, 240],
+  knees: [
+    [292, 246],
+    [290, 284],
+  ],
+};
+/** The foot crosses over the other leg toward the opposite hand, the hip lifting with it. */
+const SCORPION_NEAR_ACROSS: Pose = {
+  ...SCORPION_FLAT,
+  nearFoot: [350, 340, 300],
+  knees: [
+    [296, 236],
+    [290, 284],
+  ],
+};
+const SCORPION_FAR_RISING: Pose = {
+  ...SCORPION_FLAT,
+  farFoot: [282, 270, 120],
+  knees: [
+    [290, 256],
+    [292, 294],
+  ],
+};
+const SCORPION_FAR_ACROSS: Pose = {
+  ...SCORPION_FLAT,
+  farFoot: [350, 200, 60],
+  knees: [
+    [290, 256],
+    [296, 304],
+  ],
+};
+
+export const REVERSE_SCORPION: FigureClip = {
+  view: 'above',
+  straightArms: true,
+  widths: { shoulder: 20, hip: 14 },
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SCORPION_FLAT },
+    { ms: 800, pose: SCORPION_NEAR_RISING, ease: 'in' },
+    { ms: 800, pose: SCORPION_NEAR_ACROSS, ease: 'out' },
+    { ms: 500, pose: SCORPION_NEAR_ACROSS },
+    { ms: 800, pose: SCORPION_NEAR_RISING, ease: 'in' },
+    { ms: 800, pose: SCORPION_FLAT, ease: 'out' },
+    { ms: 300, pose: SCORPION_FLAT },
+    { ms: 800, pose: SCORPION_FAR_RISING, ease: 'in' },
+    { ms: 800, pose: SCORPION_FAR_ACROSS, ease: 'out' },
+    { ms: 500, pose: SCORPION_FAR_ACROSS },
+    { ms: 800, pose: SCORPION_FAR_RISING, ease: 'in' },
+    { ms: 800, pose: SCORPION_FLAT, ease: 'out' },
+    { ms: 300, pose: SCORPION_FLAT },
   ],
 };
 

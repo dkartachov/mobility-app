@@ -37,6 +37,10 @@ export type Pose = {
   neck: number;
   /** A shorter spine than `BONES.torso`, for a torso leaning toward the camera. */
   torsoLength?: number;
+  /** A shorter neck than `BONES.neck`, for a head dropping toward the camera. */
+  neckLength?: number;
+  /** How long each arm looks, as a fraction of its full length, for an arm pointing into the screen. */
+  armLengths?: readonly [near: number, far: number];
   nearHand: Extremity;
   farHand: Extremity;
   nearFoot: Extremity;
@@ -223,6 +227,11 @@ export function poseAt(clip: FigureClip, timeMs: number): Pose {
         arch: lerp(a.arch, b.arch, t),
         neck: lerp(a.neck, b.neck, t),
         torsoLength: lerp(a.torsoLength ?? BONES.torso, b.torsoLength ?? BONES.torso, t),
+        neckLength: lerp(a.neckLength ?? BONES.neck, b.neckLength ?? BONES.neck, t),
+        armLengths: [
+          lerp(a.armLengths?.[0] ?? 1, b.armLengths?.[0] ?? 1, t),
+          lerp(a.armLengths?.[1] ?? 1, b.armLengths?.[1] ?? 1, t),
+        ],
         nearHand: lerpExtremity(a.nearHand, b.nearHand, t, step),
         farHand: lerpExtremity(a.farHand, b.farHand, t, step),
         nearFoot: lerpExtremity(a.nearFoot, b.nearFoot, t, step),
@@ -311,13 +320,13 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
   'worklet';
   const { hip, nearHand, farHand, nearFoot, farFoot, knees } = pose;
   const shoulder = shoulderOf(pose);
-  const head = along(shoulder, pose.neck, BONES.neck);
+  const head = along(shoulder, pose.neck, pose.neckLength ?? BONES.neck);
   const { nearShoulder, farShoulder, nearHip, farHip } = limbRoots(pose, clip);
   const armBends = clip.armBends ?? [-1, -1];
   const legBends = clip.legBends ?? [1, 1];
 
   // Knees bend forward and elbows backward, whichever way the limb is pointing.
-  const arm = (root: Point, hand: Extremity, bend: Bend): string => {
+  const arm = (root: Point, hand: Extremity, bend: Bend, length: number): string => {
     if (clip.straightArms) {
       // The hand shortens along with the rest of the arm as it swings toward the camera.
       const scale = 1 + BONES.hand / (BONES.upperArm + BONES.forearm);
@@ -325,7 +334,7 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
       const tipY = root[1] + (hand[1] - root[1]) * scale;
       return `M${root[0]} ${root[1]}L${tipX} ${tipY}`;
     }
-    return limbPath(root, hand, BONES.upperArm, BONES.forearm, bend, BONES.hand);
+    return limbPath(root, hand, BONES.upperArm * length, BONES.forearm * length, bend, BONES.hand * length);
   };
   const leg = (root: Point, foot: Extremity, bend: Bend, knee?: Point): string => {
     if (!knee) return limbPath(root, foot, BONES.thigh, BONES.shin, bend, BONES.foot);
@@ -360,8 +369,8 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
     : '';
 
   return {
-    nearArm: arm(nearShoulder, nearHand, armBends[0]),
-    farArm: arm(farShoulder, farHand, armBends[1]),
+    nearArm: arm(nearShoulder, nearHand, armBends[0], pose.armLengths?.[0] ?? 1),
+    farArm: arm(farShoulder, farHand, armBends[1], pose.armLengths?.[1] ?? 1),
     nearLeg: leg(nearHip, nearFoot, legBends[0], knees?.[0]),
     farLeg: leg(farHip, farFoot, legBends[1], knees?.[1]),
     torso: `M${hip[0]} ${hip[1]}Q${spine[0]} ${spine[1]} ${shoulder[0]} ${shoulder[1]}${girdles}`,
