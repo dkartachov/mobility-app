@@ -89,6 +89,8 @@ export type FigureClip = {
   legBends?: readonly [near: Bend, far: Bend];
   /** Below 1 pulls the camera back around the middle of the floor, to fit an arm overhead. */
   zoom?: number;
+  /** A band held in this hand and looped around this foot. */
+  band?: readonly [hand: 'nearHand' | 'farHand', foot: 'nearFoot' | 'farFoot'];
 };
 
 /** A single finger, seen from the side, bending at its three joints. Angles are in degrees of flexion. */
@@ -111,6 +113,8 @@ export type FigurePaths = {
   neck: string;
   headX: number;
   headY: number;
+  /** Empty when the clip has no band. */
+  band: string;
 };
 
 type Timed = { keyframes: readonly { ms: number }[] };
@@ -155,6 +159,9 @@ export function limbRoots(pose: Pose, clip: FigureClip) {
     farHip: along(pose.hip, pose.torso - 90, widths.hip),
   };
 }
+
+/** How far each side of a band's loop sits from the ankle, and runs on past it. */
+const BAND_WRAP = 10;
 
 /** How high a step lifts, as a fraction of how far it travels. */
 const STEP_HEIGHT = 0.2;
@@ -332,6 +339,22 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
     pose.torso + 90,
     pose.arch * 2
   );
+  // Both sides of the loop run from the hand to either side of the ankle and a little past it,
+  // so the band looks wrapped around the foot rather than ending at it.
+  let band = '';
+  if (clip.band) {
+    const hand = pose[clip.band[0]];
+    const foot = pose[clip.band[1]];
+    const length = Math.max(0.001, Math.hypot(foot[0] - hand[0], foot[1] - hand[1]));
+    const ux = (foot[0] - hand[0]) / length;
+    const uy = (foot[1] - hand[1]) / length;
+    const endX = foot[0] + ux * BAND_WRAP;
+    const endY = foot[1] + uy * BAND_WRAP;
+    band =
+      `M${hand[0]} ${hand[1]}L${endX - uy * BAND_WRAP} ${endY + ux * BAND_WRAP}` +
+      `M${hand[0]} ${hand[1]}L${endX + uy * BAND_WRAP} ${endY - ux * BAND_WRAP}`;
+  }
+
   const girdles = clip.widths
     ? `M${nearShoulder[0]} ${nearShoulder[1]}L${farShoulder[0]} ${farShoulder[1]}M${nearHip[0]} ${nearHip[1]}L${farHip[0]} ${farHip[1]}`
     : '';
@@ -345,6 +368,7 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
     neck: `M${shoulder[0]} ${shoulder[1]}L${head[0]} ${head[1]}`,
     headX: head[0],
     headY: head[1],
+    band,
   };
 }
 

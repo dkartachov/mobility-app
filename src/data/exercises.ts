@@ -6,6 +6,8 @@ import {
   ACTIVE_STRAIGHT_LEG_RAISE,
   ACTIVE_V_SIT,
   ANKLE_MOBILIZATION,
+  BACK_LYING_REVERSE_PIGEON,
+  BELLY_DOWN_FOOT_SPLAY,
   BLACKBURN,
   BOTTOM_SQUAT_ROTATION,
   CAT_COW,
@@ -17,9 +19,11 @@ import {
   FLOOR_ANGELS,
   FROG_ROCKS,
   HIP_CIRCLES,
+  HORSE_STANCE,
   INCHWORM,
   KNIGHT_TO_HAMSTRING,
   LEG_SWINGS,
+  LYING_WINDSHIELD_WIPER_HOLD,
   NINETY_TO_NINETY_ROTATIONS,
   OPEN_BOOK,
   PIGEON_STRETCH,
@@ -1009,6 +1013,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep your chest up, push your knees out over your toes and hold',
     ],
     photo: require('@/assets/images/exercises/horse-stance.png'),
+    animation: HORSE_STANCE,
   },
   {
     id: 'belly-down-foot-splay',
@@ -1021,6 +1026,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax and let gravity lower your shins, and hold',
     ],
     photo: require('@/assets/images/exercises/belly-down-foot-splay.png'),
+    animation: BELLY_DOWN_FOOT_SPLAY,
   },
   {
     id: 'lying-windshield-wiper-hold',
@@ -1033,6 +1039,7 @@ const ALL_EXERCISES: Exercise[] = [
       'For more stretch, cross the outside ankle over the inside knee, then hold and switch sides',
     ],
     photo: require('@/assets/images/exercises/lying-windshield-wiper-hold.png'),
+    animation: LYING_WINDSHIELD_WIPER_HOLD,
     twoSided: true,
   },
   {
@@ -1047,6 +1054,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Let the thigh rotate inward and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/back-lying-reverse-pigeon.png'),
+    animation: BACK_LYING_REVERSE_PIGEON,
     twoSided: true,
   },
 ];

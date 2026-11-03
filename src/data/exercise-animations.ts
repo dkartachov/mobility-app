@@ -1111,6 +1111,191 @@ const LEG_SWING_BACK = legSwing(125);
 const LEG_SWING_PASSING = legSwing(80);
 const LEG_SWING_FORWARD = legSwing(35);
 
+// --- Horse stance: from the front, feet wide, sinking from standing into the squat and holding ---
+
+const HORSE_UP: Pose = {
+  hip: [480, 284],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearHand: [432, 296, -95],
+  farHand: [528, 296, -85],
+  nearFoot: [360, ANKLE_Y, 180],
+  farFoot: [600, ANKLE_Y, 0],
+  knees: [
+    [411, 370],
+    [549, 370],
+  ],
+};
+const HORSE_DOWN: Pose = {
+  ...HORSE_UP,
+  hip: [480, 372],
+  nearHand: [384, 352, -90],
+  farHand: [576, 352, -90],
+  knees: [
+    [372, 358],
+    [588, 358],
+  ],
+};
+
+export const HORSE_STANCE: FigureClip = {
+  view: 'side',
+  widths: { shoulder: 28, hip: 18 },
+  armBends: [-1, 1],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: HORSE_UP },
+    { ms: 500, pose: HORSE_UP },
+    { ms: 1800, pose: HORSE_DOWN },
+    { ms: 4000, pose: HORSE_DOWN },
+    { ms: 1600, pose: HORSE_UP },
+  ],
+};
+
+// --- Belly down foot splay: from above, face down; the knees bend, then the shins fall out to the sides ---
+
+const SPLAY_BASE = {
+  hip: [390, 270],
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  nearHand: [590, 175, 0],
+  farHand: [590, 365, 0],
+} satisfies Partial<Pose>;
+
+const SPLAY_FLAT: Pose = {
+  ...SPLAY_BASE,
+  // The far foot's -180 is the same as 180, but turns it out the short way to -110.
+  nearFoot: [191, 258, 180],
+  farFoot: [191, 282, -180],
+  knees: [
+    [291, 259],
+    [291, 281],
+  ],
+};
+/** Shins pointing straight up at the camera, so only the feet show past the knees. */
+const SPLAY_BENT: Pose = {
+  ...SPLAY_BASE,
+  nearFoot: [294, 258, 180],
+  farFoot: [294, 282, -180],
+  knees: [
+    [292, 262],
+    [292, 278],
+  ],
+};
+const SPLAY_OUT: Pose = {
+  ...SPLAY_BENT,
+  nearFoot: [262, 196, 110],
+  farFoot: [262, 344, -110],
+};
+
+export const BELLY_DOWN_FOOT_SPLAY: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 20, hip: 14 },
+  armBends: [1, -1],
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: SPLAY_FLAT },
+    { ms: 1200, pose: SPLAY_BENT },
+    { ms: 300, pose: SPLAY_BENT },
+    { ms: 1800, pose: SPLAY_OUT },
+    { ms: 3500, pose: SPLAY_OUT },
+    { ms: 1500, pose: SPLAY_BENT },
+    { ms: 1200, pose: SPLAY_FLAT },
+    { ms: 500, pose: SPLAY_FLAT },
+  ],
+};
+
+// --- Lying windshield wiper hold: from above, on the back, both knees fall to one side, then the other ---
+
+const WIPER_BASE = {
+  hip: [390, 270],
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  nearHand: [505, 103, 94],
+  farHand: [505, 437, -94],
+  nearFoot: [262, 228, 180],
+  farFoot: [262, 312, 180],
+} satisfies Partial<Pose>;
+
+/** Knees pointing at the ceiling, so the legs look short from above. */
+const WIPER_UP: Pose = {
+  ...WIPER_BASE,
+  knees: [
+    [325, 240],
+    [325, 300],
+  ],
+};
+const WIPER_DOWN_FAR: Pose = {
+  ...WIPER_BASE,
+  knees: [
+    [310, 316],
+    [342, 372],
+  ],
+};
+const WIPER_DOWN_NEAR: Pose = {
+  ...WIPER_BASE,
+  knees: [
+    [342, 168],
+    [310, 224],
+  ],
+};
+
+export const LYING_WINDSHIELD_WIPER_HOLD: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 20, hip: 14 },
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: WIPER_UP },
+    { ms: 1600, pose: WIPER_DOWN_FAR },
+    { ms: 3000, pose: WIPER_DOWN_FAR },
+    { ms: 1600, pose: WIPER_UP },
+    { ms: 1600, pose: WIPER_DOWN_NEAR },
+    { ms: 3000, pose: WIPER_DOWN_NEAR },
+    { ms: 1600, pose: WIPER_UP },
+    { ms: 400, pose: WIPER_UP },
+  ],
+};
+
+// --- Back lying reverse pigeon: from above, knee held over the hip; the band swings the shin out to the side ---
+
+const REVERSE_PIGEON_BASE = {
+  hip: [390, 270],
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  farHand: [505, 437, -94],
+  farFoot: [190, 284, 180],
+  // The thigh points up at the camera, leaning a little toward the chest.
+  knees: [
+    [458, 244],
+    [290, 284],
+  ],
+} satisfies Partial<Pose>;
+
+/** Shin level with the floor, pointing down along the body toward the other foot. */
+const REVERSE_PIGEON_IN: Pose = { ...REVERSE_PIGEON_BASE, nearHand: [565, 185, 40], nearFoot: [366, 206, 150] };
+const REVERSE_PIGEON_TURNING: Pose = { ...REVERSE_PIGEON_BASE, nearHand: [592, 160, 50], nearFoot: [395, 162, 140] };
+const REVERSE_PIGEON_OUT: Pose = { ...REVERSE_PIGEON_BASE, nearHand: [610, 140, 60], nearFoot: [440, 142, 135] };
+
+export const BACK_LYING_REVERSE_PIGEON: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 20, hip: 14 },
+  armBends: [1, -1],
+  band: ['nearHand', 'nearFoot'],
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: REVERSE_PIGEON_IN },
+    { ms: 500, pose: REVERSE_PIGEON_IN },
+    { ms: 1000, pose: REVERSE_PIGEON_TURNING, ease: 'in' },
+    { ms: 1000, pose: REVERSE_PIGEON_OUT, ease: 'out' },
+    { ms: 3500, pose: REVERSE_PIGEON_OUT },
+    { ms: 1000, pose: REVERSE_PIGEON_TURNING, ease: 'in' },
+    { ms: 1000, pose: REVERSE_PIGEON_IN, ease: 'out' },
+  ],
+};
+
 export const LEG_SWINGS: FigureClip = {
   view: 'side',
   stillFrame: 2,
