@@ -53,37 +53,39 @@ export function MilestoneBadges({ totalSeconds }: { totalSeconds: number }) {
       style={styles.list}
       contentContainerStyle={styles.content}>
       {MILESTONE_HOURS.map((hours, i) => (
-        <MilestoneBadge key={hours} hours={hours} reached={i < reachedCount} shape={SHAPES[i % SHAPES.length]} />
+        <MilestoneBadge key={hours} hours={hours} reached={i < reachedCount} />
       ))}
     </ScrollView>
   );
 }
 
-type MilestoneBadgeProps = {
-  hours: number;
-  reached: boolean;
-  shape: (typeof SHAPES)[number];
-};
+/** The artwork of a milestone's badge, without its number. */
+export function BadgeShape({ hours, size, color }: { hours: number; size: number; color: string }) {
+  const shape = SHAPES[MILESTONE_HOURS.indexOf(hours) % SHAPES.length];
+  const outline = (OUTLINE * size) / BADGE_SIZE;
 
-function MilestoneBadge({ hours, reached, shape }: MilestoneBadgeProps) {
+  return (
+    <Svg width={size} height={size} viewBox={`${-outline / 2} ${-outline / 2} ${size} ${size}`}>
+      <Polygon
+        points={shapePoints(size - outline, shape.sides, shape.star)}
+        fill={color}
+        stroke={color}
+        strokeWidth={outline}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function MilestoneBadge({ hours, reached }: { hours: number; reached: boolean }) {
   const theme = useTheme();
-  const color = reached ? theme.tint : theme.backgroundSelected;
-  const inner = BADGE_SIZE - OUTLINE;
 
   return (
     <View
       accessible
       accessibilityLabel={`${hours} ${hours === 1 ? 'hour' : 'hours'}, ${reached ? 'reached' : 'not reached yet'}`}
       style={styles.badge}>
-      <Svg width={BADGE_SIZE} height={BADGE_SIZE} viewBox={`${-OUTLINE / 2} ${-OUTLINE / 2} ${BADGE_SIZE} ${BADGE_SIZE}`}>
-        <Polygon
-          points={shapePoints(inner, shape.sides, shape.star)}
-          fill={color}
-          stroke={color}
-          strokeWidth={OUTLINE}
-          strokeLinejoin="round"
-        />
-      </Svg>
+      <BadgeShape hours={hours} size={BADGE_SIZE} color={reached ? theme.tint : theme.backgroundSelected} />
       <View style={styles.number}>
         <ThemedText type="smallBold" themeColor={reached ? 'onTint' : 'textSecondary'} style={styles.numberText}>
           {hours}

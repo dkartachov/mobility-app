@@ -1,7 +1,7 @@
-import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useReducer, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, type ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { css, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +46,10 @@ import { getWorkoutFilters } from '@/lib/workout-filters';
 import { createPlayerReducer } from '@/lib/workout-player';
 
 const TICK_MS = 250;
+/** Exactly on a milestone the bar counts as empty towards the next one, so it stops this far short. */
+const JUST_BELOW_SECONDS = 0.001;
+/** Leaves the full bar in view for a moment once the celebration has faded away. */
+const RETURN_DELAY_MS = 800;
 
 function parseMinutes(value: string | undefined) {
   const minutes = Number(value);
@@ -95,24 +99,26 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
   });
   const [completing, setCompleting] = useState(false);
   const [result, setResult] = useState<{ fromSeconds: number; toSeconds: number }>();
-  const [cancelled, setCancelled] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   useWorkoutCues(state.cue);
   // A locked screen would background the app, pausing the cues mid-workout.
   useKeepAwake();
 
   // Leaving mid-workout loses it, so confirm first and then go all the way back to the start screen.
-  usePreventRemove(!result && !cancelled, () => {
+  // The summary has nothing to confirm: going back does nothing there, and only its Done button leaves.
+  usePreventRemove(!leaving, () => {
+    if (result) return;
     showDialog({
       title: 'Cancel workout?',
       message: "This workout won't be saved.",
       cancelLabel: 'Keep going',
-      confirm: { label: 'Cancel workout', onPress: () => setCancelled(true) },
+      confirm: { label: 'Cancel workout', onPress: () => setLeaving(true) },
     });
   });
   // Runs after the re-render that lifts the prevention above, so this navigation isn't blocked.
   useEffect(() => {
-    if (cancelled) router.dismissTo('/');
-  }, [cancelled]);
+    if (leaving) router.dismissTo('/');
+  }, [leaving]);
 
   const onTimeout = state.timeoutMs !== undefined;
   const running = !state.paused && state.phase !== 'finished' && !completing && !onTimeout;
@@ -145,7 +151,7 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
     setResult({ fromSeconds, toSeconds: fromSeconds + plannedSeconds });
   };
 
-  if (result) return <WorkoutSummary {...result} />;
+  if (result) return <WorkoutSummary {...result} onLeave={() => setLeaving(true)} />;
 
   return (
     <ThemedView style={styles.screen}>
@@ -248,21 +254,51 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
   );
 }
 
-/** Shown after completing: the milestone bar grows by the time just logged. */
-function WorkoutSummary({ fromSeconds, toSeconds }: { fromSeconds: number; toSeconds: number }) {
+type WorkoutSummaryProps = {
+  fromSeconds: number;
+  toSeconds: number;
+  onLeave: () => void;
+};
+
+/**
+ * Shown after completing: the milestone bar grows by the time just logged. If that reaches a
+ * milestone it stops full and opens the celebration, then carries on towards the next one on return.
+ */
+function WorkoutSummary({ fromSeconds, toSeconds, onLeave }: WorkoutSummaryProps) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const [filled, setFilled] = useState(false);
+  const [celebrated, setCelebrated] = useState(false);
+  const celebrating = useRef(false);
   const reached = milestoneReached(fromSeconds, toSeconds);
+  const stopsAtMilestone = reached !== null && !celebrated;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (celebrating.current) setCelebrated(true);
+    }, [])
+  );
+
+  const onBarFilled = () => {
+    if (stopsAtMilestone) {
+      celebrating.current = true;
+      router.push({ pathname: '/milestone-reached', params: { hours: reached } });
+    } else {
+      setFilled(true);
+    }
+  };
 
   // Waits for Done, so nothing interrupts the summary and its milestone.
   const finish = () => {
-    router.dismissTo('/');
+    onLeave();
     promptForReminderIfDue(db).catch(console.warn);
   };
 
   return (
-    <ThemedView style={[styles.summary, { paddingBottom: insets.bottom + Spacing.three }]}>
+    <ThemedView
+      style={[styles.summary, { paddingTop: insets.top + Spacing.three, paddingBottom: insets.bottom + Spacing.three }]}>
+      {/* No back button or swipe: Done is the way out. */}
+      <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <View style={styles.summaryContent}>
         <Animated.View entering={ZoomIn.springify()} style={styles.summaryBadge}>
           <IconBadge name={{ ios: 'checkmark', android: 'check' }} size={96} />
@@ -283,18 +319,13 @@ function WorkoutSummary({ fromSeconds, toSeconds }: { fromSeconds: number; toSec
             <ThemedText type="smallBold">{formatDuration(toSeconds)}</ThemedText>
           </View>
           <MilestoneBar
-            totalSeconds={toSeconds}
+            totalSeconds={stopsAtMilestone ? reached * 3600 - JUST_BELOW_SECONDS : toSeconds}
             animateFromSeconds={fromSeconds}
             durationMs={2000}
-            delayMs={300}
-            onAnimationEnd={() => setFilled(true)}
+            delayMs={celebrated ? RETURN_DELAY_MS : 300}
+            onAnimationEnd={onBarFilled}
           />
         </Card>
-        {filled && reached !== null && (
-          <Animated.View entering={ZoomIn.springify()} style={styles.milestone}>
-            <Tag label={`${reached}h milestone reached!`} highlighted />
-          </Animated.View>
-        )}
       </View>
       <View style={styles.summaryDone}>
         {filled && (
@@ -513,9 +544,6 @@ const styles = StyleSheet.create({
   },
   summaryBar: {
     gap: Spacing.three,
-  },
-  milestone: {
-    alignItems: 'center',
   },
   // Reserves the button's space so the content above doesn't shift when it appears.
   summaryDone: {

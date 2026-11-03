@@ -6,7 +6,9 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withSequence,
   withTiming,
+  ZoomIn,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -41,13 +43,16 @@ export function MilestoneBar({
   const initialSeconds = animateFromSeconds ?? totalSeconds;
   const animated = animateFromSeconds !== undefined;
   const seconds = useSharedValue(initialSeconds);
-  const [nextHours, setNextHours] = useState(() => milestoneProgress(initialSeconds).nextHours);
+  const initialHours = milestoneProgress(initialSeconds).nextHours;
+  const [nextHours, setNextHours] = useState(initialHours);
+  // The full bar dissolving over the new one's fill, so crossing a milestone doesn't just snap to empty.
+  const dissolve = useSharedValue(0);
 
   useEffect(() => {
     if (!animated) seconds.set(totalSeconds);
   }, [animated, seconds, totalSeconds]);
 
-  // Only the total restarts it; the delay is for the first fill.
+  // Only the total restarts it.
   useEffect(() => {
     if (!animated) return;
     seconds.set(
@@ -65,12 +70,16 @@ export function MilestoneBar({
     () => milestoneProgress(seconds.value).nextHours,
     (next, previous) => {
       if (next !== previous) scheduleOnRN(setNextHours, next);
+      if (next !== previous && next !== null && previous !== null) {
+        dissolve.set(withSequence(withTiming(1, { duration: 0 }), withTiming(0, { duration: 700 })));
+      }
     }
   );
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${milestoneProgress(seconds.value).progress * 100}%`,
   }));
+  const dissolveStyle = useAnimatedStyle(() => ({ opacity: dissolve.value }));
 
   const finalProgress = milestoneProgress(totalSeconds).progress;
 
@@ -81,6 +90,7 @@ export function MilestoneBar({
         accessibilityValue={{ min: 0, max: 100, now: Math.round(finalProgress * 100) }}
         style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
         <Animated.View style={[styles.fill, { backgroundColor: theme.tint }, fillStyle]} />
+        <Animated.View style={[styles.dissolve, { backgroundColor: theme.tint }, dissolveStyle]} />
       </View>
       <View style={styles.label}>
         {nextHours === null ? (
@@ -92,9 +102,11 @@ export function MilestoneBar({
             <ThemedText type="small" themeColor="textSecondary">
               Next milestone
             </ThemedText>
-            <ThemedText type="smallBold" themeColor="tint">
-              {nextHours}h
-            </ThemedText>
+            <Animated.View key={nextHours} entering={nextHours !== initialHours ? ZoomIn.springify() : undefined}>
+              <ThemedText type="smallBold" themeColor="tint">
+                {nextHours}h
+              </ThemedText>
+            </Animated.View>
           </>
         )}
       </View>
@@ -113,6 +125,10 @@ const styles = StyleSheet.create({
   },
   fill: {
     height: '100%',
+    borderRadius: 4,
+  },
+  dissolve: {
+    ...StyleSheet.absoluteFill,
     borderRadius: 4,
   },
   label: {
