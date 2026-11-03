@@ -9,7 +9,7 @@ import { showDialog, useDialogOpen } from './dialog';
  * Screens a restart shouldn't interrupt: sessions and forms have progress to lose, Settings runs
  * backup restores, and iOS can't present a dialog over the `presentation: 'modal'` ones.
  */
-const HOLD_PATHS = ['/workout', '/mobility-test', '/edit-profile', '/new-goal', '/settings'];
+export const HOLD_PATHS = ['/workout', '/mobility-test', '/edit-profile', '/new-goal', '/settings'];
 
 async function downloadUpdate() {
   try {
