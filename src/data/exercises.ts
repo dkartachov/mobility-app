@@ -3,8 +3,8 @@ import type { ImageSource } from 'expo-image';
 import type { ExerciseAnimation } from '@/lib/figure-rig';
 
 import {
+  ACTIVE_PANCAKE,
   ACTIVE_STRAIGHT_LEG_RAISE,
-  ACTIVE_V_SIT,
   ANKLE_MOBILIZATION,
   BACK_LYING_REVERSE_PIGEON,
   BELLY_DOWN_FOOT_SPLAY,
@@ -189,8 +189,8 @@ const ALL_EXERCISES: Exercise[] = [
     twoSided: true,
   },
   {
-    id: 'v-sit',
-    name: 'V sit',
+    id: 'pancake',
+    name: 'Pancake',
     stimulus: 'Inner thighs, hamstrings and lower back',
     position: 'seated',
     instructions: [
@@ -198,11 +198,11 @@ const ALL_EXERCISES: Exercise[] = [
       'Sit tall, then walk your hands forward between your legs',
       'Relax and let your chest sink toward the floor',
     ],
-    photo: require('@/assets/images/exercises/v-sit.png'),
+    photo: require('@/assets/images/exercises/pancake.png'),
   },
   {
-    id: 'active-v-sit',
-    name: 'Active V sit',
+    id: 'active-pancake',
+    name: 'Active pancake',
     stimulus: 'Inner thighs, hamstrings, lower back and hip flexors',
     position: 'seated',
     instructions: [
@@ -210,8 +210,8 @@ const ALL_EXERCISES: Exercise[] = [
       'Fold forward as far as you can, then sit back up tall',
       'Keep moving in and out of the stretch, going a little deeper each time',
     ],
-    photo: require('@/assets/images/exercises/active-v-sit.png'),
-    animation: ACTIVE_V_SIT,
+    photo: require('@/assets/images/exercises/active-pancake.png'),
+    animation: ACTIVE_PANCAKE,
     active: true,
     oneMinuteOnly: true,
   },

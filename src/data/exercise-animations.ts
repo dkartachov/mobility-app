@@ -433,9 +433,9 @@ const FACE_DOWN: Pose = {
   farFoot: [191, 284, 180],
 };
 
-// --- Active V-sit: seen from the front, so the wide legs show. The torso folds toward the camera ---
+// --- Active pancake: seen from the front, so the wide legs show. The torso folds toward the camera ---
 
-const V_SIT_UP: Pose = {
+const PANCAKE_UP: Pose = {
   hip: [480, 425],
   torso: 90,
   arch: 0,
@@ -445,26 +445,26 @@ const V_SIT_UP: Pose = {
   nearFoot: [270, 452, 110],
   farFoot: [690, 452, 70],
 };
-const V_SIT_FOLDED: Pose = {
-  ...V_SIT_UP,
+const PANCAKE_FOLDED: Pose = {
+  ...PANCAKE_UP,
   torsoLength: 55,
   neckLength: 8,
   nearHand: [440, 495, -90],
   farHand: [520, 495, -90],
 };
 
-export const ACTIVE_V_SIT: FigureClip = {
+export const ACTIVE_PANCAKE: FigureClip = {
   view: 'above',
   widths: { shoulder: 30, hip: 14 },
   legBends: [-1, 1],
   armBends: [-1, 1],
   stillFrame: 1,
   keyframes: [
-    { ms: 0, pose: V_SIT_UP },
-    { ms: 1600, pose: V_SIT_FOLDED },
-    { ms: 400, pose: V_SIT_FOLDED },
-    { ms: 1600, pose: V_SIT_UP },
-    { ms: 300, pose: V_SIT_UP },
+    { ms: 0, pose: PANCAKE_UP },
+    { ms: 1600, pose: PANCAKE_FOLDED },
+    { ms: 400, pose: PANCAKE_FOLDED },
+    { ms: 1600, pose: PANCAKE_UP },
+    { ms: 300, pose: PANCAKE_UP },
   ],
 };
 
