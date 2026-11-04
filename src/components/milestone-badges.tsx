@@ -80,16 +80,19 @@ export function MilestoneBadges({
 }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const reachedCount = MILESTONE_HOURS.filter((hours) => totalSeconds >= hours * 3600).length;
+  // Scrolled along, the latest badge lines up with the screen's padding. A gap any narrower than
+  // that would leave the edge of the badge before it peeking in from the side.
+  const gap = Math.max(BADGE_GAP, inset);
 
   return (
     <ScrollView
       ref={scrollRef}
       horizontal
       onContentSizeChange={() =>
-        scrollRef.current?.scrollTo({ x: Math.max(0, reachedCount - 1) * (BADGE_SIZE + BADGE_GAP), animated: false })
+        scrollRef.current?.scrollTo({ x: Math.max(0, reachedCount - 1) * (BADGE_SIZE + gap), animated: false })
       }
       style={{ marginHorizontal: -inset }}
-      contentContainerStyle={[styles.content, { paddingHorizontal: inset }]}>
+      contentContainerStyle={{ gap, paddingHorizontal: inset }}>
       {MILESTONE_HOURS.map((hours, i) => (
         <MilestoneBadge key={hours} hours={hours} reached={i < reachedCount} />
       ))}
@@ -335,9 +338,6 @@ function MilestoneBadge({ hours, reached }: { hours: number; reached: boolean })
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: BADGE_GAP,
-  },
   badge: {
     width: BADGE_SIZE,
     height: BADGE_SIZE,
