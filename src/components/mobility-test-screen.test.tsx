@@ -91,7 +91,7 @@ describe('flexibility test warm-up', () => {
     expect(screen.getByText('Warm-up done')).toBeTruthy();
   });
 
-  it('asks the same before going back after the warm-up', async () => {
+  it('asks the same before going back or swiping back after the warm-up', async () => {
     await openTest();
     await fireEvent.press(button('Start warm-up'));
     await fireEvent.press(button('Finish warm-up'));

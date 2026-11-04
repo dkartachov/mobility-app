@@ -81,7 +81,7 @@ export default function MobilityTestScreen() {
   // The results read the score back from the database, so they wait for the save to finish.
   const phase = startedPhase === 'calculating' && minTimeElapsed && saving !== 'pending' ? 'results' : startedPhase;
 
-  // Leaving after the warm-up wastes it, so it's confirmed whether by Not now or Android's back.
+  // Leaving after the warm-up wastes it, so Not now, the back button and swiping back all confirm first.
   const confirmSkipTest = () =>
     showDialog({
       title: 'Skip the test?',
@@ -165,10 +165,9 @@ export default function MobilityTestScreen() {
       <Stack.Screen
         options={{
           title: phase === 'measuring' ? `${index + 1} of ${TEST_STEPS.length}` : '',
-          // The warm-up player has its own back button in place of the header. Once it's done, the
-          // only ways on are its screen's two buttons.
-          headerShown: !fullScreen && phase !== 'warmup' && phase !== 'ready',
-          gestureEnabled: !fullScreen && phase !== 'ready',
+          // The warm-up player has its own back button in place of the header.
+          headerShown: !fullScreen && phase !== 'warmup',
+          gestureEnabled: !fullScreen,
         }}
       />
       {phase === 'intro' && (
@@ -259,7 +258,7 @@ function Ready({ onStart, onCancel }: { onStart: () => void; onCancel: () => voi
   const insets = useSafeAreaInsets();
 
   return (
-    <ThemedView style={[styles.screen, styles.centeredScreen, { paddingTop: insets.top }]}>
+    <ThemedView style={[styles.screen, styles.centeredScreen]}>
       <View style={styles.readyContent}>
         <Animated.View entering={ZoomIn.springify()}>
           <IconBadge name={{ ios: 'checkmark', android: 'check' }} size={88} />
