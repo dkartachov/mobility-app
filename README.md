@@ -147,12 +147,12 @@ Averages are for adults up to 30, and the per-decade column is the change after 
 | Knee to wall | 11.0 / 11.3 cm at 18–29 | 3.6 / 3.0 cm | By age group, see below | Strong | Weight-bearing lunge, big toe to wall; 899 adults in Canada, Spain and Iran, by seven age groups and sex [1]. Matches 400 young women in India (11.2 / 10.4 cm right / left) [2] |
 | Shoulder abduction | 156° / 157° | 15° | −5° / −4° | Strong | Active, standing, inclinometer; 2404 adults without shoulder pain, by five-year age group and sex [3] |
 | Shoulder external rotation | 62° / 72° | 16° | −3° / −4° | Moderate | Active, standing with the elbow at the side; same 2404 adults [3], but judged by eye to the nearest 5°, where the app measures it |
-| Hip external rotation | 41.5° / 42.5° | 7.1° / 7.4° | −1.5° / −1.5° | Strong | Seated, with an examiner rotating the leg, as a partner does in the app; 987 adults aged 19–32 [10]. 151 adults aged about 22 measured much the same (43° / 40°) [4]; small decline with age [7] |
-| Hip internal rotation | 43° / 43.5° | 7.6° / 7.9° | −1.5° / −1.5° | Strong | Seated, with an examiner rotating the leg; 987 adults aged 19–32 [10]. 151 adults aged about 22 had a bigger gap between the sexes (41° / 47°) [4] |
+| Hip external rotation | 41.5° / 42.5° | 7.1° / 7.4° | −1.7° / −1.1° | Strong | Seated, with an examiner rotating the leg, as a partner does in the app; 987 adults aged 19–32 [10]. 151 adults aged about 22 measured much the same (43° / 40°) [4]. Decline from the US national health survey, 1683 adults aged 25–74 [7] |
+| Hip internal rotation | 43° / 43.5° | 7.6° / 7.9° | −1° / −1° | Strong | Seated, with an examiner rotating the leg; 987 adults aged 19–32 [10]. 151 adults aged about 22 had a bigger gap between the sexes (41° / 47°) [4]. Decline from the US national health survey [7] |
 | Sit and reach | −1.5 / +5 cm past the toes | 10 / 9.6 cm | −1.1 / −0.6 cm | Strong | Canadian Health Measures Survey 2016–17, a national sample, percentiles by five-year age group and sex [5] |
 | Knee to chest | 130° / 134° | 7.8° / 8.2° | −1.5° / −1.2° | Strong | Supine hip flexion, 674 healthy people by age and sex [6]; SD and decline worked out from the study's raw data |
-| Straight leg raise | 79° / 89° | 17.8° / 12.4° | 0° / 0° | Moderate | Passive, lying on the back; 90 adults aged about 25 [8]. Women about 8° further and no change with age from 20 to 79 in 214 adults [9], whose full tables are paywalled |
-| Hip abduction | 41° / 40° | 8.3° / 7.4° | −1° / −1° | Strong | Active, lying on the back, goniometer; 987 adults aged 19–32 [10]. The US national health survey (1892 people) found only 3–5° less from young to old adults [7] |
+| Straight leg raise | 68.5° / 76.3° | 6.8° / 9.5° | 0° / 0° | Strong | Passive, lying on the back, stopping at firm resistance; 214 adults aged 20–79, by decade and sex, with no change with age [9]. A machine pushing to the most people could bear went 11–13° further [8] |
+| Hip abduction | 41° / 40° | 8.3° / 7.4° | −1.8° / −0.9° | Strong | Active, lying on the back, goniometer; 987 adults aged 19–32 [10]. Decline from the US national health survey, measured the same way [7] |
 | Overhead reach | 166° / 165° | 13° | −4° / −4° | Strong | Active flexion, inclinometer; 2404 adults without shoulder pain [3] |
 
 Knee to wall by age group [1, table 1], mean ± SD in cm. Each group counts as its average age, so a 30-year-old is compared with values between the first two rows:
@@ -173,8 +173,9 @@ How the numbers were derived:
 - **Sit and reach**: the survey's flexometer puts the feet at the 26 cm mark, so its medians for ages 20–29 (24.5 cm men, 31.1 cm women) are 1.5 cm short of and 5.1 cm past the toes. Each sex's SD is its 10th–90th percentile spread divided by 2.563, which is how far apart those percentiles are in a normal distribution: 10.0 cm for men and 9.6 cm for women. The survey's percentiles fit a normal distribution closely (its 5th percentile for men is 8.8 cm; the normal model gives 8.2 cm).
 - **Gill 2020 tests**: averages of the left and right sides for ages 20–29 (external rotation) or 20–44 (abduction, flexion), and the decline is the drop to ages 65–69 spread over the decades in between.
 - **Knee to chest**: from the CDC study's raw data (`papers/cdc-normal-rom-dataset.xls`, both sides of everyone measured): 130.4° ± 7.8 for men and 133.8° ± 8.2 for women aged 20–44, and the decline is a straight line fitted to everyone aged 30–69.
-- **Straight leg raise**: means rounded from Marshall & Siegler (79.4 ± 17.8° men, 89.4 ± 12.4° women). No decline with age, since Youdas found none across six decades.
+- **Straight leg raise**: Youdas's averages over all ages, both sides (68.5 ± 6.8° men, 76.3 ± 9.5° women). Its decades differ by no more than chance (men 65–71°, women 74–78°), so there's no decline. Youdas stopped where the examiner felt firm resistance and the person agreed, which is the firm stretch the app asks for. Marshall & Siegler's machine went on to the most each person could bear (79.4 ± 17.8° men, 89.4 ± 12.4° women), so it measures stretch tolerance as well, which is why its spread is so much wider. Youdas recruited from a hospital fitness centre and left out people with a BMI of 30 or more, so its averages may be a little above the general population's.
 - **Hip rotation and abduction**: Hallaçeli 2014's averages for men and women (41.5 ± 7.1° and 42.4 ± 7.4° external rotation, 42.9 ± 7.6° and 43.6 ± 7.9° internal rotation, both passive and seated; 40.9 ± 8.3° and 40.1 ± 7.4° abduction, active and lying on the back). Their study also measured passive abduction and active rotation, which differ from these by 5–6°, so the right column has to match how the app's test is done. Rotation lying face down is 3–10° more again [4].
+- **Hip decline with age**: from Roach & Miles's tables by sex, race and age group [7, tables 4–7], the drop in the mean from ages 25–39 to 60–74 (about 32 to 67, so 3.5 decades), with white and Black adults averaged by group size. Men: external rotation 32.8° → 27.0°, internal rotation 33.7° → 30.0°, abduction 45.1° → 38.8°. Women: external rotation 35.1° → 31.1°, internal rotation 31.7° → 28.1°, abduction 42.7° → 39.4°. Their rotation was active and the app's is passive, so the decline is assumed to be the same number of degrees either way. Results were rounded to 5°, which blurs single results but not group averages.
 
 ### Measurement error per test
 
@@ -199,18 +200,9 @@ Standard error of measurement (`measurementError`), used to tell real changes fr
 - Results are assumed to be normally distributed. Some aren't: shoulder flexion piles up near 180°, so overhead reach can't score much above 86.
 - Every test starts with the same warm-up (`src/data/test-warmup.ts`): a minute of marching, then about five minutes of dynamic moves for the ankles, hips, hamstrings and shoulders, with no static holds. A warm-up raises range of motion for a while, so doing the same one every time keeps results comparable from test to test. Most norms were measured without a warm-up, though, so scores may read slightly high against them.
 - Norms for children and teenagers aren't modelled; anyone younger than a norm's youngest age is compared with that age.
-- The hip rotation and abduction norms come from adults aged 19–32, so their decline with age is still the small one reported for the US national health survey [7] rather than measured age groups.
+- The hip rotation and abduction norms combine two studies: averages from adults aged 19–32 [10], and the decline with age from a US survey 1971–75 that stopped at 74 [7]. Past 74 the decline is carried on in a straight line.
 
-### Better data wanted
-
-These sources would make tests' norms stronger, but their tables weren't freely available. Any of them can usually be found through a university or public library, by interlibrary loan, or by asking the authors (ResearchGate's "Request full-text" button works well).
-
-| Test | What's missing | Source to get | What it would change |
-|---|---|---|---|
-| Hip abduction and rotation | Active abduction and rotation by age group, sex and race | Roach & Miles 1991 [7], [doi:10.1093/ptj/71.9.656](https://doi.org/10.1093/ptj/71.9.656) | A measured decline with age instead of the estimated −1 to −1.5° a decade |
-| Straight leg raise | Means and SDs by sex and age group | Youdas et al. 2005 [9], [doi:10.2519/jospt.2005.35.4.246](https://doi.org/10.2519/jospt.2005.35.4.246) | Moderate → strong: averages from 214 adults aged 20–79 instead of 90 young adults |
-
-Copies of the freely available sources are in `papers/` (see its README).
+Copies of the sources are in `papers/` (see its README).
 
 ### References
 

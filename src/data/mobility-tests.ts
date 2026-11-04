@@ -208,11 +208,12 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     norm: decliningNorm({
       // Seated, with an examiner rotating the leg (passive), which is how this test is done: 41.5°
       // ± 7.1 in men and 42.4° ± 7.4 in women, 987 adults aged 19–32 (Hallaçeli 2014). Han 2015
-      // found much the same in 151 adults (43° and 40°). Rotation declines only a little with age
-      // (Roach & Miles 1991).
+      // found much the same in 151 adults (43° and 40°). The decline is the US national health
+      // survey's, from ages 25–39 to 60–74: about 6° in men and 4° in women (Roach & Miles 1991,
+      // 1683 adults, active rotation seated).
       mean: { male: 41.5, female: 42.5 },
       sd: { male: 7.1, female: 7.4 },
-      perDecade: { male: -1.5, female: -1.5 },
+      perDecade: { male: -1.7, female: -1.1 },
       evidence: 'strong',
     }),
     // Seated, with a phone, the same person measuring again (Charlton 2015, in Keogh 2019).
@@ -231,10 +232,11 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     norm: decliningNorm({
       // Seated, with an examiner rotating the leg (passive): 42.9° ± 7.6 in men and 43.6° ± 7.9 in
       // women, 987 adults aged 19–32 (Hallaçeli 2014). Han 2015 found a bigger gap between the
-      // sexes in 151 adults (41° and 47°).
+      // sexes in 151 adults (41° and 47°). About 3.5° less from ages 25–39 to 60–74 in both sexes
+      // (Roach & Miles 1991).
       mean: { male: 43, female: 43.5 },
       sd: { male: 7.6, female: 7.9 },
-      perDecade: { male: -1.5, female: -1.5 },
+      perDecade: { male: -1, female: -1 },
       evidence: 'strong',
     }),
     // Seated, with a phone, the same person measuring again (Charlton 2015, in Keogh 2019).
@@ -298,13 +300,14 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     area: 'hamstrings',
     movement: 'Leg raise',
     norm: decliningNorm({
-      // Passive, lying on the back: 79° ± 18 in men and 89° ± 12 in women aged about 25 (Marshall &
-      // Siegler 2014, 90 adults). Women about 8° further and no change with age from 20 to 79
-      // (Youdas 2005, 214 adults), whose full tables are paywalled.
-      mean: { male: 79, female: 89 },
-      sd: { male: 17.8, female: 12.4 },
+      // Passive, lying on the back with the other thigh held down, stopping at firm resistance:
+      // 68.5° ± 6.8 in men and 76.3° ± 9.5 in women, with no change with age from 20 to 79
+      // (Youdas 2005, 214 adults). A machine pushing to the most a person could bear went 11–13°
+      // further (Marshall & Siegler 2014), past the firm stretch the app asks for.
+      mean: { male: 68.5, female: 76.3 },
+      sd: { male: 6.8, female: 9.5 },
       perDecade: { male: 0, female: 0 },
-      evidence: 'moderate',
+      evidence: 'strong',
     }),
     // Inclinometer on the thigh, retested 3 days apart by the same rater (Liu 2022).
     measurementError: 3.6,
@@ -322,11 +325,12 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     movement: 'Abduction',
     norm: decliningNorm({
       // Active, lying on the back with a goniometer: 40.9° ± 8.3 in men and 40.1° ± 7.4 in women,
-      // 987 adults aged 19–32 (Hallaçeli 2014). The US national health survey found only 3–5° less
-      // from young to old adults (Roach & Miles 1991, 1892 people).
+      // 987 adults aged 19–32 (Hallaçeli 2014). The US national health survey, measuring the same
+      // way, found about 6° less in men and 3° less in women from ages 25–39 to 60–74 (Roach &
+      // Miles 1991, 1683 adults).
       mean: { male: 41, female: 40 },
       sd: { male: 8.3, female: 7.4 },
-      perDecade: { male: -1, female: -1 },
+      perDecade: { male: -1.8, female: -0.9 },
       evidence: 'strong',
     }),
     // Retested a week apart with a goniometer (Nussbaumer 2010).

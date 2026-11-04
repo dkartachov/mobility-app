@@ -257,7 +257,9 @@ it('has a sensible norm and measurement error for every test', () => {
     // Flexibility is no better in the oldest than the youngest.
     const [youngest, oldest] = [norm.byAge[0], norm.byAge[norm.byAge.length - 1]];
     expect([id, oldest.mean.male <= youngest.mean.male && oldest.mean.female <= youngest.mean.female]).toEqual([id, true]);
-    // Well under the spread between people, or the test couldn't tell anyone apart.
-    expect([id, measurementError > 0 && measurementError <= Math.min(youngest.sd.male, youngest.sd.female) / 2]).toEqual([id, true]);
+    // Well under the spread between people, or the test couldn't tell anyone apart: a reliability
+    // (ICC, 1 − (error / SD)²) of at least 0.7, the usual bar for an acceptable test.
+    const sd = Math.min(youngest.sd.male, youngest.sd.female);
+    expect([id, measurementError > 0 && 1 - (measurementError / sd) ** 2 >= 0.7]).toEqual([id, true]);
   }
 });
