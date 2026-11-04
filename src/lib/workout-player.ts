@@ -31,9 +31,18 @@ export type PlayerAction =
 /** When the "10 seconds" cue is spoken. */
 const WARNING_MS = 10_000;
 
-export function createPlayerReducer(steps: WorkoutStep[], bufferMs: number) {
+/**
+ * The get-ready countdown before a step. Switching to a two-sided exercise's second side can take
+ * less time than getting into a new exercise, since you're already in position.
+ */
+export function stepBufferMs(step: WorkoutStep, bufferMs: number, sideSwitchBufferMs = bufferMs) {
+  return step.side === 2 ? sideSwitchBufferMs : bufferMs;
+}
+
+export function createPlayerReducer(steps: WorkoutStep[], bufferMs: number, sideSwitchBufferMs = bufferMs) {
   function startStep(state: PlayerState, index: number): PlayerState {
-    return { ...state, index, phase: 'buffer', remainingMs: bufferMs, countdown: state.countdown + 1 };
+    const remainingMs = stepBufferMs(steps[index], bufferMs, sideSwitchBufferMs);
+    return { ...state, index, phase: 'buffer', remainingMs, countdown: state.countdown + 1 };
   }
 
   return function reducer(state: PlayerState, action: PlayerAction): PlayerState {

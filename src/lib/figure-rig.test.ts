@@ -1,4 +1,5 @@
 import { EXERCISES } from '@/data/exercises';
+import { MARCHING_EXERCISE } from '@/data/test-warmup';
 
 import {
   BONES,
@@ -18,7 +19,8 @@ import {
   type Pose,
 } from './figure-rig';
 
-const animated = EXERCISES.flatMap((e) =>
+// The warm-up's marching isn't in the library, but is held to the same standard.
+const animated = [...EXERCISES, MARCHING_EXERCISE].flatMap((e) =>
   e.animation && e.animation.view !== 'hand' ? [{ id: e.id, animation: e.animation }] : []
 );
 const hands = EXERCISES.flatMap((e) => (e.animation?.view === 'hand' ? [{ id: e.id, animation: e.animation }] : []));

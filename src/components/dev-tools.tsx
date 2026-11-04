@@ -81,7 +81,7 @@ export function DevTools() {
           <View style={styles.switchText}>
             <ThemedText>Skip test measurements</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Next works in flexibility tests without measuring. Skipped measurements save as 0.
+              Next works in flexibility tests without measuring, and the warm-up can be skipped. Skipped measurements save as 0.
             </ThemedText>
           </View>
           <Switch

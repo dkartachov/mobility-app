@@ -2,7 +2,7 @@ import { router, Stack, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -20,12 +20,20 @@ import { ScrollView } from '@/components/scroll-view';
 import { TestMeasurement } from '@/components/test-measurement';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WorkoutPlayer } from '@/components/workout-player';
 import { Spacing } from '@/constants/theme';
 import { SCORE_AREAS, SCORE_BAND_LABELS, scoreBand, scoreChange } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS, METHOD_UNITS, SIDE_LABELS, TEST_STEPS } from '@/data/mobility-tests';
+import {
+  TEST_WARMUP,
+  WARMUP_BUFFER_SECONDS,
+  WARMUP_MINUTES,
+  WARMUP_SIDE_SWITCH_SECONDS,
+} from '@/data/test-warmup';
 import { logMobilityTest, useMobilityScore } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
-import { useSkipTestMeasurements } from '@/lib/dev-settings';
+import { getFastWorkouts, useSkipTestMeasurements } from '@/lib/dev-settings';
+import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
 
 /** The calculating screen shows at least this long, even when saving is quicker. */
 const CALCULATING_MS = 2000;
@@ -33,17 +41,33 @@ const CALCULATING_MS = 2000;
 /** Lets the results fade in before the score animates. */
 const ANIMATION_DELAY_MS = 300;
 
+/** The measurements themselves, without the warm-up. */
+const TEST_MINUTES = 20;
+
 const TIPS = [
   'Test at the same time of day, ideally before a workout.',
-  'Do the same warm-up every time, or none at all.',
+  'Start the tests straight after the warm-up, while you are still warm.',
   'Move slowly into each position and stop at a firm stretch, never pain.',
   'Measure the same way each time so results are comparable.',
 ];
 
 const AREA_LABELS = Object.fromEntries(SCORE_AREAS.map(({ id, label }) => [id, label]));
 
-/** 'calculating' turns into 'results' on its own, once the save is done and the minimum time is up. */
-type Phase = 'intro' | 'measuring' | 'calculating';
+/**
+ * The warm-up comes first, so every test starts from the same state. 'calculating' turns into
+ * 'results' on its own, once the save is done and the minimum time is up.
+ */
+type Phase = 'intro' | 'warmup' | 'ready' | 'measuring' | 'calculating';
+
+/** The warm-up's steps and countdowns, shortened by the dev switch for fast workouts. */
+function warmupPlan() {
+  const fast = getFastWorkouts();
+  return {
+    steps: fast ? TEST_WARMUP.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : TEST_WARMUP,
+    bufferMs: (fast ? FAST_BUFFER_SECONDS : WARMUP_BUFFER_SECONDS) * 1000,
+    sideSwitchBufferMs: (fast ? FAST_BUFFER_SECONDS : WARMUP_SIDE_SWITCH_SECONDS) * 1000,
+  };
+}
 
 export default function MobilityTestScreen() {
   const db = useSQLiteContext();
@@ -57,9 +81,17 @@ export default function MobilityTestScreen() {
   // The results read the score back from the database, so they wait for the save to finish.
   const phase = startedPhase === 'calculating' && minTimeElapsed && saving !== 'pending' ? 'results' : startedPhase;
 
-  // Mid-test, leaving loses the measurements; on the results screen it means "done".
-  usePreventRemove(phase !== 'intro' && !leaving, () => {
-    if (phase === 'measuring') {
+  // Mid-warm-up, leaving goes back to the intro; mid-test it loses the measurements; on the results
+  // screen it means "done". Before the warm-up and between it and the test there's nothing to lose.
+  usePreventRemove(phase !== 'intro' && phase !== 'ready' && !leaving, () => {
+    if (phase === 'warmup') {
+      showDialog({
+        title: 'Stop the warm-up?',
+        message: "You'll need to warm up again before testing.",
+        cancelLabel: 'Keep going',
+        confirm: { label: 'Stop warm-up', onPress: () => setPhase('intro') },
+      });
+    } else if (phase === 'measuring') {
       showDialog({
         title: 'Stop the test?',
         message: "Your measurements won't be saved.",
@@ -122,11 +154,20 @@ export default function MobilityTestScreen() {
       <Stack.Screen
         options={{
           title: phase === 'measuring' ? `${index + 1} of ${TEST_STEPS.length}` : '',
-          headerShown: !fullScreen,
+          // The warm-up player has its own back button in place of the header.
+          headerShown: !fullScreen && phase !== 'warmup',
           gestureEnabled: !fullScreen,
         }}
       />
-      {phase === 'intro' && <Intro onStart={() => setPhase('measuring')} />}
+      {phase === 'intro' && (
+        <Intro
+          onStart={() => setPhase('warmup')}
+          // Dev only, along with skipping measurements, so the test can be clicked through quickly.
+          onSkipWarmup={skipMeasurements ? () => setPhase('ready') : undefined}
+        />
+      )}
+      {phase === 'warmup' && <Warmup onComplete={() => setPhase('ready')} />}
+      {phase === 'ready' && <Ready onStart={() => setPhase('measuring')} onCancel={() => setLeaving('cancel')} />}
       {phase === 'measuring' && (
         <Measure
           key={index}
@@ -144,17 +185,24 @@ export default function MobilityTestScreen() {
   );
 }
 
-function Intro({ onStart }: { onStart: () => void }) {
+function Intro({ onStart, onSkipWarmup }: { onStart: () => void; onSkipWarmup?: () => void }) {
   const insets = useSafeAreaInsets();
 
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader
-          eyebrow="About 20 minutes"
+          eyebrow={`About ${WARMUP_MINUTES + TEST_MINUTES} minutes`}
           title="Flexibility test"
-          subtitle={`${FLEXIBILITY_TESTS.length} tests, ${TEST_STEPS.length} measurements in total.`}
+          subtitle={`A ${WARMUP_MINUTES}-minute warm-up, then ${FLEXIBILITY_TESTS.length} tests and ${TEST_STEPS.length} measurements.`}
         />
+        <Card style={styles.introCard}>
+          <CardTitle icon={{ ios: 'figure.walk', android: 'directions_walk' }} title="Warm-up first" />
+          <ThemedText>
+            Light movement raises your range for a while, so every test starts with the same short warm-up. That
+            way your results compare fairly from one test to the next.
+          </ThemedText>
+        </Card>
         <Card style={styles.introCard}>
           <CardTitle icon={{ ios: 'lightbulb.fill', android: 'lightbulb' }} title="For accurate results" />
           {TIPS.map((tip) => (
@@ -173,7 +221,47 @@ function Intro({ onStart }: { onStart: () => void }) {
         </Card>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
+        <Button title="Start warm-up" onPress={onStart} />
+        {onSkipWarmup && <Button title="Skip warm-up" variant="secondary" onPress={onSkipWarmup} />}
+      </View>
+    </ThemedView>
+  );
+}
+
+function Warmup({ onComplete }: { onComplete: () => void }) {
+  // Read once: toggling fast mode mid-warm-up shouldn't change the running warm-up.
+  const [plan] = useState(warmupPlan);
+
+  return (
+    <WorkoutPlayer
+      {...plan}
+      completeLabel="Finish warm-up"
+      onComplete={onComplete}
+      // Asks to stop the warm-up first, see the screen's prevent-remove.
+      onBack={() => router.back()}
+    />
+  );
+}
+
+function Ready({ onStart, onCancel }: { onStart: () => void; onCancel: () => void }) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <ThemedView style={[styles.screen, styles.centeredScreen]}>
+      <View style={styles.readyContent}>
+        <Animated.View entering={ZoomIn.springify()}>
+          <IconBadge name={{ ios: 'checkmark', android: 'check' }} size={88} />
+        </Animated.View>
+        <ThemedText type="title" accessibilityRole="header" style={styles.centeredText}>
+          Warm-up done
+        </ThemedText>
+        <ThemedText themeColor="textSecondary" style={styles.centeredText}>
+          Start the test now, while you&apos;re still warm.
+        </ThemedText>
+      </View>
+      <View style={[styles.footer, styles.readyFooter, { paddingBottom: insets.bottom + Spacing.three }]}>
         <Button title="Start test" onPress={onStart} />
+        <Button title="Not now" variant="secondary" onPress={onCancel} />
       </View>
     </ThemedView>
   );
@@ -377,6 +465,20 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: Spacing.screen,
     paddingTop: Spacing.two,
+    gap: Spacing.two,
+  },
+  readyContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+  },
+  readyFooter: {
+    alignSelf: 'stretch',
+  },
+  centeredText: {
+    textAlign: 'center',
   },
   footerRow: {
     flexDirection: 'row',

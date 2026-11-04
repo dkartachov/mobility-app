@@ -158,6 +158,7 @@ How the numbers were derived:
 - The hip rotation, knee to chest and straight leg raise norms were measured by a clinician or a machine moving the joint for the person (passive range). Hip rotation is done the same way in the app, with a partner; knee to chest is pulled in with your own hands, and the straight leg raise with a towel or belt. Something that doesn't stretch is closest to a clinician's hand: an elastic band lets the leg drift a few degrees at the top. The shoulder, hip abduction and sit-and-reach norms were active, like the app.
 - Results are assumed to be normally distributed. Some aren't: shoulder flexion piles up near 180°, so overhead reach can't score much above 86.
 - Norms for children and teenagers aren't modelled; anyone under 30 is compared with adults up to 30.
+- Every test starts with the same warm-up (`src/data/test-warmup.ts`): a minute of marching, then about five minutes of dynamic moves for the ankles, hips, hamstrings and shoulders, with no static holds. A warm-up raises range of motion for a while, so doing the same one every time keeps results comparable from test to test. Most norms were measured without a warm-up, though, so scores may read slightly high against them.
 
 ### Better data wanted
 

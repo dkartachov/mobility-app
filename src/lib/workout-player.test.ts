@@ -62,3 +62,32 @@ describe('timeouts', () => {
     expect(ended).toMatchObject({ index: 1, phase: 'buffer', remainingMs: BUFFER_MS });
   });
 });
+
+describe('side switch countdown', () => {
+  const SWITCH_MS = 3000;
+  const twoSided = EXERCISES.find((exercise) => exercise.twoSided)!;
+  const sided: WorkoutStep[] = [
+    { exercise: EXERCISES[0], durationSeconds: 60 },
+    { exercise: twoSided, durationSeconds: 30, side: 1 },
+    { exercise: twoSided, durationSeconds: 30, side: 2 },
+  ];
+  const sidedReducer = createPlayerReducer(sided, BUFFER_MS, SWITCH_MS);
+  const at = (index: number): PlayerState => ({ index, phase: 'active', remainingMs: 1000, paused: false, countdown: 0 });
+
+  it('uses the shorter countdown before the second side', () => {
+    expect(sidedReducer(at(1), { type: 'tick', deltaMs: 1000 })).toMatchObject({ index: 2, remainingMs: SWITCH_MS });
+  });
+
+  it('uses the full countdown before a new exercise', () => {
+    expect(sidedReducer(at(0), { type: 'tick', deltaMs: 1000 })).toMatchObject({ index: 1, remainingMs: BUFFER_MS });
+  });
+
+  it('applies to skipping and resetting too', () => {
+    expect(sidedReducer(at(0), { type: 'goTo', index: 2 }).remainingMs).toBe(SWITCH_MS);
+    expect(sidedReducer(at(2), { type: 'reset' }).remainingMs).toBe(SWITCH_MS);
+  });
+
+  it('defaults to the full countdown', () => {
+    expect(createPlayerReducer(sided, BUFFER_MS)(at(1), { type: 'tick', deltaMs: 1000 }).remainingMs).toBe(BUFFER_MS);
+  });
+});
