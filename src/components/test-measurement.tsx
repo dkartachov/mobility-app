@@ -13,11 +13,11 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { Button } from './button';
 import { Card } from './card';
+import { showDialog } from './dialog';
+import { Icon } from './icon';
+import { PressableScale } from './pressable-scale';
 import { ProgressBar } from './progress-bar';
 import { ThemedText } from './themed-text';
-
-/** Lines kept for the status under the reading, enough for the longest start position. */
-const STATUS_LINES = 3;
 
 /**
  * Phone measurements are taken this many times and averaged, which roughly halves how much a
@@ -31,14 +31,34 @@ type MeasurementProps = {
   onChange: (value: number | null) => void;
 };
 
+// Every test's card is the same height, phone or slider, so the screen doesn't jump between tests:
+// the label always takes two lines, and the controls under the reading always take this much room.
+
+/** Lines kept for what's measured, enough for the longest. Small text is 20 high. */
+const LABEL_LINES = 2;
+
+/** A progress bar (10), the gap below it (8) and an outlined button (56). */
+const CONTROLS_HEIGHT = 74;
+
 /** The measuring part of a test step: a phone sensor reading or a distance on a slider. */
 export function TestMeasurement({ test, value, onChange }: MeasurementProps) {
   const { method } = test;
   return (
-    <Card>
-      <ThemedText type="small" themeColor="textSecondary">
-        {test.measurement}
-      </ThemedText>
+    <Card style={styles.card}>
+      <View style={styles.labelRow}>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.label} numberOfLines={LABEL_LINES}>
+          {test.measurement}
+        </ThemedText>
+        {method.kind !== 'distance' && (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="How measuring with the phone works"
+            hitSlop={Spacing.two}
+            onPress={() => showDialog(phoneInstructions(method))}>
+            <Icon name={{ ios: 'info.circle', android: 'info' }} color="textSecondary" size={20} />
+          </PressableScale>
+        )}
+      </View>
       {method.kind === 'distance' ? (
         <ValueSlider
           value={value}
@@ -60,6 +80,19 @@ export function TestMeasurement({ test, value, onChange }: MeasurementProps) {
       )}
     </Card>
   );
+}
+
+/** The steps of a phone measurement, behind the card's info button for anyone who wants them. */
+function phoneInstructions(method: PhoneMethod) {
+  return {
+    title: 'Measuring with the phone',
+    message: [
+      `1. Tap Start measuring, then get into the start position: ${method.startPosition.toLowerCase()}. Hold still until a tone plays.`,
+      '2. Move into the stretch and hold still at your furthest point until a second tone saves the reading.',
+      `3. Do it ${PHONE_READINGS} times and the readings are averaged. If they show in red, they're too far apart: check the phone hasn't slipped and measure again.`,
+      "It's hands-free: the tones and vibrations tell you when each step is done, so you don't need to look at the screen.",
+    ].join('\n\n'),
+  };
 }
 
 function PhoneMeasurement({
@@ -125,62 +158,62 @@ function PhoneMeasurement({
   const finished = readings.length === PHONE_READINGS ? readings : null;
   // A finished set whose readings are too far apart to average without asking.
   const disagree = !active && finished !== null && gap(finished) > maxGap && !keptAnyway;
-  const status = {
-    disagree: finished
-      ? `${finished.map((r) => `${r}${unit}`).join(' and ')} are ${gap(finished)}${unit} apart, too far for the same stretch. Check the phone hasn’t slipped and measure again.`
-      : '',
-    idle: `Hands-free: a tone plays when the start position is set and when each of the ${PHONE_READINGS} readings is saved.`,
-    zeroing: `Get into the start position and hold still: ${method.startPosition.toLowerCase()}`,
-    measuring: 'Move into the stretch, then hold still at your furthest point',
-    midSet: `Reading ${readings.length} of ${PHONE_READINGS} saved. Measure again the same way and they'll be averaged.`,
-    done: finished
-      ? `Saved the average of ${finished.map((r) => `${r}${unit}`).join(' and ')}. Measure again if either didn’t feel like your furthest point.`
-      : 'Saved. Measure again if it didn’t feel like your furthest point.',
-  }[disagree ? 'disagree' : midSet ? 'midSet' : phase === 'idle' && value !== null ? 'done' : phase];
+  // Readings too far apart show side by side in red, with the choice of what to do below them.
+  const shown = disagree
+    ? finished!.map((r) => `${r}${unit}`).join(' · ')
+    : reading === null
+      ? '—'
+      : `${reading}${unit}`;
 
   // The same layout in every phase, only the contents change, so the box keeps its size when
-  // measuring starts and ends.
+  // measuring starts and ends. The steps are behind the card's info button rather than in here.
   return (
-    <View style={styles.phone}>
-      <ThemedText type="stat" style={styles.reading} themeColor={reading === null ? 'textSecondary' : 'text'}>
-        {reading === null ? '—' : `${reading}${unit}`}
-      </ThemedText>
+    <View style={styles.measure}>
       <ThemedText
-        type={active || disagree ? 'smallBold' : 'small'}
-        themeColor={disagree ? 'danger' : active ? 'text' : 'textSecondary'}
-        style={[styles.centered, styles.status]}
-        numberOfLines={STATUS_LINES}>
-        {status}
+        type="stat"
+        style={styles.reading}
+        themeColor={disagree ? 'danger' : reading === null ? 'textSecondary' : 'text'}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        accessibilityLabel={
+          disagree ? `${shown.replace(' · ', ' and ')}, too far apart to average. Measure again.` : undefined
+        }>
+        {shown}
       </ThemedText>
-      <View style={[styles.hold, { opacity: active && holdProgress > 0 ? 1 : 0 }]}>
-        <ProgressBar progress={holdProgress} />
-        <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-          {phase === 'zeroing' ? 'Setting the start position…' : 'Hold still, saving…'}
-        </ThemedText>
-      </View>
-      {active ? (
-        <Button title="Cancel" variant="secondary" onPress={cancel} />
-      ) : disagree ? (
-        <>
-          <Button title="Measure again" onPress={start} />
+      <View style={styles.controls}>
+        {/* Fills while holding still, to set the start position or save a reading. */}
+        <View style={{ opacity: active && holdProgress > 0 ? 1 : 0 }}>
+          <ProgressBar progress={holdProgress} />
+        </View>
+        {active ? (
+          <Button title="Cancel" variant="secondary" onPress={cancel} />
+        ) : disagree ? (
+          // Side by side rather than stacked, so this choice doesn't make the card taller.
+          <View style={styles.buttonRow}>
+            <View style={styles.rowButton}>
+              <Button title="Measure again" onPress={start} />
+            </View>
+            <View style={styles.rowButton}>
+              <Button
+                title="Use average"
+                variant="secondary"
+                onPress={() => {
+                  setKeptAnyway(true);
+                  onChange(average(finished!));
+                }}
+              />
+            </View>
+          </View>
+        ) : midSet ? (
+          <Button title={`Take reading ${readings.length + 1}`} onPress={start} />
+        ) : (
           <Button
-            title="Use the average anyway"
-            variant="secondary"
-            onPress={() => {
-              setKeptAnyway(true);
-              onChange(average(finished!));
-            }}
+            title={value !== null ? 'Measure again' : 'Start measuring'}
+            variant={value !== null ? 'secondary' : 'primary'}
+            onPress={start}
           />
-        </>
-      ) : midSet ? (
-        <Button title={`Take reading ${readings.length + 1}`} onPress={start} />
-      ) : (
-        <Button
-          title={value !== null ? 'Measure again' : 'Start measuring'}
-          variant={value !== null ? 'secondary' : 'primary'}
-          onPress={start}
-        />
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -208,25 +241,28 @@ function ValueSlider({
   const initial = Math.min(max, Math.max(min, 0));
 
   return (
-    <View style={styles.slider}>
+    <View style={styles.measure}>
       <ThemedText type="stat" style={styles.reading} themeColor={value === null ? 'textSecondary' : 'text'}>
         {value === null ? '—' : `${value} ${unit}`}
       </ThemedText>
-      <Slider
-        value={value ?? initial}
-        minimumValue={min}
-        maximumValue={max}
-        step={step}
-        onValueChange={(next) => onChange(Math.round(next / step) * step)}
-        minimumTrackTintColor={theme.tint}
-        maximumTrackTintColor={theme.backgroundSelected}
-        thumbTintColor={theme.tint}
-        accessibilityLabel={`${label}, in ${unit}`}
-      />
-      <View style={styles.sliderLimits}>
+      {/* The limits sit either side of the slider rather than under it, to fit the same room as the phone's controls. */}
+      <View style={[styles.controls, styles.sliderRow]}>
         <ThemedText type="small" themeColor="textSecondary">
           {min} {unit}
         </ThemedText>
+        <View style={styles.slider}>
+          <Slider
+            value={value ?? initial}
+            minimumValue={min}
+            maximumValue={max}
+            step={step}
+            onValueChange={(next) => onChange(Math.round(next / step) * step)}
+            minimumTrackTintColor={theme.tint}
+            maximumTrackTintColor={theme.backgroundSelected}
+            thumbTintColor={theme.tint}
+            accessibilityLabel={`${label}, in ${unit}`}
+          />
+        </View>
         <ThemedText type="small" themeColor="textSecondary">
           {max} {unit}
         </ThemedText>
@@ -236,31 +272,47 @@ function ValueSlider({
 }
 
 const styles = StyleSheet.create({
-  phone: {
-    gap: Spacing.twoAndHalf,
-    paddingTop: Spacing.one,
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  label: {
+    flex: 1,
+    minHeight: LABEL_LINES * 20,
+  },
+  /** Tighter than a usual card, to leave the animation and instructions more of the screen. */
+  card: {
+    paddingVertical: Spacing.twoAndHalf,
+    gap: Spacing.one,
+  },
+  measure: {
+    gap: Spacing.one,
   },
   reading: {
     textAlign: 'center',
-    fontSize: 56,
-    lineHeight: 64,
+    fontSize: 48,
+    lineHeight: 56,
   },
-  /** Room for the longest status, so a shorter one doesn't shrink the box. Small text is 20 high. */
-  status: {
-    height: STATUS_LINES * 20,
+  /** At least the phone's controls' height, centered, so the slider's shorter controls take the same room. */
+  controls: {
+    minHeight: CONTROLS_HEIGHT,
+    justifyContent: 'center',
+    gap: Spacing.two,
   },
-  hold: {
-    gap: Spacing.one,
+  buttonRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
   },
-  centered: {
-    textAlign: 'center',
+  rowButton: {
+    flex: 1,
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   slider: {
-    gap: Spacing.two,
-    paddingTop: Spacing.two,
-  },
-  sliderLimits: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flex: 1,
   },
 });

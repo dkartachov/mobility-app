@@ -50,7 +50,12 @@ export type Pose = {
    * shorter than they are. Give it in every pose of a clip or in none.
    */
   knees?: readonly [near: Point, far: Point];
+  /** Places the elbows rather than solving them, for forearms pointing partly at the camera. Give it in every pose of a clip or in none. */
+  elbows?: readonly [near: Point, far: Point];
 };
+
+/** Something in the scene the figure uses, like a wall, a box or a table, drawn behind it. */
+export type Scenery = { x: number; y: number; width: number; height: number };
 
 export type Keyframe = {
   /** Time taken to arrive at this pose from the one before it. */
@@ -91,10 +96,16 @@ export type FigureClip = {
   armBends?: readonly [near: Bend, far: Bend];
   /** Which side [near, far] knees stick out on. Forward from the spine by default. */
   legBends?: readonly [near: Bend, far: Bend];
-  /** Below 1 pulls the camera back around the middle of the floor, to fit an arm overhead. */
+  /**
+   * Below 1 pulls the camera back around the middle of the floor, to fit an arm overhead. Above 1,
+   * with `focus`, moves in on the part of the body the clip is about.
+   */
   zoom?: number;
+  /** The point to center the camera on, to zoom in on a limb. Parts that never move can fall outside the frame. */
+  focus?: Point;
   /** A band held in this hand and looped around this foot. */
   band?: readonly [hand: 'nearHand' | 'farHand', foot: 'nearFoot' | 'farFoot'];
+  scenery?: readonly Scenery[];
 };
 
 /** A single finger, seen from the side, bending at its three joints. Angles are in degrees of flexion. */
@@ -243,6 +254,13 @@ export function poseAt(clip: FigureClip, timeMs: number): Pose {
                 [lerp(a.knees[1][0], b.knees[1][0], t), lerp(a.knees[1][1], b.knees[1][1], t)],
               ]
             : undefined,
+        elbows:
+          a.elbows && b.elbows
+            ? [
+                [lerp(a.elbows[0][0], b.elbows[0][0], t), lerp(a.elbows[0][1], b.elbows[0][1], t)],
+                [lerp(a.elbows[1][0], b.elbows[1][0], t), lerp(a.elbows[1][1], b.elbows[1][1], t)],
+              ]
+            : undefined,
       };
       if (!swing) return body;
 
@@ -318,7 +336,7 @@ function limbPath(root: Point, target: Extremity, first: number, second: number,
 /** Traces the figure in the given pose. */
 export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
   'worklet';
-  const { hip, nearHand, farHand, nearFoot, farFoot, knees } = pose;
+  const { hip, nearHand, farHand, nearFoot, farFoot, knees, elbows } = pose;
   const shoulder = shoulderOf(pose);
   const head = along(shoulder, pose.neck, pose.neckLength ?? BONES.neck);
   const { nearShoulder, farShoulder, nearHip, farHip } = limbRoots(pose, clip);
@@ -326,7 +344,11 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
   const legBends = clip.legBends ?? [1, 1];
 
   // Knees bend forward and elbows backward, whichever way the limb is pointing.
-  const arm = (root: Point, hand: Extremity, bend: Bend, length: number): string => {
+  const arm = (root: Point, hand: Extremity, bend: Bend, length: number, elbow?: Point): string => {
+    if (elbow) {
+      const tip = along([hand[0], hand[1]], hand[2], BONES.hand);
+      return `M${root[0]} ${root[1]}L${elbow[0]} ${elbow[1]}L${hand[0]} ${hand[1]}L${tip[0]} ${tip[1]}`;
+    }
     if (clip.straightArms) {
       // The hand shortens along with the rest of the arm as it swings toward the camera.
       const scale = 1 + BONES.hand / (BONES.upperArm + BONES.forearm);
@@ -369,8 +391,8 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
     : '';
 
   return {
-    nearArm: arm(nearShoulder, nearHand, armBends[0], pose.armLengths?.[0] ?? 1),
-    farArm: arm(farShoulder, farHand, armBends[1], pose.armLengths?.[1] ?? 1),
+    nearArm: arm(nearShoulder, nearHand, armBends[0], pose.armLengths?.[0] ?? 1, elbows?.[0]),
+    farArm: arm(farShoulder, farHand, armBends[1], pose.armLengths?.[1] ?? 1, elbows?.[1]),
     nearLeg: leg(nearHip, nearFoot, legBends[0], knees?.[0]),
     farLeg: leg(farHip, farFoot, legBends[1], knees?.[1]),
     torso: `M${hip[0]} ${hip[1]}Q${spine[0]} ${spine[1]} ${shoulder[0]} ${shoulder[1]}${girdles}`,
@@ -381,11 +403,12 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
   };
 }
 
-/** The part of the scene to show, pulled back around the middle of the floor for a `zoom` below 1. */
+/** The part of the scene to show: centered on `focus` if there is one, otherwise around the middle of the floor. */
 export function figureViewBox(clip: FigureClip): string {
   const zoom = clip.zoom ?? 1;
   const width = SCENE.width / zoom;
   const height = SCENE.height / zoom;
+  if (clip.focus) return `${clip.focus[0] - width / 2} ${clip.focus[1] - height / 2} ${width} ${height}`;
   const left = (SCENE.width - width) / 2;
   const top = SCENE.floorY - SCENE.floorY / zoom;
   return `${left} ${top} ${width} ${height}`;

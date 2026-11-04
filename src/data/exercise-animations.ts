@@ -1472,3 +1472,319 @@ export const MARCHING: FigureClip = {
     { ms: 450, pose: MARCH_STAND, swing: true },
   ],
 };
+
+// ===== Flexibility tests: each shows the start position, the move into the measurement, and back =====
+
+// --- Knee to wall: lunging at a wall, the front knee drives forward to touch it with the heel down ---
+
+/** The front toes sit this far from the wall, about the average result. */
+const KTW_FRONT_FOOT: Extremity = [500, ANKLE_Y, 0];
+const KTW_BACK_FOOT: Extremity = [360, 446, -15];
+
+const KTW_BACK: Pose = {
+  hip: [455, 290],
+  torso: 85,
+  arch: 0,
+  neck: 85,
+  nearHand: [562, 230, 80],
+  farHand: [556, 238, 80],
+  nearFoot: KTW_FRONT_FOOT,
+  farFoot: KTW_BACK_FOOT,
+};
+const KTW_TOUCHING: Pose = { ...KTW_BACK, hip: [461, 342], torso: 82 };
+
+export const KNEE_TO_WALL: FigureClip = {
+  view: 'side',
+  scenery: [{ x: 570, y: 40, width: 40, height: 430 }],
+  zoom: 1.3,
+  focus: [490, 290],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: KTW_BACK },
+    { ms: 400, pose: KTW_BACK },
+    { ms: 1300, pose: KTW_TOUCHING },
+    { ms: 800, pose: KTW_TOUCHING },
+    { ms: 1300, pose: KTW_BACK },
+  ],
+};
+
+// --- Shared by the standing shoulder tests: from the front, so an arm moving out to the side shows ---
+
+const STANDING_FRONT: Omit<Pose, 'nearHand' | 'farHand'> = {
+  hip: [480, 259],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearFoot: [450, ANKLE_Y, 180],
+  farFoot: [510, ANKLE_Y, 0],
+};
+const STANDING_FRONT_WIDTHS = { shoulder: 28, hip: 16 };
+/** Where the shoulders sit with `STANDING_FRONT_WIDTHS`, near on the left. */
+const FRONT_NEAR_SHOULDER: Point = [452, 134];
+const FRONT_FAR_SHOULDER: Point = [508, 134];
+
+// --- Shoulder abduction: a straight arm rises out to the side and on overhead ---
+
+const abductionAt = (degrees: number): Pose => ({
+  ...STANDING_FRONT,
+  nearHand: armAt(FRONT_NEAR_SHOULDER, degrees),
+  farHand: armAt(FRONT_FAR_SHOULDER, 85),
+});
+const ABDUCTION_DOWN = abductionAt(95);
+const ABDUCTION_OUT = abductionAt(180);
+const ABDUCTION_UP = abductionAt(260);
+
+export const SHOULDER_ABDUCTION: FigureClip = {
+  view: 'side',
+  straightArms: true,
+  widths: STANDING_FRONT_WIDTHS,
+  legBends: [-1, 1],
+  zoom: 1.35,
+  focus: [450, 120],
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: ABDUCTION_DOWN },
+    { ms: 400, pose: ABDUCTION_DOWN },
+    { ms: 1100, pose: ABDUCTION_OUT, swing: true, ease: 'in' },
+    { ms: 1100, pose: ABDUCTION_UP, swing: true, ease: 'out' },
+    { ms: 700, pose: ABDUCTION_UP },
+    { ms: 1100, pose: ABDUCTION_OUT, swing: true, ease: 'in' },
+    { ms: 1100, pose: ABDUCTION_DOWN, swing: true, ease: 'out' },
+  ],
+};
+
+// --- Shoulder external rotation: from the front, the forearm swings from pointing at the camera out to the side ---
+
+/** The near elbow tucked in at the side, bent to 90°. */
+const ER_ELBOW: Point = [450, 209];
+const FAR_ELBOW_HANGING: Point = [510, 209];
+
+/** The forearm turned this far out from pointing straight ahead, so it looks shorter the closer it is to 0. */
+const externalRotationAt = (degrees: number): Pose => ({
+  ...STANDING_FRONT,
+  nearHand: [ER_ELBOW[0] - 75 * Math.sin((degrees * Math.PI) / 180), ER_ELBOW[1], 180],
+  farHand: [511, 284, -90],
+  elbows: [ER_ELBOW, FAR_ELBOW_HANGING],
+});
+const ER_AHEAD = externalRotationAt(15);
+const ER_OUT = externalRotationAt(65);
+
+export const SHOULDER_EXTERNAL_ROTATION: FigureClip = {
+  view: 'side',
+  widths: STANDING_FRONT_WIDTHS,
+  legBends: [-1, 1],
+  zoom: 1.8,
+  focus: [455, 175],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: ER_AHEAD },
+    { ms: 500, pose: ER_AHEAD },
+    { ms: 1500, pose: ER_OUT },
+    { ms: 900, pose: ER_OUT },
+    { ms: 1500, pose: ER_AHEAD },
+  ],
+};
+
+// --- Seated hip rotation: from the front, on the edge of a table, the shin swings like a pendulum ---
+
+const TABLE: FigureClip['scenery'] = [
+  { x: 320, y: 312, width: 320, height: 16 },
+  { x: 336, y: 328, width: 14, height: 142 },
+  { x: 610, y: 328, width: 14, height: 142 },
+];
+/** The thighs point at the camera along the table, so the knees sit just under the hips. */
+const SEATED_KNEES: readonly [Point, Point] = [
+  [458, 312],
+  [502, 312],
+];
+
+/** The near shin swung this far from hanging straight down, positive toward the other leg. */
+const shinAt = (degrees: number): Extremity => {
+  const radians = (degrees * Math.PI) / 180;
+  const [kneeX, kneeY] = SEATED_KNEES[0];
+  return [kneeX + 100 * Math.sin(radians), kneeY + 100 * Math.cos(radians), degrees - 90];
+};
+
+const SEATED: Pose = {
+  hip: [480, 300],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearHand: [410, 300, -90],
+  farHand: [550, 300, -90],
+  nearFoot: shinAt(0),
+  farFoot: [502, 412, -90],
+  knees: SEATED_KNEES,
+};
+/** For external rotation the other foot tucks back under the table, out of the way. */
+const SEATED_TUCKED: Pose = { ...SEATED, farFoot: [502, 372, -90] };
+
+const seatedRotation = (start: Pose, degrees: number): FigureClip => {
+  const rotated: Pose = { ...start, nearFoot: shinAt(degrees) };
+  return {
+    view: 'side',
+    widths: STANDING_FRONT_WIDTHS,
+    armBends: [-1, 1],
+    scenery: TABLE,
+    zoom: 1.3,
+    focus: [480, 300],
+    stillFrame: 2,
+    keyframes: [
+      { ms: 0, pose: start },
+      { ms: 500, pose: start },
+      { ms: 1800, pose: rotated },
+      { ms: 1500, pose: rotated },
+      { ms: 1800, pose: start },
+    ],
+  };
+};
+
+export const HIP_EXTERNAL_ROTATION = seatedRotation(SEATED_TUCKED, 40);
+export const HIP_INTERNAL_ROTATION = seatedRotation(SEATED, -40);
+
+// --- Sit and reach: legs straight with the feet against a box, folding to reach along its top ---
+
+const SIT_REACH_UP: Pose = {
+  hip: [380, 446],
+  torso: 92,
+  arch: 0,
+  neck: 90,
+  nearHand: [460, 434, -10],
+  farHand: [468, 434, -10],
+  nearFoot: [579, 446, 90],
+  farFoot: [579, 446, 90],
+};
+const SIT_REACH_FOLDED: Pose = {
+  ...SIT_REACH_UP,
+  torso: 28,
+  arch: 8,
+  neck: 5,
+  nearHand: [628, 388, 0],
+  farHand: [636, 388, 0],
+};
+
+export const SIT_AND_REACH: FigureClip = {
+  view: 'side',
+  scenery: [{ x: 592, y: 398, width: 110, height: 72 }],
+  zoom: 1.5,
+  focus: [520, 370],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SIT_REACH_UP },
+    { ms: 400, pose: SIT_REACH_UP },
+    { ms: 1800, pose: SIT_REACH_FOLDED },
+    { ms: 2000, pose: SIT_REACH_FOLDED },
+    { ms: 1600, pose: SIT_REACH_UP },
+  ],
+};
+
+// --- Knee to chest: lying on the back, head to the left, both hands pull one knee in ---
+
+/** Holding the shin just below the knee, elbows out to the sides. */
+const KNEE_TO_CHEST_IN: Pose = {
+  ...LEG_RAISE_DOWN,
+  nearHand: [398, 372, -20],
+  farHand: [404, 376, -20],
+  nearFoot: [470, 403, 30],
+};
+
+export const KNEE_TO_CHEST: FigureClip = {
+  view: 'side',
+  armBends: [1, 1],
+  zoom: 1.7,
+  focus: [455, 385],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: LEG_RAISE_DOWN },
+    { ms: 400, pose: LEG_RAISE_DOWN },
+    { ms: 1500, pose: KNEE_TO_CHEST_IN },
+    { ms: 1500, pose: KNEE_TO_CHEST_IN },
+    { ms: 1500, pose: LEG_RAISE_DOWN },
+  ],
+};
+
+// --- Straight leg raise: the same, but a strap around the foot pulls the straight leg up ---
+
+const STRAP_DOWN: Pose = { ...LEG_RAISE_DOWN, nearHand: [420, 405, 0], farHand: [426, 409, 0] };
+const STRAP_UP: Pose = { ...LEG_RAISE_UP, nearHand: [392, 340, 60], farHand: [398, 344, 60] };
+
+export const STRAIGHT_LEG_RAISE: FigureClip = {
+  view: 'side',
+  armBends: [1, 1],
+  band: ['nearHand', 'nearFoot'],
+  zoom: 1.6,
+  focus: [455, 360],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: STRAP_DOWN },
+    { ms: 400, pose: STRAP_DOWN },
+    { ms: 1700, pose: STRAP_UP, swing: true },
+    { ms: 1500, pose: STRAP_UP },
+    { ms: 1700, pose: STRAP_DOWN, swing: true },
+  ],
+};
+
+// --- Hip abduction: from above, lying on the back, one straight leg slides out to the side ---
+
+const ABDUCTION_FLAT: Pose = {
+  hip: [390, 270],
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  // Arms angled out a little, so they don't lie over the legs.
+  nearHand: [380, 205, 180],
+  farHand: [380, 335, 180],
+  // A hair short of full reach, so the straight legs don't kink at the knee.
+  nearFoot: [190.1, 256, 180],
+  farFoot: [190.1, 284, 180],
+};
+/** Swung 40° out around its hip, which sits at [390, 256]. */
+const ABDUCTION_WIDE: Pose = { ...ABDUCTION_FLAT, nearFoot: [236.9, 127.5, 140] };
+
+export const HIP_ABDUCTION: FigureClip = {
+  view: 'above',
+  straightArms: true,
+  widths: { shoulder: 20, hip: 14 },
+  zoom: 1.4,
+  focus: [380, 240],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: ABDUCTION_FLAT },
+    { ms: 400, pose: ABDUCTION_FLAT },
+    { ms: 1600, pose: ABDUCTION_WIDE, swing: true },
+    { ms: 900, pose: ABDUCTION_WIDE },
+    { ms: 1600, pose: ABDUCTION_FLAT, swing: true },
+  ],
+};
+
+// --- Overhead reach: lying on the back with knees bent, a straight arm lowers from the ceiling to overhead ---
+
+const LYING_SHOULDER: Point = [315, 446];
+
+const overheadAt = (degrees: number): Pose => ({
+  hip: [440, 446],
+  torso: 180,
+  arch: 0,
+  neck: 172,
+  nearHand: armAt(LYING_SHOULDER, degrees),
+  farHand: armAt(LYING_SHOULDER, 3),
+  nearFoot: [560, ANKLE_Y, 0],
+  farFoot: [568, ANKLE_Y, 0],
+});
+const OVERHEAD_UP = overheadAt(270);
+const OVERHEAD_DOWN = overheadAt(185);
+
+export const OVERHEAD_REACH: FigureClip = {
+  view: 'side',
+  straightArms: true,
+  zoom: 1.6,
+  focus: [330, 360],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: OVERHEAD_UP },
+    { ms: 400, pose: OVERHEAD_UP },
+    { ms: 1800, pose: OVERHEAD_DOWN, swing: true },
+    { ms: 900, pose: OVERHEAD_DOWN },
+    { ms: 1800, pose: OVERHEAD_UP, swing: true },
+  ],
+};

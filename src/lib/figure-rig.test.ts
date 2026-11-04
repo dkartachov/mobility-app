@@ -1,4 +1,5 @@
 import { EXERCISES } from '@/data/exercises';
+import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { MARCHING_EXERCISE } from '@/data/test-warmup';
 
 import {
@@ -19,8 +20,8 @@ import {
   type Pose,
 } from './figure-rig';
 
-// The warm-up's marching isn't in the library, but is held to the same standard.
-const animated = [...EXERCISES, MARCHING_EXERCISE].flatMap((e) =>
+// The warm-up's marching and the flexibility tests aren't in the library, but are held to the same standard.
+const animated = [...EXERCISES, MARCHING_EXERCISE, ...FLEXIBILITY_TESTS].flatMap((e) =>
   e.animation && e.animation.view !== 'hand' ? [{ id: e.id, animation: e.animation }] : []
 );
 const hands = EXERCISES.flatMap((e) => (e.animation?.view === 'hand' ? [{ id: e.id, animation: e.animation }] : []));
@@ -102,7 +103,8 @@ describe('exercise animations', () => {
             expect(segmentLengths(leg).map((l) => Math.round(l))).toEqual([BONES.thigh, BONES.shin, BONES.foot]);
           }
         }
-        if (clip.straightArms) continue;
+        // As with knees, placed elbows are for forearms seen foreshortened.
+        if (clip.straightArms || pose.elbows) continue;
         // Arms pointing into the screen look shorter, but in proportion.
         [paths.nearArm, paths.farArm].forEach((arm, side) => {
           const scale = pose.armLengths?.[side] ?? 1;
@@ -117,7 +119,7 @@ describe('exercise animations', () => {
       clip.keyframes.forEach((frame, i) => {
         for (const limb of limbs) {
           const isHand = limb.endsWith('Hand');
-          if (isHand ? clip.straightArms : frame.pose.knees) continue;
+          if (isHand ? clip.straightArms || frame.pose.elbows : frame.pose.knees) continue;
           const held = clip.keyframes[i - 1]?.pose[limb].join() === frame.pose[limb].join();
           // Between keyframes as well when it isn't going anywhere; a hand on its way somewhere can trail.
           const start = i === 0 ? 0 : keyframeTime(clip, i - 1);
@@ -150,9 +152,12 @@ describe('exercise animations', () => {
 
     it('stays inside the frame', () => {
       const [left, top, width, height] = figureViewBox(clip).split(' ').map(Number);
-      for (const pose of samples(clip)) {
-        const paths = solveFigure(pose, clip);
-        const points = [paths.nearArm, paths.farArm, paths.nearLeg, paths.farLeg, paths.neck].flatMap(pathPoints);
+      const parts = ['nearArm', 'farArm', 'nearLeg', 'farLeg', 'neck'] as const;
+      const solved = samples(clip).map((pose) => solveFigure(pose, clip));
+      // Zoomed in on a limb, the parts that never move can be cropped, but whatever moves stays in view.
+      const shown = clip.focus ? parts.filter((part) => solved.some((paths) => paths[part] !== solved[0][part])) : parts;
+      for (const paths of solved) {
+        const points = shown.flatMap((part) => pathPoints(paths[part]));
         for (const [x, y] of points) {
           expect(x).toBeGreaterThan(left);
           expect(x).toBeLessThan(left + width);

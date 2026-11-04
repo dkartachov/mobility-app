@@ -8,9 +8,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { showDialog } from '@/components/dialog';
+import { ExerciseVideo } from '@/components/exercise-video';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
+import { Pager } from '@/components/pager';
 import { Pill, ScoreChangePill } from '@/components/pill';
 import { ProgressBar } from '@/components/progress-bar';
 import { ScoreBars } from '@/components/score-bars';
@@ -298,30 +300,36 @@ function Measure({ index, value, onChange, onBack, onNext, canSkip }: MeasurePro
       <View style={styles.progress}>
         <ProgressBar progress={(index + 1) / TEST_STEPS.length} />
       </View>
-      <ScrollView
-        contentContainerStyle={styles.content}
-       
-        keyboardShouldPersistTaps="handled">
-        <View style={styles.heading}>
-          <View style={styles.headingRow}>
-            <ThemedText type="eyebrow" themeColor="tint">
-              {AREA_LABELS[test.area]}
+      <ExerciseVideo animation={test.animation} />
+      {/* The animation shows what to do, so the full instructions are a swipe away for whoever needs them. */}
+      <Pager>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.heading}>
+            <View style={styles.headingRow}>
+              <ThemedText type="eyebrow" themeColor="tint">
+                {AREA_LABELS[test.area]}
+              </ThemedText>
+              {side && <SidePill label={SIDE_LABELS[side]} />}
+            </View>
+            {/* One line even for long names like "Shoulder external rotation", shrinking if it has to. */}
+            <ThemedText
+              type="title"
+              style={styles.testName}
+              accessibilityRole="header"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}>
+              {test.name}
             </ThemedText>
-            {side && <SidePill label={SIDE_LABELS[side]} />}
+            {test.method.kind !== 'distance' && (
+              <ThemedText themeColor="textSecondary">Start position: {test.method.startPosition.toLowerCase()}</ThemedText>
+            )}
           </View>
-          {/* One line even for long names like "Shoulder external rotation", shrinking if it has to. */}
-          <ThemedText
-            type="title"
-            style={styles.testName}
-            accessibilityRole="header"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}>
-            {test.name}
-          </ThemedText>
-        </View>
-        <ThemedText>{test.instructions}</ThemedText>
-      </ScrollView>
+        </ScrollView>
+        <ScrollView contentContainerStyle={styles.content}>
+          <ThemedText>{test.instructions}</ThemedText>
+        </ScrollView>
+      </Pager>
       {/* Outside the scroll view, so the reading and Cancel stay in view however long the instructions are. */}
       <View style={styles.measurement}>
         <TestMeasurement test={test} value={value} onChange={onChange} />
@@ -431,6 +439,7 @@ const styles = StyleSheet.create({
   },
   progress: {
     paddingHorizontal: Spacing.screen,
+    paddingBottom: Spacing.two,
   },
   heading: {
     gap: Spacing.one,

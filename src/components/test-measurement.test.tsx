@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 
+import { DialogHost } from './dialog';
 import { TestMeasurement } from './test-measurement';
 
 // The phone's sensors are faked: each test hands readings to the measurement's `onResult` itself.
@@ -46,16 +47,30 @@ describe('TestMeasurement', () => {
     const onChange = await measure(150, 170);
 
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByText(/150° and 170° are 20° apart/)).toBeTruthy();
+    expect(screen.getByText('150° · 170°')).toBeTruthy();
     expect(screen.getByText('Measure again')).toBeTruthy();
   });
 
   it('can keep the average of readings that are far apart', async () => {
     const onChange = await measure(150, 170);
 
-    await fireEvent.press(screen.getByText('Use the average anyway'));
+    await fireEvent.press(screen.getByText('Use average'));
     expect(onChange).toHaveBeenCalledWith(160);
-    expect(screen.queryByText(/apart/)).toBeNull();
+    expect(screen.queryByText('150° · 170°')).toBeNull();
+    expect(screen.queryByText('Use average')).toBeNull();
+  });
+
+  it('explains how phone measuring works from the info button', async () => {
+    await render(
+      <>
+        <TestMeasurement test={SHOULDER_ABDUCTION} value={null} onChange={jest.fn()} />
+        <DialogHost />
+      </>
+    );
+
+    await fireEvent.press(screen.getByRole('button', { name: 'How measuring with the phone works' }));
+    expect(screen.getByText('Measuring with the phone')).toBeTruthy();
+    expect(screen.getByText(/arm hanging straight by your side\. Hold still until a tone plays/)).toBeTruthy();
   });
 
   it('starts a new pair after a disagreeing one', async () => {

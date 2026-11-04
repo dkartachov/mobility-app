@@ -31,7 +31,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // The same fixed palette as the exercise photos, which don't change with the theme either.
-const COLORS = { background: '#E3EEEC', ground: '#D8E6E3', mat: '#D0E6E2', near: '#0F8F82', far: '#7DC4BA', band: '#D9443B' };
+const COLORS = { background: '#E3EEEC', ground: '#D8E6E3', mat: '#D0E6E2', near: '#0F8F82', far: '#7DC4BA', band: '#D9443B', scenery: '#BCD3CF' };
 
 const VIEW_BOX = `0 0 ${SCENE.width} ${SCENE.height}`;
 const HEAD_RADIUS = 30;
@@ -73,16 +73,20 @@ export function ExerciseFigure({ clip }: { clip: FigureClip }) {
 
   return (
     <View accessible accessibilityRole="image" accessibilityLabel="Animated demonstration" style={styles.scene}>
-      <Svg width="100%" height="100%" viewBox={VIEW_BOX} style={StyleSheet.absoluteFill}>
-        <Rect width={SCENE.width} height={SCENE.height} fill={COLORS.background} />
+      {/* In the figure's own frame, so the floor and scenery line up with it however the camera moves. */}
+      <Svg width="100%" height="100%" viewBox={viewBox} style={StyleSheet.absoluteFill}>
         {clip.view === 'above' ? (
           <Ellipse cx={SCENE.width / 2} cy={SCENE.height / 2} rx={300} ry={235} fill={COLORS.mat} />
         ) : (
           <>
-            <Rect y={SCENE.floorY + 10} width={SCENE.width} height={SCENE.height} fill={COLORS.ground} />
+            {/* Wider and deeper than the scene, so it still reaches the edges when the camera pulls back. */}
+            <Rect x={-SCENE.width} y={SCENE.floorY + 10} width={SCENE.width * 3} height={SCENE.height} fill={COLORS.ground} />
             <Rect x={120} y={SCENE.floorY} width={720} height={10} rx={5} fill={COLORS.mat} />
           </>
         )}
+        {clip.scenery?.map((item, i) => (
+          <Rect key={i} {...item} rx={4} fill={COLORS.scenery} />
+        ))}
       </Svg>
       <Animated.View style={[StyleSheet.absoluteFill, fade]}>
         <Svg width="100%" height="100%" viewBox={viewBox}>

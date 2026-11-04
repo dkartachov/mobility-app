@@ -8,6 +8,20 @@
  * down with as few setup changes as possible.
  */
 
+import type { FigureClip } from '@/lib/figure-rig';
+
+import {
+  HIP_ABDUCTION,
+  HIP_EXTERNAL_ROTATION,
+  HIP_INTERNAL_ROTATION,
+  KNEE_TO_CHEST,
+  KNEE_TO_WALL,
+  OVERHEAD_REACH,
+  SHOULDER_ABDUCTION,
+  SHOULDER_EXTERNAL_ROTATION,
+  SIT_AND_REACH,
+  STRAIGHT_LEG_RAISE,
+} from './exercise-animations';
 import type { ScoreArea } from './mobility-score';
 
 export type Side = 'left' | 'right';
@@ -119,6 +133,8 @@ export type FlexibilityTest = {
   measurementError: number;
   /** Tested once per side when true. */
   twoSided: boolean;
+  /** Shows the start position and the move into the measurement, above the instructions. */
+  animation: FigureClip;
   instructions: string;
   /** What the number means. */
   measurement: string;
@@ -152,6 +168,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     instructions:
       'Face a wall with this foot in front, pointing straight at the wall, the other foot behind and a hand on the wall for balance. Keeping the front heel on the floor, bend the knee forward until it touches the wall. Move the foot back a little at a time until it is as far as it can be with the knee still touching and the heel still down.',
     measurement: 'Distance from your big toe to the wall',
+    animation: KNEE_TO_WALL,
     // Half centimetres, since a centimetre is a third of the spread between people.
     method: { kind: 'distance', min: 0, max: 20, step: 0.5 },
   },
@@ -175,6 +192,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
       'Stand tall with this arm hanging straight by your side, holding the phone in this hand with the palm facing forward. Keeping the arm and wrist straight, raise it out to the side and up overhead as far as you can, without leaning to the other side or shrugging.',
     measurement: 'Shoulder angle, with the arm by your side as 0°',
     method: { kind: 'tilt', startPosition: 'Arm hanging straight by your side', startAngle: 0 },
+    animation: SHOULDER_ABDUCTION,
   },
   {
     id: 'shoulder-external-rotation',
@@ -199,6 +217,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // The forearm stays level, so its turn outwards is turning around the vertical axis. Only that
     // turning counts, so how the phone is gripped doesn't matter, but a wrist bending sideways does.
     method: { kind: 'rotation', startPosition: 'Forearm pointing straight ahead' },
+    animation: SHOULDER_EXTERNAL_ROTATION,
   },
   {
     id: 'hip-external-rotation',
@@ -223,6 +242,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
       'Sit tall on the edge of a table with your thighs supported and feet hanging free, and tuck the other foot back under the table. Strap the phone along the front of this shin. Relax the leg while a partner holds the knee still and slowly swings the foot inwards, towards the other leg, until it stops or you feel a firm stretch. Keep both sit bones on the table.',
     measurement: 'Angle of the shin from vertical',
     method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
+    animation: HIP_EXTERNAL_ROTATION,
   },
   {
     id: 'hip-internal-rotation',
@@ -246,6 +266,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
       'Sit tall on the edge of a table with your thighs supported and feet hanging free. Strap the phone along the front of this shin. Relax the leg while a partner holds the knee still and slowly swings the foot outwards, away from the other leg, until it stops or you feel a firm stretch. Keep both sit bones on the table.',
     measurement: 'Angle of the shin from vertical',
     method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
+    animation: HIP_INTERNAL_ROTATION,
   },
   {
     id: 'sit-and-reach',
@@ -268,6 +289,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
       'Sit on the floor with your legs straight and together, and the soles of your feet flat against the bottom stair or a sturdy box. Lay a tape measure along the top with 0 at the edge by your toes, running away from you. With one hand on top of the other, slowly reach forward along the tape as far as you can, keeping the knees straight. Hold the furthest point for 2 seconds without bouncing, and take the best of three.',
     measurement: 'Fingertip distance past your toes, negative if you fall short',
     method: { kind: 'distance', min: -30, max: 30 },
+    animation: SIT_AND_REACH,
   },
   {
     id: 'knee-to-chest',
@@ -293,6 +315,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Tilt follows the phone's angle to gravity, so it reads the thigh's angle on the side of the
     // thigh as well as on top. Above the knee, not across it, so bending the knee doesn't move it.
     method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
+    animation: KNEE_TO_CHEST,
   },
   {
     id: 'straight-leg-raise',
@@ -317,6 +340,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     measurement: 'Angle of the leg from the floor',
     // Same phone position as knee to chest. With the knee straight, the thigh's angle is the leg's.
     method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
+    animation: STRAIGHT_LEG_RAISE,
   },
   {
     id: 'hip-abduction',
@@ -343,6 +367,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // turning counts, so it doesn't matter where on the leg the phone sits or which way it faces,
     // as long as the knee stays straight so the shin moves with the thigh.
     method: { kind: 'rotation', startPosition: 'Both legs straight and together' },
+    animation: HIP_ABDUCTION,
   },
   {
     id: 'overhead-reach',
@@ -364,6 +389,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
       'Lie on your back with knees bent and lower back pressed into the floor. Hold the phone in this hand with the arm and wrist straight, pointing at the ceiling. Keeping the arm straight, lower it overhead towards the floor without letting your back arch, your ribs flare or your body bend to the side.',
     measurement: 'Shoulder angle, with the arm by your side as 0°',
     method: { kind: 'tilt', startPosition: 'Arm straight, pointing at the ceiling', startAngle: 90 },
+    animation: OVERHEAD_REACH,
   },
 ];
 
