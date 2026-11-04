@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
 import { ExercisePhoto } from '@/components/exercise-photo';
@@ -10,33 +11,57 @@ import { TextField } from '@/components/field';
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/page-header';
 import { PressableScale } from '@/components/pressable-scale';
-import { FlatList } from '@/components/scroll-view';
+import { FlatList, ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import {
+  EQUIPMENT,
+  EQUIPMENT_LABELS,
   EXERCISE_TYPE_LABELS,
   EXERCISE_TYPES,
   EXERCISES,
+  POSITION_LABELS,
+  POSITIONS,
   searchExercises,
   type Exercise,
-  type ExerciseType,
 } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  filterLibrary,
+  hasLibraryFilters,
+  NO_LIBRARY_FILTERS,
+  toggleLibraryFilter,
+  type LibraryFilters,
+} from '@/lib/library-filters';
 
-const typeOf = (exercise: Exercise): ExerciseType => (exercise.active ? 'active' : 'passive');
+/** Every filter in one row, grouped by what they filter. */
+const FILTER_CHIPS = [
+  ...POSITIONS.map((value) => ({ group: 'positions' as const, value, label: POSITION_LABELS[value] })),
+  ...EQUIPMENT.map((value) => ({ group: 'equipment' as const, value, label: EQUIPMENT_LABELS[value] })),
+  ...EXERCISE_TYPES.map((value) => ({ group: 'types' as const, value, label: EXERCISE_TYPE_LABELS[value] })),
+];
 
 export default function LibraryScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  /** Null shows every type. */
-  const [type, setType] = useState<ExerciseType | null>(null);
-  const results = searchExercises(query).filter((exercise) => type === null || typeOf(exercise) === type);
-  const filtered = query.trim() !== '' || type !== null;
+  const [filters, setFilters] = useState<LibraryFilters>(NO_LIBRARY_FILTERS);
+  // The list follows a moment behind, so the chips and search field respond straight away instead
+  // of waiting for every tile to render; otherwise a chip's fade stalls until the list is done.
+  const listQuery = useDeferredValue(query);
+  const listFilters = useDeferredValue(filters);
+  const searching = listQuery.trim() !== '';
+  const filtering = hasLibraryFilters(listFilters);
+  const results = filterLibrary(searchExercises(listQuery), listFilters);
   const total = `${EXERCISES.length} ${EXERCISES.length === 1 ? 'exercise' : 'exercises'}`;
-  const empty = query.trim()
-    ? `No ${type ? `${EXERCISE_TYPE_LABELS[type].toLowerCase()} ` : ''}exercises match "${query.trim()}".`
-    : 'No exercises of this type.';
+  const empty = searching
+    ? `No exercises match "${listQuery.trim()}"${filtering ? ' with these filters' : ''}.`
+    : 'No exercises match these filters.';
+
+  const clear = () => {
+    setQuery('');
+    setFilters(NO_LIBRARY_FILTERS);
+  };
 
   return (
     <FlatList
@@ -49,7 +74,7 @@ export default function LibraryScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <PageHeader
-            eyebrow={filtered ? `${results.length} of ${total}` : total}
+            eyebrow={searching || filtering ? `${results.length} of ${total}` : total}
             eyebrowColor="textSecondary"
             title="Library"
           />
@@ -68,20 +93,41 @@ export default function LibraryScreen() {
               <Icon name={{ ios: 'magnifyingglass', android: 'search' }} color="textSecondary" size={18} />
             </View>
           </View>
-          <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Exercise type">
-            <Chip label="All" selected={type === null} onPress={() => setType(null)} />
-            {EXERCISE_TYPES.map((option) => (
+          {/* Runs to the screen's edges, so chips scroll off them instead of being cut short inside the padding. */}
+          <ScrollView
+            horizontal
+            keyboardShouldPersistTaps="handled"
+            accessibilityLabel="Filters"
+            style={styles.chipList}
+            contentContainerStyle={styles.chips}>
+            <Chip label="All" selected={!hasLibraryFilters(filters)} onPress={() => setFilters(NO_LIBRARY_FILTERS)} />
+            {FILTER_CHIPS.map(({ group, value, label }) => (
               <Chip
-                key={option}
-                label={EXERCISE_TYPE_LABELS[option]}
-                selected={type === option}
-                onPress={() => setType(option)}
+                key={value}
+                multiSelect
+                label={label}
+                selected={(filters[group] as readonly string[]).includes(value)}
+                onPress={() => setFilters(toggleLibraryFilter(filters, group, value))}
               />
             ))}
+          </ScrollView>
+        </View>
+      }
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Icon name={{ ios: 'magnifyingglass', android: 'search_off' }} color="textSecondary" size={36} />
+          <ThemedText themeColor="textSecondary" style={styles.emptyText}>
+            {empty}
+          </ThemedText>
+          <View style={styles.emptyButton}>
+            <Button
+              title={searching && filtering ? 'Clear all' : searching ? 'Clear search' : 'Clear filters'}
+              variant="secondary"
+              onPress={clear}
+            />
           </View>
         </View>
       }
-      ListEmptyComponent={<ThemedText themeColor="textSecondary">{empty}</ThemedText>}
       renderItem={({ item }) => <ExerciseTile exercise={item} />}
     />
   );
@@ -137,10 +183,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
   },
+  chipList: {
+    marginHorizontal: -Spacing.three,
+  },
   chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+  },
+  empty: {
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingVertical: Spacing.five,
+  },
+  emptyText: {
+    textAlign: 'center',
+  },
+  emptyButton: {
+    alignSelf: 'center',
   },
   tile: {
     flexDirection: 'row',
@@ -168,8 +227,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.half,
     borderRadius: Radius.full,
   },
+  // A little smaller than a regular eyebrow, to fit beside the photo, but not so small it's hard to read.
   tagText: {
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: 0.6,
   },
 });
