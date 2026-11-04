@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 
 import { Card } from '@/components/card';
 import { Icon } from '@/components/icon';
@@ -27,6 +28,9 @@ const TILE_GAP = Spacing.three;
 const TILE_PADDING = Spacing.three;
 /** Lets the tab finish appearing before the cards animate. */
 const ANIMATION_DELAY_MS = 200;
+/** The cards' entrance: each starts this long after the one before. */
+const STAGGER_MS = 60;
+const ENTER_MS = 400;
 
 export default function DashboardScreen() {
   const theme = useTheme();
@@ -77,32 +81,35 @@ export default function DashboardScreen() {
       eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
       title={profile?.firstName ? `Hi, ${profile.firstName}` : 'Dashboard'}
       gap={Spacing.three}>
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityLabel={`Training days. ${trainingMessage}`}
-        onPress={() => router.push('/training-days')}>
-        <Card
-          style={[
-            styles.trainingCard,
-            trainedAllWeek && {
-              borderWidth: 1,
-              borderColor: `${theme.trained}80`,
-              boxShadow: `0 0 16px ${theme.trained}59`,
-            },
-          ]}>
-          <View style={styles.trainingHeader}>
-            <ThemedText type="smallBold" style={styles.trainingMessage}>
-              {trainingMessage}
-            </ThemedText>
-            <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={14} />
-          </View>
-          {weekDays && <WeekStrip days={weekDays} celebration={celebration} delayMs={ANIMATION_DELAY_MS + 150} />}
-        </Card>
-      </PressableScale>
+      <Animated.View entering={enterCard(0)}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`Training days. ${trainingMessage}`}
+          onPress={() => router.push('/training-days')}>
+          <Card
+            style={[
+              styles.trainingCard,
+              trainedAllWeek && {
+                borderWidth: 1,
+                borderColor: `${theme.trained}80`,
+                boxShadow: `0 0 16px ${theme.trained}59`,
+              },
+            ]}>
+            <View style={styles.trainingHeader}>
+              <ThemedText type="smallBold" style={styles.trainingMessage}>
+                {trainingMessage}
+              </ThemedText>
+              <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={14} />
+            </View>
+            {weekDays && <WeekStrip days={weekDays} celebration={celebration} delayMs={ANIMATION_DELAY_MS + 150} />}
+          </Card>
+        </PressableScale>
+      </Animated.View>
 
       {/* Equal widths; time stays short while score grows taller to fit its ring and bars. */}
       <View style={styles.tileRow}>
         <DashboardTile
+          order={1}
           label="Mobility time"
           accessibilityLabel={`Mobility time, ${formatDuration(stats.totalSeconds)}`}
           onPress={() => router.push('/mobility-time')}>
@@ -119,6 +126,7 @@ export default function DashboardScreen() {
         </DashboardTile>
 
         <DashboardTile
+          order={2}
           label="Score"
           accessibilityLabel={`Mobility score${score?.overall == null ? '' : ` ${Math.round(score.overall)}`}`}
           onPress={() => router.push('/mobility-score')}>
@@ -148,6 +156,8 @@ export default function DashboardScreen() {
 }
 
 type DashboardTileProps = {
+  /** Position in the dashboard's staggered entrance. */
+  order: number;
   label: string;
   accessibilityLabel: string;
   onPress: () => void;
@@ -156,24 +166,29 @@ type DashboardTileProps = {
 };
 
 /** Tappable card with a label and chevron along the top. */
-function DashboardTile({ label, accessibilityLabel, onPress, children }: DashboardTileProps) {
+function DashboardTile({ order, label, accessibilityLabel, onPress, children }: DashboardTileProps) {
   return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      style={styles.tile}>
-      <Card style={styles.tileCard}>
-        <View style={styles.tileHeader}>
-          <ThemedText type="eyebrow" themeColor="textSecondary" numberOfLines={1} style={styles.tileLabel}>
-            {label}
-          </ThemedText>
-          <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={14} />
-        </View>
-        {children}
-      </Card>
-    </PressableScale>
+    <Animated.View entering={enterCard(order)} style={styles.tile}>
+      <PressableScale accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress}>
+        <Card style={styles.tileCard}>
+          <View style={styles.tileHeader}>
+            <ThemedText type="eyebrow" themeColor="textSecondary" numberOfLines={1} style={styles.tileLabel}>
+              {label}
+            </ThemedText>
+            <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={14} />
+          </View>
+          {children}
+        </Card>
+      </PressableScale>
+    </Animated.View>
   );
+}
+
+/** Slides each card up into place a little after the one before it. Skipped when reduce motion is on. */
+function enterCard(order: number) {
+  return FadeInDown.delay(order * STAGGER_MS)
+    .duration(ENTER_MS)
+    .easing(Easing.out(Easing.cubic));
 }
 
 const styles = StyleSheet.create({

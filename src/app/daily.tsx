@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { css } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -142,6 +143,7 @@ function TimeOption({ minutes, label, selected, onPress }: TimeOptionProps) {
       onPress={onPress}
       style={[
         styles.option,
+        cssStyles.fade,
         selected
           ? { backgroundColor: theme.tint, boxShadow: `0 8px 20px ${theme.tint}55` }
           : [{ backgroundColor: theme.backgroundElement }, Elevation[scheme]],
@@ -211,5 +213,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+  },
+});
+
+/** Reanimated CSS transitions, which React Native's `StyleSheet.create` doesn't type. */
+const cssStyles = css.create({
+  // Fades between selected and not, instead of snapping.
+  fade: {
+    transitionProperty: 'backgroundColor',
+    transitionDuration: 150,
   },
 });

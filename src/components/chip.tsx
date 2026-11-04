@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { css } from 'react-native-reanimated';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -28,6 +29,7 @@ export function Chip({ label, selected, onPress, multiSelect }: ChipProps) {
       }}
       style={[
         styles.chip,
+        cssStyles.fade,
         {
           backgroundColor: selected ? theme.tint : theme.backgroundElement,
           borderColor: selected ? theme.tint : theme.border,
@@ -46,5 +48,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
+  },
+});
+
+/** Reanimated CSS transitions, which React Native's `StyleSheet.create` doesn't type. */
+const cssStyles = css.create({
+  // Fades between selected and not, instead of snapping.
+  fade: {
+    transitionProperty: ['backgroundColor', 'borderColor'],
+    transitionDuration: 150,
   },
 });
