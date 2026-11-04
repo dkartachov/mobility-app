@@ -38,10 +38,6 @@ yarn-error.*
 
 example
 
-# copyrighted papers, kept locally only (see papers/README.md)
-/papers/roach-miles-normal-hip-and-knee-active-range-of-motion.pdf
-/papers/youdas-et-al-2005-the-influence-of-gender-and-age-on-hamstring-muscle-length-in-healthy-adults.pdf
-
 # generated native folders
 /ios
 /android

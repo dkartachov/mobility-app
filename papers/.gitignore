@@ -1,0 +1,4 @@
+# Copyrighted papers, kept locally only (see README.md). Here rather than in the root .gitignore,
+# which the EAS fingerprint hashes: editing that changes the runtime version and breaks OTA updates.
+/roach-miles-normal-hip-and-knee-active-range-of-motion.pdf
+/youdas-et-al-2005-the-influence-of-gender-and-age-on-hamstring-muscle-length-in-healthy-adults.pdf
