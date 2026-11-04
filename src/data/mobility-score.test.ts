@@ -1,5 +1,6 @@
 import {
   compareScores,
+  explainNoRealChange,
   formatScoreChange,
   maxReadingGap,
   mobilityScore,
@@ -192,16 +193,34 @@ describe('compareScores', () => {
 
   it('counts a change as real only past 95% of what measurement error could do', () => {
     // Errors of 3 points each combine to 4.24, so the cut-off is 8.3 points.
-    expect(compareScores(hipsOnly(58, 3), hipsOnly(50, 3)).overall).toEqual({ points: 8, real: false });
-    expect(compareScores(hipsOnly(59, 3), hipsOnly(50, 3)).overall).toEqual({ points: 9, real: true });
-    expect(compareScores(hipsOnly(41, 3), hipsOnly(50, 3)).overall).toEqual({ points: -9, real: true });
-    expect(compareScores(hipsOnly(50, 3), hipsOnly(50, 3)).overall).toEqual({ points: 0, real: false });
+    expect(compareScores(hipsOnly(58, 3), hipsOnly(50, 3)).overall).toMatchObject({ points: 8, real: false });
+    expect(compareScores(hipsOnly(59, 3), hipsOnly(50, 3)).overall).toMatchObject({ points: 9, real: true });
+    expect(compareScores(hipsOnly(41, 3), hipsOnly(50, 3)).overall).toMatchObject({ points: -9, real: true });
+    expect(compareScores(hipsOnly(50, 3), hipsOnly(50, 3)).overall).toMatchObject({ points: 0, real: false });
+  });
+
+  it('says how big a change measurement error could explain', () => {
+    expect(compareScores(hipsOnly(58, 3), hipsOnly(50, 3)).overall?.noise).toBeCloseTo(1.96 * Math.hypot(3, 3), 2);
   });
 
   it('compares each area, null where either test has no score', () => {
     const { areas } = compareScores(hipsOnly(70, 1), hipsOnly(50, 1));
-    expect(areas.hips).toEqual({ points: 20, real: true });
+    expect(areas.hips).toMatchObject({ points: 20, real: true });
     expect(areas.ankles).toBeNull();
+  });
+});
+
+describe('explainNoRealChange', () => {
+  it('gives the change and how much measuring alone could move the score', () => {
+    const { title, message } = explainNoRealChange({ points: 3, real: false, noise: 8.3 });
+    expect(title).toBe('Why no real change?');
+    expect(message).toMatch(/^Your score went up 3 points, /);
+    expect(message).toContain('up to 8 points');
+  });
+
+  it('reads naturally for no change, one point and a drop', () => {
+    expect(explainNoRealChange({ points: 0, real: false, noise: 6 }).message).toMatch(/^Your score didn't change, /);
+    expect(explainNoRealChange({ points: -1, real: false, noise: 6 }).message).toMatch(/^Your score went down 1 point, /);
   });
 });
 

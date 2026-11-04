@@ -6,9 +6,9 @@ import { ScoreBars } from './score-bars';
 
 const SCORES: AreaScores = { shoulders: 60, hips: 50, hamstrings: 40, ankles: null };
 const CHANGES: ScoreChanges['areas'] = {
-  shoulders: { points: 10, real: true },
-  hips: { points: 2, real: false },
-  hamstrings: { points: -9, real: true },
+  shoulders: { points: 10, real: true, noise: 5 },
+  hips: { points: 2, real: false, noise: 5 },
+  hamstrings: { points: -9, real: true, noise: 5 },
   ankles: null,
 };
 

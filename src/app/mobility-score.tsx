@@ -60,7 +60,7 @@ export default function MobilityScoreScreen() {
                 Take a flexibility test to get your score.
               </ThemedText>
             )}
-            {overallChange !== null && <ScoreChangePill change={overallChange} suffix=" since last test" />}
+            {overallChange !== null && <ScoreChangePill change={overallChange} suffix=" since last test" explainable />}
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <ScoreBars

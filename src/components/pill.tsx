@@ -2,10 +2,12 @@ import type { ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Radius, Spacing, type ThemeColor } from '@/constants/theme';
-import { formatScoreChange, type ScoreChange } from '@/data/mobility-score';
+import { explainNoRealChange, formatScoreChange, type ScoreChange } from '@/data/mobility-score';
 import { useTheme } from '@/hooks/use-theme';
 
+import { showDialog } from './dialog';
 import { Icon } from './icon';
+import { PressableScale } from './pressable-scale';
 import { ThemedText } from './themed-text';
 
 type Tone = 'neutral' | 'accent' | 'danger';
@@ -44,16 +46,30 @@ export function Pill({ label, tone = 'neutral', kind = 'tag', size = 'regular', 
 
 /**
  * How much a score went up or down, e.g. "+4 pts since last test", or "No real change" when it's
- * within measurement error.
+ * within measurement error. With `explainable`, "No real change" is a button that explains why.
  */
-export function ScoreChangePill({ change, suffix = '' }: { change: ScoreChange; suffix?: string }) {
+export function ScoreChangePill({
+  change,
+  suffix = '',
+  explainable = false,
+}: {
+  change: ScoreChange;
+  suffix?: string;
+  explainable?: boolean;
+}) {
   const { points, real } = change;
+  const label = `${real ? formatScoreChange(points) : 'No real change'}${suffix}`;
+  if (real || !explainable) {
+    return <Pill kind="value" tone={!real ? 'neutral' : points > 0 ? 'accent' : 'danger'} label={label} />;
+  }
   return (
-    <Pill
-      kind="value"
-      tone={!real ? 'neutral' : points > 0 ? 'accent' : 'danger'}
-      label={`${real ? formatScoreChange(points) : 'No real change'}${suffix}`}
-    />
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint="Explains why"
+      onPress={() => showDialog(explainNoRealChange(change))}>
+      <Pill kind="value" label={label} icon={{ ios: 'info.circle', android: 'info' }} />
+    </PressableScale>
   );
 }
 

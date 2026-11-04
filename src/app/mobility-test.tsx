@@ -391,7 +391,7 @@ function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => vo
           )}
           {overallChange !== null && (
             <View style={styles.change}>
-              <ScoreChangePill change={overallChange} suffix=" since last test" />
+              <ScoreChangePill change={overallChange} suffix=" since last test" explainable />
             </View>
           )}
         </Animated.View>

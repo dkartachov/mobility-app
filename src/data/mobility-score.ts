@@ -180,6 +180,8 @@ export type ScoreChange = {
    * time when flexibility hasn't changed. Smaller changes are shown as no real change.
    */
   real: boolean;
+  /** The biggest change, in score points, that measurement error alone explains 95% of the time. */
+  noise: number;
 };
 
 export type ScoreChanges = {
@@ -195,7 +197,22 @@ function scoreChange(current: number | null, currentError: number | null, previo
   if (current === null || previous === null) return null;
   // The difference of two scores with independent errors has the error of both combined.
   const noise = Z_95 * Math.hypot(currentError ?? 0, previousError ?? 0);
-  return { points: Math.round(current) - Math.round(previous), real: Math.abs(current - previous) > noise };
+  return { points: Math.round(current) - Math.round(previous), real: Math.abs(current - previous) > noise, noise };
+}
+
+/** Why a change that isn't real is shown as no real change, for an info dialog. */
+export function explainNoRealChange({ points, noise }: ScoreChange) {
+  const moved =
+    points === 0
+      ? "Your score didn't change"
+      : `Your score went ${points > 0 ? 'up' : 'down'} ${Math.abs(points)} ${Math.abs(points) === 1 ? 'point' : 'points'}`;
+  return {
+    title: 'Why no real change?',
+    message:
+      `${moved}, but no measurement is exact. The same person measures a little differently from one day to the next, from how warm they are, the time of day or where the phone sits.\n\n` +
+      `With your results, measuring alone could move your score by up to ${Math.max(1, Math.round(noise))} points, so a smaller change can't be told apart from that. Bigger changes show in points.\n\n` +
+      'Testing the same way each time, at the same time of day, keeps this as small as it can be.',
+  };
 }
 
 /** Changes in the overall and area scores from `previous` to `current`. */

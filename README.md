@@ -109,7 +109,7 @@ Each flexibility test result is scored against published data on healthy adults,
 
 Measuring the same person twice never gives quite the same result, so small score changes are mostly noise. Every test has a `measurementError`: its standard error of measurement, from studies that retested healthy adults (see the sources table below). A result's error in score points is that error times how steeply the score climbs at that result (`scoreError`), so the same error moves a score most near average and barely at either end. Errors are combined the same way as the scores, taking each measurement's error to be independent, so an area or overall score built from many measurements is steadier than any one test.
 
-A change counts as real when it's bigger than 1.96 times the two scores' errors combined (`compareScores`), which measurement error alone would beat less than 5% of the time. Smaller changes show as "No real change" (or "Same" under the area bars), and real ones in points, such as "+12 pts".
+A change counts as real when it's bigger than 1.96 times the two scores' errors combined (`compareScores`), which measurement error alone would beat less than 5% of the time. Smaller changes show as "No real change" (or "Same" under the area bars), and real ones in points, such as "+12 pts". On the score screen and test results, tapping "No real change" explains why, with how many points measuring alone could have moved the score (`explainNoRealChange`).
 
 The errors are from clinicians or researchers measuring, mostly retesting days to a week apart. Self-measuring with a phone probably adds some error, and averaging two readings takes some away, so the cut-off is a reasonable guide rather than exact.
 
