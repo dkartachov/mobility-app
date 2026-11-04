@@ -67,15 +67,39 @@ describe('flexibility test warm-up', () => {
     expect(screen.getByText('Knee to wall')).toBeTruthy();
   });
 
-  it('leaves without asking when the test is declined after the warm-up', async () => {
+  it('asks before leaving when the test is declined after the warm-up', async () => {
     await openTest();
     await fireEvent.press(button('Start warm-up'));
     await fireEvent.press(button('Finish warm-up'));
 
     await fireEvent.press(button('Not now'));
+    expect(screen.getByText('Skip the test?')).toBeTruthy();
 
+    await fireEvent.press(button('Skip test'));
     expect(await screen.findByText('Home')).toBeTruthy();
     expect(screen.queryByText('Warm-up done')).toBeNull();
+  });
+
+  it('stays after the warm-up when skipping the test is cancelled', async () => {
+    await openTest();
+    await fireEvent.press(button('Start warm-up'));
+    await fireEvent.press(button('Finish warm-up'));
+
+    await fireEvent.press(button('Not now'));
+    await fireEvent.press(button('Stay'));
+
+    expect(screen.getByText('Warm-up done')).toBeTruthy();
+  });
+
+  it('asks the same before going back after the warm-up', async () => {
+    await openTest();
+    await fireEvent.press(button('Start warm-up'));
+    await fireEvent.press(button('Finish warm-up'));
+
+    await act(() => router.back());
+
+    expect(screen.getByText('Skip the test?')).toBeTruthy();
+    expect(screen.getByText('Warm-up done')).toBeTruthy();
   });
 
   it('asks before stopping the warm-up, then goes back to the intro', async () => {

@@ -81,10 +81,21 @@ export default function MobilityTestScreen() {
   // The results read the score back from the database, so they wait for the save to finish.
   const phase = startedPhase === 'calculating' && minTimeElapsed && saving !== 'pending' ? 'results' : startedPhase;
 
-  // Mid-warm-up, leaving goes back to the intro; mid-test it loses the measurements; on the results
-  // screen it means "done". Before the warm-up and between it and the test there's nothing to lose.
-  usePreventRemove(phase !== 'intro' && phase !== 'ready' && !leaving, () => {
-    if (phase === 'warmup') {
+  // Leaving after the warm-up wastes it, so it's confirmed whether by Not now or Android's back.
+  const confirmSkipTest = () =>
+    showDialog({
+      title: 'Skip the test?',
+      message: "You'll need to warm up again next time.",
+      cancelLabel: 'Stay',
+      confirm: { label: 'Skip test', onPress: () => setLeaving('cancel') },
+    });
+
+  // Mid-warm-up, leaving goes back to the intro; after it, it wastes the warm-up; mid-test it loses
+  // the measurements; on the results screen it means "done". Before the warm-up there's nothing to lose.
+  usePreventRemove(phase !== 'intro' && !leaving, () => {
+    if (phase === 'ready') {
+      confirmSkipTest();
+    } else if (phase === 'warmup') {
       showDialog({
         title: 'Stop the warm-up?',
         message: "You'll need to warm up again before testing.",
@@ -154,9 +165,10 @@ export default function MobilityTestScreen() {
       <Stack.Screen
         options={{
           title: phase === 'measuring' ? `${index + 1} of ${TEST_STEPS.length}` : '',
-          // The warm-up player has its own back button in place of the header.
-          headerShown: !fullScreen && phase !== 'warmup',
-          gestureEnabled: !fullScreen,
+          // The warm-up player has its own back button in place of the header. Once it's done, the
+          // only ways on are its screen's two buttons.
+          headerShown: !fullScreen && phase !== 'warmup' && phase !== 'ready',
+          gestureEnabled: !fullScreen && phase !== 'ready',
         }}
       />
       {phase === 'intro' && (
@@ -167,7 +179,7 @@ export default function MobilityTestScreen() {
         />
       )}
       {phase === 'warmup' && <Warmup onComplete={() => setPhase('ready')} />}
-      {phase === 'ready' && <Ready onStart={() => setPhase('measuring')} onCancel={() => setLeaving('cancel')} />}
+      {phase === 'ready' && <Ready onStart={() => setPhase('measuring')} onCancel={confirmSkipTest} />}
       {phase === 'measuring' && (
         <Measure
           key={index}
@@ -247,7 +259,7 @@ function Ready({ onStart, onCancel }: { onStart: () => void; onCancel: () => voi
   const insets = useSafeAreaInsets();
 
   return (
-    <ThemedView style={[styles.screen, styles.centeredScreen]}>
+    <ThemedView style={[styles.screen, styles.centeredScreen, { paddingTop: insets.top }]}>
       <View style={styles.readyContent}>
         <Animated.View entering={ZoomIn.springify()}>
           <IconBadge name={{ ios: 'checkmark', android: 'check' }} size={88} />
