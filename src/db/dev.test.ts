@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { expectedResult } from '@/data/mobility-score';
+import { normAt } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { addDays, todayKey } from '@/lib/dates';
 import { createTestDb } from '@/test-utils/sqlite';
@@ -45,9 +45,9 @@ describe('addDevMobilityTestResults', () => {
     );
     for (const { exercise_id, value } of results) {
       const { norm } = FLEXIBILITY_TESTS.find((t) => t.id === exercise_id)!;
-      const mean = expectedResult(norm, { sex: null, age: null });
+      const { mean, sd } = normAt(norm, { sex: null, age: null });
       // Rounding can take a result half a unit past the spread.
-      expect(Math.abs(value - mean)).toBeLessThanOrEqual(DEV_RESULT_SPREAD * norm.sd + 0.5);
+      expect(Math.abs(value - mean)).toBeLessThanOrEqual(DEV_RESULT_SPREAD * sd + 0.5);
     }
   });
 });

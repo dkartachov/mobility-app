@@ -16,7 +16,7 @@ import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
-import { NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
+import { NO_AREA_SCORES } from '@/data/mobility-score';
 import { useMobilityScore, useTestSchedule, type TestSchedule } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateKey } from '@/lib/dates';
@@ -36,7 +36,7 @@ export default function MobilityScoreScreen() {
   const insets = useSafeAreaInsets();
   const schedule = useTestSchedule();
   const score = useMobilityScore();
-  const overallChange = score ? scoreChange(score.overall, score.previous?.overall) : null;
+  const overallChange = score?.changes?.overall ?? null;
 
   return (
     <ThemedView style={styles.screen}>
@@ -65,7 +65,7 @@ export default function MobilityScoreScreen() {
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <ScoreBars
             scores={score?.areas ?? NO_AREA_SCORES}
-            previous={score?.previous?.areas}
+            changes={score?.changes?.areas}
             delayMs={ANIMATION_DELAY_MS}
             barHeight={140}
           />

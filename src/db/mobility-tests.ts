@@ -1,6 +1,13 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { mobilityScore, type Demographics, type MobilityScore, type ScoredResult } from '@/data/mobility-score';
+import {
+  compareScores,
+  mobilityScore,
+  type Demographics,
+  type MobilityScore,
+  type ScoreChanges,
+  type ScoredResult,
+} from '@/data/mobility-score';
 import type { Side, Unit } from '@/data/mobility-tests';
 import { addDays, ageFromDateKey, daysBetween, toDateKey, todayKey, type DateKey } from '@/lib/dates';
 
@@ -65,6 +72,8 @@ export function useTestSchedule() {
 export type ScoreWithBaseline = MobilityScore & {
   /** The score from the previous test with results, `null` before there are two. */
   previous: MobilityScore | null;
+  /** Changes since the previous test, `null` before there are two. */
+  changes: ScoreChanges | null;
 };
 
 /**
@@ -93,7 +102,9 @@ export async function getMobilityScore(db: SQLiteDatabase): Promise<ScoreWithBas
   };
   const [latest, previous] = tests;
   if (!latest) return null;
-  return { ...(await scoreOf(latest)), previous: previous ? await scoreOf(previous) : null };
+  const current = await scoreOf(latest);
+  const before = previous ? await scoreOf(previous) : null;
+  return { ...current, previous: before, changes: before ? compareScores(current, before) : null };
 }
 
 export function useMobilityScore() {

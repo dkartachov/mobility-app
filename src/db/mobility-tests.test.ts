@@ -64,10 +64,10 @@ describe('mobility tests', () => {
     expect(await getMobilityScore(db)).toBeNull();
   });
 
-  // Without a profile, sit and reach is compared with both sexes up to the peak age: 1.75 cm ± 10 cm.
+  // Without a profile, sit and reach is compared with both sexes up to the peak age: 1.75 cm ± 9.8 cm.
   it('scores the latest test with results', async () => {
     await logMobilityTest(db, new Date(2026, 8, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 1.75, unit: 'cm' }]);
-    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.75, unit: 'cm' }]);
+    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.55, unit: 'cm' }]);
     // A later test without results, like the dev tools' "Log flexibility test today", doesn't count.
     await logMobilityTest(db, new Date(2026, 9, 2, 9));
 
@@ -79,7 +79,7 @@ describe('mobility tests', () => {
   });
 
   it('has no previous score after only one test with results', async () => {
-    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.75, unit: 'cm' }]);
+    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.55, unit: 'cm' }]);
     expect(await getMobilityScore(db)).toMatchObject({ overall: expect.closeTo(84.13, 2), previous: null });
   });
 

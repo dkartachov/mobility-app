@@ -22,7 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WorkoutPlayer } from '@/components/workout-player';
 import { Spacing } from '@/constants/theme';
-import { SCORE_AREAS, SCORE_BAND_LABELS, scoreBand, scoreChange } from '@/data/mobility-score';
+import { SCORE_AREAS, SCORE_BAND_LABELS, scoreBand } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS, METHOD_UNITS, SIDE_LABELS, TEST_STEPS } from '@/data/mobility-tests';
 import {
   TEST_WARMUP,
@@ -41,8 +41,8 @@ const CALCULATING_MS = 2000;
 /** Lets the results fade in before the score animates. */
 const ANIMATION_DELAY_MS = 300;
 
-/** The measurements themselves, without the warm-up. */
-const TEST_MINUTES = 20;
+/** The measurements themselves, without the warm-up, with two readings for each phone measurement. */
+const TEST_MINUTES = 25;
 
 const TIPS = [
   'Test at the same time of day, ideally before a workout.',
@@ -372,7 +372,7 @@ function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => vo
   const loaded = useMobilityScore();
   const score = saveFailed ? null : loaded;
   const overall = score?.overall ?? null;
-  const overallChange = score ? scoreChange(score.overall, score.previous?.overall) : null;
+  const overallChange = score?.changes?.overall ?? null;
 
   return (
     <ThemedView style={[styles.screen, { paddingTop: insets.top }]}>
@@ -402,7 +402,7 @@ function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => vo
                 icon={{ ios: 'chart.bar.fill', android: 'bar_chart' }}
                 title={score.previous ? 'Improvement by area' : 'By area'}
               />
-              <ScoreBars scores={score.areas} previous={score.previous?.areas} delayMs={ANIMATION_DELAY_MS} />
+              <ScoreBars scores={score.areas} changes={score.changes?.areas} delayMs={ANIMATION_DELAY_MS} />
             </Card>
             <ScoreBreakdown score={score} />
           </>

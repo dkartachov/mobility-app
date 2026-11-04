@@ -4,7 +4,7 @@
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { expectedResult } from '@/data/mobility-score';
+import { normAt } from '@/data/mobility-score';
 import { METHOD_UNITS, TEST_STEPS } from '@/data/mobility-tests';
 import { addDays, daysBetween, todayKey } from '@/lib/dates';
 import { MILESTONE_HOURS, milestoneProgress } from '@/lib/milestones';
@@ -69,8 +69,7 @@ export const DEV_RESULT_SPREAD = 2.5;
  */
 function randomResults(previous: Map<string, number>) {
   return TEST_STEPS.map(({ test, side }) => {
-    const { sd } = test.norm;
-    const mean = expectedResult(test.norm, { sex: null, age: null });
+    const { mean, sd } = normAt(test.norm, { sex: null, age: null });
     const last = previous.get(`${test.id}:${side}`);
     const [firstLow, firstHigh] = DEV_FIRST_RESULT_RANGE;
     const value =

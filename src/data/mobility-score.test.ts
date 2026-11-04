@@ -1,24 +1,29 @@
 import {
-  expectedResult,
+  compareScores,
   formatScoreChange,
+  maxReadingGap,
   mobilityScore,
   normalCdf,
+  normAt,
   SCORE_AREAS,
   SCORE_BAND_LABELS,
   SCORE_COLOR_STOPS,
   SCORE_COLORS,
   scoreBand,
-  scoreChange,
+  scoreError,
   scoreResult,
   type Demographics,
+  type MobilityScore,
   type ScoreBand,
 } from './mobility-score';
-import { FLEXIBILITY_TESTS, NORM_PEAK_AGE, type TestNorm } from './mobility-tests';
+import { FLEXIBILITY_TESTS, NORM_PEAK_AGE, OLDEST_NORM_AGE, type TestNorm } from './mobility-tests';
 
+// Steady to 30, then 2 (men) and 4 (women) a decade less until 80.
 const NORM: TestNorm = {
-  mean: { male: 40, female: 50 },
-  sd: 10,
-  perDecade: { male: -2, female: -4 },
+  byAge: [
+    { age: NORM_PEAK_AGE, mean: { male: 40, female: 50 }, sd: { male: 10, female: 10 } },
+    { age: OLDEST_NORM_AGE, mean: { male: 30, female: 30 }, sd: { male: 10, female: 10 } },
+  ],
   evidence: 'strong',
 };
 const ANYONE: Demographics = { sex: null, age: null };
@@ -32,20 +37,34 @@ describe('normalCdf', () => {
   });
 });
 
-describe('expectedResult', () => {
+describe('normAt', () => {
   it('uses the average for the sex, or of both sexes when unknown', () => {
-    expect(expectedResult(NORM, { sex: 'male', age: null })).toBe(40);
-    expect(expectedResult(NORM, { sex: 'female', age: null })).toBe(50);
-    expect(expectedResult(NORM, ANYONE)).toBe(45);
+    expect(normAt(NORM, { sex: 'male', age: null }).mean).toBe(40);
+    expect(normAt(NORM, { sex: 'female', age: null }).mean).toBe(50);
+    expect(normAt(NORM, ANYONE).mean).toBe(45);
   });
 
-  it('changes by decade past the peak age only, up to the oldest norm age', () => {
-    expect(expectedResult(NORM, { sex: 'male', age: 20 })).toBe(40);
-    expect(expectedResult(NORM, { sex: 'male', age: NORM_PEAK_AGE })).toBe(40);
-    expect(expectedResult(NORM, { sex: 'male', age: 55 })).toBe(35);
-    expect(expectedResult(NORM, { sex: 'female', age: 55 })).toBe(40);
-    expect(expectedResult(NORM, { sex: null, age: 55 })).toBe(37.5);
-    expect(expectedResult(NORM, { sex: 'male', age: 95 })).toBe(expectedResult(NORM, { sex: 'male', age: 80 }));
+  it('changes between the ages it has, and holds before the first and after the last', () => {
+    expect(normAt(NORM, { sex: 'male', age: 20 }).mean).toBe(40);
+    expect(normAt(NORM, { sex: 'male', age: NORM_PEAK_AGE }).mean).toBe(40);
+    expect(normAt(NORM, { sex: 'male', age: 55 }).mean).toBe(35);
+    expect(normAt(NORM, { sex: 'female', age: 55 }).mean).toBe(40);
+    expect(normAt(NORM, { sex: null, age: 55 }).mean).toBe(37.5);
+    expect(normAt(NORM, { sex: 'male', age: 95 }).mean).toBe(30);
+  });
+
+  it('interpolates the SD of each sex too', () => {
+    const norm: TestNorm = {
+      byAge: [
+        { age: 20, mean: { male: 10, female: 10 }, sd: { male: 4, female: 2 } },
+        { age: 40, mean: { male: 8, female: 6 }, sd: { male: 2, female: 2 } },
+        { age: 60, mean: { male: 6, female: 4 }, sd: { male: 2, female: 1 } },
+      ],
+      evidence: 'strong',
+    };
+    expect(normAt(norm, { sex: 'male', age: 30 })).toEqual({ mean: 9, sd: 3 });
+    expect(normAt(norm, { sex: 'female', age: 50 })).toEqual({ mean: 5, sd: 1.5 });
+    expect(normAt(norm, { sex: null, age: 30 })).toEqual({ mean: 8.5, sd: 2.5 });
   });
 });
 
@@ -68,6 +87,20 @@ describe('scoreResult', () => {
   });
 });
 
+describe('scoreError', () => {
+  const TEST = { ...FLEXIBILITY_TESTS[0], norm: NORM, measurementError: 2 };
+
+  it('is the measurement error times the slope of the score', () => {
+    // At average the score climbs 100 × 0.3989 points per SD, and 2 is a fifth of an SD.
+    expect(scoreError(45, TEST, ANYONE)).toBeCloseTo(7.98, 2);
+  });
+
+  it('shrinks towards either end, where the score barely moves', () => {
+    expect(scoreError(65, TEST, ANYONE)).toBeLessThan(scoreError(55, TEST, ANYONE));
+    expect(scoreError(25, TEST, ANYONE)).toBeCloseTo(scoreError(65, TEST, ANYONE));
+  });
+});
+
 it('bands scores by percentile', () => {
   expect(scoreBand(0)).toBe('wellBelow');
   expect(scoreBand(9.9)).toBe('wellBelow');
@@ -81,21 +114,21 @@ it('bands scores by percentile', () => {
 });
 
 describe('mobilityScore', () => {
-  // Men at 30: knee to wall 11 ± 3 cm, hip abduction 42° ± 10°, knee to chest 130° ± 10°, sit and
+  // Men at 25: knee to wall 11 ± 3.6 cm, hip abduction 41° ± 8.3°, knee to chest 130° ± 7.8°, sit and
   // reach 1.5 cm short of the toes ± 10 cm.
-  const MAN: Demographics = { sex: 'male', age: 30 };
+  const MAN: Demographics = { sex: 'male', age: 25 };
 
   it('averages sides, then tests within an area, then areas', () => {
     const score = mobilityScore(
       [
         // Ankles: one SD below average on the left, one above on the right.
-        { exerciseId: 'knee-to-wall', side: 'left', value: 8, unit: 'cm' },
-        { exerciseId: 'knee-to-wall', side: 'right', value: 14, unit: 'cm' },
+        { exerciseId: 'knee-to-wall', side: 'left', value: 7.4, unit: 'cm' },
+        { exerciseId: 'knee-to-wall', side: 'right', value: 14.6, unit: 'cm' },
         // Hips: hip abduction one SD above, knee to chest one SD below, on both sides.
-        { exerciseId: 'hip-abduction', side: 'left', value: 52, unit: 'deg' },
-        { exerciseId: 'hip-abduction', side: 'right', value: 52, unit: 'deg' },
-        { exerciseId: 'knee-to-chest', side: 'left', value: 120, unit: 'deg' },
-        { exerciseId: 'knee-to-chest', side: 'right', value: 120, unit: 'deg' },
+        { exerciseId: 'hip-abduction', side: 'left', value: 49.3, unit: 'deg' },
+        { exerciseId: 'hip-abduction', side: 'right', value: 49.3, unit: 'deg' },
+        { exerciseId: 'knee-to-chest', side: 'left', value: 122.2, unit: 'deg' },
+        { exerciseId: 'knee-to-chest', side: 'right', value: 122.2, unit: 'deg' },
       ],
       MAN
     );
@@ -108,18 +141,31 @@ describe('mobilityScore', () => {
   it('scores each test and each of its sides', () => {
     const score = mobilityScore(
       [
-        { exerciseId: 'knee-to-wall', side: 'left', value: 8, unit: 'cm' },
-        { exerciseId: 'knee-to-wall', side: 'right', value: 14, unit: 'cm' },
+        { exerciseId: 'knee-to-wall', side: 'left', value: 7.4, unit: 'cm' },
+        { exerciseId: 'knee-to-wall', side: 'right', value: 14.6, unit: 'cm' },
         { exerciseId: 'sit-and-reach', side: null, value: -1.5, unit: 'cm' },
       ],
       MAN
     );
     expect(score.tests['knee-to-wall']).toEqual({
       score: expect.closeTo(50),
+      error: expect.any(Number),
       sides: { left: expect.closeTo(15.87, 2), right: expect.closeTo(84.13, 2) },
     });
-    expect(score.tests['sit-and-reach']).toEqual({ score: expect.closeTo(50), sides: {} });
+    expect(score.tests['sit-and-reach']).toEqual({ score: expect.closeTo(50), error: expect.any(Number), sides: {} });
     expect(score.tests['knee-to-chest']).toBeUndefined();
+  });
+
+  it('combines errors so that averaging more results makes a score steadier', () => {
+    const atAverage = (side: 'left' | 'right') => ({ exerciseId: 'knee-to-wall', side, value: 11, unit: 'cm' as const });
+    const one = mobilityScore([atAverage('left')], MAN);
+    const both = mobilityScore([atAverage('left'), atAverage('right')], MAN);
+    // 0.7 cm on an SD of 3.6 cm, at average.
+    expect(one.tests['knee-to-wall']!.error).toBeCloseTo(100 * 0.3989 * (0.7 / 3.6), 1);
+    expect(both.tests['knee-to-wall']!.error).toBeCloseTo(one.tests['knee-to-wall']!.error / Math.SQRT2);
+    expect(both.errors.areas.ankles).toBeCloseTo(both.tests['knee-to-wall']!.error);
+    expect(both.errors.overall).toBeCloseTo(both.tests['knee-to-wall']!.error);
+    expect(both.errors.areas.hips).toBeNull();
   });
 
   it('leaves out results in a unit the test no longer uses', () => {
@@ -129,23 +175,46 @@ describe('mobilityScore', () => {
   });
 });
 
-describe('scoreChange', () => {
-  it('compares the rounded scores', () => {
-    expect(scoreChange(60.4, 50.6)).toBe(9);
-    expect(scoreChange(40, 52)).toBe(-12);
+describe('compareScores', () => {
+  const NO_AREAS = { shoulders: null, hips: null, hamstrings: null, ankles: null };
+  /** A score with only hips, for an overall of `overall` with a standard error of `error`. */
+  const hipsOnly = (overall: number, error: number): MobilityScore => ({
+    areas: { ...NO_AREAS, hips: overall },
+    tests: {},
+    overall,
+    errors: { areas: { ...NO_AREAS, hips: error }, overall: error },
   });
 
-  it('is null without both scores', () => {
-    expect(scoreChange(null, 50)).toBeNull();
-    expect(scoreChange(50, null)).toBeNull();
-    expect(scoreChange(50, undefined)).toBeNull();
+  it('compares the rounded scores', () => {
+    expect(compareScores(hipsOnly(60.4, 1), hipsOnly(50.6, 1)).overall?.points).toBe(9);
+    expect(compareScores(hipsOnly(40, 1), hipsOnly(52, 1)).overall?.points).toBe(-12);
+  });
+
+  it('counts a change as real only past 95% of what measurement error could do', () => {
+    // Errors of 3 points each combine to 4.24, so the cut-off is 8.3 points.
+    expect(compareScores(hipsOnly(58, 3), hipsOnly(50, 3)).overall).toEqual({ points: 8, real: false });
+    expect(compareScores(hipsOnly(59, 3), hipsOnly(50, 3)).overall).toEqual({ points: 9, real: true });
+    expect(compareScores(hipsOnly(41, 3), hipsOnly(50, 3)).overall).toEqual({ points: -9, real: true });
+    expect(compareScores(hipsOnly(50, 3), hipsOnly(50, 3)).overall).toEqual({ points: 0, real: false });
+  });
+
+  it('compares each area, null where either test has no score', () => {
+    const { areas } = compareScores(hipsOnly(70, 1), hipsOnly(50, 1));
+    expect(areas.hips).toEqual({ points: 20, real: true });
+    expect(areas.ankles).toBeNull();
   });
 });
 
-it('formats changes with a sign', () => {
-  expect(formatScoreChange(12)).toBe('+12%');
-  expect(formatScoreChange(-8)).toBe('−8%');
-  expect(formatScoreChange(0)).toBe('0%');
+it('allows readings as far apart as the measurement error explains 95% of the time', () => {
+  const test = { ...FLEXIBILITY_TESTS[0], measurementError: 6.3 };
+  expect(maxReadingGap(test)).toBeCloseTo(17.46, 2);
+});
+
+it('formats changes in points with a sign', () => {
+  expect(formatScoreChange(12)).toBe('+12 pts');
+  expect(formatScoreChange(-8)).toBe('−8 pts');
+  expect(formatScoreChange(0)).toBe('0 pts');
+  expect(formatScoreChange(3, 'points')).toBe('+3 points');
 });
 
 it('has a test for every score area, each testing a different movement', () => {
@@ -160,10 +229,16 @@ it('has a stop for every score color', () => {
   expect(SCORE_COLOR_STOPS).toHaveLength(SCORE_COLORS.length);
 });
 
-it('has a sensible norm for every test', () => {
-  for (const { id, norm } of FLEXIBILITY_TESTS) {
-    expect([id, norm.sd > 0]).toEqual([id, true]);
-    // Flexibility declines with age.
-    expect([id, norm.perDecade.male <= 0 && norm.perDecade.female <= 0]).toEqual([id, true]);
+it('has a sensible norm and measurement error for every test', () => {
+  for (const { id, norm, measurementError } of FLEXIBILITY_TESTS) {
+    const ages = norm.byAge.map((point) => point.age);
+    expect([id, ages]).toEqual([id, [...ages].sort((a, b) => a - b)]);
+    expect([id, new Set(ages).size]).toEqual([id, ages.length]);
+    for (const { sd } of norm.byAge) expect([id, sd.male > 0 && sd.female > 0]).toEqual([id, true]);
+    // Flexibility is no better in the oldest than the youngest.
+    const [youngest, oldest] = [norm.byAge[0], norm.byAge[norm.byAge.length - 1]];
+    expect([id, oldest.mean.male <= youngest.mean.male && oldest.mean.female <= youngest.mean.female]).toEqual([id, true]);
+    // Well under the spread between people, or the test couldn't tell anyone apart.
+    expect([id, measurementError > 0 && measurementError <= Math.min(youngest.sd.male, youngest.sd.female) / 2]).toEqual([id, true]);
   }
 });

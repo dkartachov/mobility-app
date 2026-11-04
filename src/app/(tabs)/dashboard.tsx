@@ -14,7 +14,7 @@ import { ScoreRing } from '@/components/score-ring';
 import { ThemedText } from '@/components/themed-text';
 import { WeekStrip } from '@/components/week-strip';
 import { Radius, Spacing } from '@/constants/theme';
-import { NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
+import { NO_AREA_SCORES } from '@/data/mobility-score';
 import { useMobilityScore } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
 import { useStats, useWeekDays } from '@/db/sessions';
@@ -42,7 +42,7 @@ export default function DashboardScreen() {
   const score = useMobilityScore();
   // Fills its half-width tile, whatever the size of the phone.
   const ringSize = (width - SCREEN_PADDING * 2 - TILE_GAP) / 2 - TILE_PADDING * 2;
-  const scoreDelta = score ? scoreChange(score.overall, score.previous?.overall) : null;
+  const scoreDelta = score?.changes?.overall ?? null;
 
   // Native tabs all mount when the app loads, with Start showing. Waiting for the first time this
   // tab is opened means the cards' animations play when they can be seen.

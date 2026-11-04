@@ -2,10 +2,11 @@ import { Slider } from '@expo/ui/community/slider';
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
+import { maxReadingGap } from '@/data/mobility-score';
 import { METHOD_UNITS, UNIT_LABELS, type FlexibilityTest, type PhoneMethod } from '@/data/mobility-tests';
 import { usePhoneMeasurement } from '@/hooks/use-phone-measurement';
 import { useTheme } from '@/hooks/use-theme';
@@ -17,6 +18,12 @@ import { ThemedText } from './themed-text';
 
 /** Lines kept for the status under the reading, enough for the longest start position. */
 const STATUS_LINES = 3;
+
+/**
+ * Phone measurements are taken this many times and averaged, which roughly halves how much a
+ * single slightly-off reading moves the score.
+ */
+export const PHONE_READINGS = 2;
 
 type MeasurementProps = {
   test: FlexibilityTest;
@@ -43,7 +50,13 @@ export function TestMeasurement({ test, value, onChange }: MeasurementProps) {
           label={test.measurement}
         />
       ) : (
-        <PhoneMeasurement method={method} value={value} onChange={onChange} label={test.measurement} />
+        <PhoneMeasurement
+          method={method}
+          value={value}
+          onChange={onChange}
+          label={test.measurement}
+          maxGap={maxReadingGap(test)}
+        />
       )}
     </Card>
   );
@@ -54,11 +67,14 @@ function PhoneMeasurement({
   value,
   onChange,
   label,
+  maxGap,
 }: {
   method: PhoneMethod;
   value: number | null;
   onChange: (value: number | null) => void;
   label: string;
+  /** Readings further apart than this aren't averaged without asking, see `maxReadingGap`. */
+  maxGap: number;
 }) {
   useKeepAwake();
   const ding = useAudioPlayer(require('@/assets/sounds/ding.wav'));
@@ -70,11 +86,22 @@ function PhoneMeasurement({
     Haptics.notificationAsync(haptic);
   };
 
+  // Readings in the set being taken. The step's value only changes once a set is complete and its
+  // readings agree (or are kept anyway), so taking a new set keeps the previous result until then.
+  const [readings, setReadings] = useState<number[]>([]);
+  const [keptAnyway, setKeptAnyway] = useState(false);
+  const average = (rs: number[]) => rs.reduce((sum, r) => sum + r, 0) / rs.length;
+  const gap = (rs: number[]) => Math.max(...rs) - Math.min(...rs);
   const { phase, angle, holdProgress, start, cancel } = usePhoneMeasurement(method, {
     onZeroed: () => cue(Haptics.NotificationFeedbackType.Warning),
     onResult: (result) => {
-      cue(Haptics.NotificationFeedbackType.Success);
-      onChange(result);
+      const next = readings.length === PHONE_READINGS ? [result] : [...readings, result];
+      const complete = next.length === PHONE_READINGS;
+      const agree = !complete || gap(next) <= maxGap;
+      cue(agree ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error);
+      setReadings(next);
+      setKeptAnyway(false);
+      if (complete && agree) onChange(average(next));
     },
   });
   const unit = UNIT_LABELS[METHOD_UNITS[method.kind]];
@@ -91,13 +118,25 @@ function PhoneMeasurement({
   }
 
   const active = phase === 'zeroing' || phase === 'measuring';
-  const reading = phase === 'measuring' ? angle : phase === 'zeroing' ? null : value;
+  // Part way through a set, between readings.
+  const midSet = !active && readings.length > 0 && readings.length < PHONE_READINGS;
+  const reading =
+    phase === 'measuring' ? angle : phase === 'zeroing' ? null : midSet ? readings[readings.length - 1] : value;
+  const finished = readings.length === PHONE_READINGS ? readings : null;
+  // A finished set whose readings are too far apart to average without asking.
+  const disagree = !active && finished !== null && gap(finished) > maxGap && !keptAnyway;
   const status = {
-    idle: 'Hands-free: a tone plays once the start position is set, and again when the result is saved.',
+    disagree: finished
+      ? `${finished.map((r) => `${r}${unit}`).join(' and ')} are ${gap(finished)}${unit} apart, too far for the same stretch. Check the phone hasn’t slipped and measure again.`
+      : '',
+    idle: `Hands-free: a tone plays when the start position is set and when each of the ${PHONE_READINGS} readings is saved.`,
     zeroing: `Get into the start position and hold still: ${method.startPosition.toLowerCase()}`,
     measuring: 'Move into the stretch, then hold still at your furthest point',
-    done: 'Saved. Measure again if it didn’t feel like your furthest point.',
-  }[phase === 'idle' && value !== null ? 'done' : phase];
+    midSet: `Reading ${readings.length} of ${PHONE_READINGS} saved. Measure again the same way and they'll be averaged.`,
+    done: finished
+      ? `Saved the average of ${finished.map((r) => `${r}${unit}`).join(' and ')}. Measure again if either didn’t feel like your furthest point.`
+      : 'Saved. Measure again if it didn’t feel like your furthest point.',
+  }[disagree ? 'disagree' : midSet ? 'midSet' : phase === 'idle' && value !== null ? 'done' : phase];
 
   // The same layout in every phase, only the contents change, so the box keeps its size when
   // measuring starts and ends.
@@ -107,8 +146,8 @@ function PhoneMeasurement({
         {reading === null ? '—' : `${reading}${unit}`}
       </ThemedText>
       <ThemedText
-        type={active ? 'smallBold' : 'small'}
-        themeColor={active ? 'text' : 'textSecondary'}
+        type={active || disagree ? 'smallBold' : 'small'}
+        themeColor={disagree ? 'danger' : active ? 'text' : 'textSecondary'}
         style={[styles.centered, styles.status]}
         numberOfLines={STATUS_LINES}>
         {status}
@@ -121,6 +160,20 @@ function PhoneMeasurement({
       </View>
       {active ? (
         <Button title="Cancel" variant="secondary" onPress={cancel} />
+      ) : disagree ? (
+        <>
+          <Button title="Measure again" onPress={start} />
+          <Button
+            title="Use the average anyway"
+            variant="secondary"
+            onPress={() => {
+              setKeptAnyway(true);
+              onChange(average(finished!));
+            }}
+          />
+        </>
+      ) : midSet ? (
+        <Button title={`Take reading ${readings.length + 1}`} onPress={start} />
       ) : (
         <Button
           title={value !== null ? 'Measure again' : 'Start measuring'}

@@ -14,8 +14,9 @@ import {
   SCORE_AREAS,
   SCORE_COLOR_STOPS,
   SCORE_COLORS,
-  scoreChange,
   type AreaScores,
+  type ScoreChange,
+  type ScoreChanges,
 } from '@/data/mobility-score';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -32,8 +33,8 @@ const GRADIENT = `linear-gradient(to top, ${SCORE_COLORS.map((color, i) => `${co
 type ScoreBarsProps = {
   /** 0–100 for each area, `null` for none yet. */
   scores: AreaScores;
-  /** Scores from the previous test, to show each area's change under its label. */
-  previous?: AreaScores | null;
+  /** Changes since the previous test, to show under each area's label. */
+  changes?: ScoreChanges['areas'] | null;
   delayMs?: number;
   barHeight?: number;
   /** A small version with only the bars, no numbers or labels. */
@@ -44,7 +45,7 @@ type ScoreBarsProps = {
  * A vertical bar per score area, filling up from the bottom on mount and again from where it is
  * whenever its score changes.
  */
-export function ScoreBars({ scores, previous, delayMs = 0, barHeight = 180, barsOnly = false }: ScoreBarsProps) {
+export function ScoreBars({ scores, changes, delayMs = 0, barHeight = 180, barsOnly = false }: ScoreBarsProps) {
   return (
     <View style={styles.row}>
       {SCORE_AREAS.map(({ id, label }, i) => (
@@ -53,7 +54,7 @@ export function ScoreBars({ scores, previous, delayMs = 0, barHeight = 180, bars
           label={label}
           score={scores[id]}
           // `undefined` without a previous test, so no change row shows at all.
-          change={previous ? scoreChange(scores[id], previous[id]) : undefined}
+          change={changes ? changes[id] : undefined}
           delayMs={delayMs + i * STAGGER_MS}
           height={barHeight}
           barOnly={barsOnly}
@@ -66,8 +67,8 @@ export function ScoreBars({ scores, previous, delayMs = 0, barHeight = 180, bars
 type ScoreBarProps = {
   label: string;
   score: number | null;
-  /** Points since the previous test, `null` if either test has no score for this area. */
-  change: number | null | undefined;
+  /** Change since the previous test, `null` if either test has no score for this area. */
+  change: ScoreChange | null | undefined;
   delayMs: number;
   height: number;
   barOnly: boolean;
@@ -112,10 +113,14 @@ function ScoreBar({ label, score, change, delayMs, height, barOnly }: ScoreBarPr
       {!barOnly && change !== undefined && (
         <ThemedText
           type="smallBold"
-          themeColor={change === null || change === 0 ? 'textSecondary' : change > 0 ? 'tint' : 'danger'}
-          accessibilityLabel={change === null ? undefined : `${formatScoreChange(change)} since last test`}
+          themeColor={change === null || !change.real ? 'textSecondary' : change.points > 0 ? 'tint' : 'danger'}
+          accessibilityLabel={
+            change === null
+              ? undefined
+              : `${change.real ? formatScoreChange(change.points, 'points') : 'No real change'} since last test`
+          }
           style={styles.label}>
-          {change === null ? '—' : formatScoreChange(change)}
+          {change === null ? '—' : change.real ? formatScoreChange(change.points) : 'Same'}
         </ThemedText>
       )}
     </View>

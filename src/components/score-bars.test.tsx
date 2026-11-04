@@ -1,22 +1,30 @@
 import { render, screen } from '@testing-library/react-native';
 
-import type { AreaScores } from '@/data/mobility-score';
+import type { AreaScores, ScoreChanges } from '@/data/mobility-score';
 
 import { ScoreBars } from './score-bars';
 
 const SCORES: AreaScores = { shoulders: 60, hips: 50, hamstrings: 40, ankles: null };
-const PREVIOUS: AreaScores = { shoulders: 50, hips: 50, hamstrings: 40, ankles: null };
+const CHANGES: ScoreChanges['areas'] = {
+  shoulders: { points: 10, real: true },
+  hips: { points: 2, real: false },
+  hamstrings: { points: -9, real: true },
+  ankles: null,
+};
 
 describe('ScoreBars', () => {
-  it('names each area and shows its change', async () => {
-    await render(<ScoreBars scores={SCORES} previous={PREVIOUS} />);
+  it('names each area and shows its change, or that there was no real change', async () => {
+    await render(<ScoreBars scores={SCORES} changes={CHANGES} />);
 
     expect(screen.getByText('Shoulders')).toBeTruthy();
-    expect(screen.getAllByLabelText(/since last test/).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('+10 points since last test')).toBeTruthy();
+    expect(screen.getByText('−9 pts')).toBeTruthy();
+    expect(screen.getByLabelText('No real change since last test')).toBeTruthy();
+    expect(screen.getByText('Same')).toBeTruthy();
   });
 
   it('shows no text with only the bars, keeping the areas for screen readers', async () => {
-    await render(<ScoreBars scores={SCORES} previous={PREVIOUS} barsOnly />);
+    await render(<ScoreBars scores={SCORES} changes={CHANGES} barsOnly />);
 
     expect(screen.queryByText('60')).toBeNull();
     expect(screen.queryByText('Shoulders')).toBeNull();

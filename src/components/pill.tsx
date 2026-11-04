@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Radius, Spacing, type ThemeColor } from '@/constants/theme';
-import { formatScoreChange } from '@/data/mobility-score';
+import { formatScoreChange, type ScoreChange } from '@/data/mobility-score';
 import { useTheme } from '@/hooks/use-theme';
 
 import { Icon } from './icon';
@@ -42,13 +42,17 @@ export function Pill({ label, tone = 'neutral', kind = 'tag', size = 'regular', 
   );
 }
 
-/** How much a score went up or down, e.g. "+4 since last test". */
-export function ScoreChangePill({ change, suffix = '' }: { change: number; suffix?: string }) {
+/**
+ * How much a score went up or down, e.g. "+4 pts since last test", or "No real change" when it's
+ * within measurement error.
+ */
+export function ScoreChangePill({ change, suffix = '' }: { change: ScoreChange; suffix?: string }) {
+  const { points, real } = change;
   return (
     <Pill
       kind="value"
-      tone={change > 0 ? 'accent' : change < 0 ? 'danger' : 'neutral'}
-      label={`${formatScoreChange(change)}${suffix}`}
+      tone={!real ? 'neutral' : points > 0 ? 'accent' : 'danger'}
+      label={`${real ? formatScoreChange(points) : 'No real change'}${suffix}`}
     />
   );
 }
