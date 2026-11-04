@@ -54,7 +54,8 @@ export default function MilestoneBadgeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     justifyContent: 'center',
     gap: Spacing.six,
   },

@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  ReduceMotion,
   cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
@@ -11,26 +12,24 @@ import Animated, {
 import type { ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type TimerBarProps = {
+type Countdown = {
   totalMs: number;
   remainingMs: number;
   running: boolean;
-  /** Changes whenever a new countdown starts (next step, reset), jumping the bar to its start. */
+  /** Changes whenever a new countdown starts (next step, reset), jumping the progress to its start. */
   countdown: number;
-  /** The fill's color, e.g. muted for the get-ready countdown. */
-  color?: ThemeColor;
 };
 
 /**
- * Countdown progress that fills smoothly on the UI thread instead of stepping with each timer
- * tick. Only the start, pause and resume of a countdown are synced from JS.
+ * 0–1 progress through a countdown, moving smoothly on the UI thread instead of stepping with each
+ * timer tick. Only the start, pause and resume of a countdown are synced from JS.
  */
-export function TimerBar({ totalMs, remainingMs, running, countdown, color = 'tint' }: TimerBarProps) {
-  const theme = useTheme();
+export function useCountdownProgress({ totalMs, remainingMs, running, countdown }: Countdown) {
   const progress = useSharedValue(1 - remainingMs / totalMs);
 
   // remainingMs changes on every tick, so these only re-sync when a countdown starts, stops or resumes.
-  useEffect(() => {
+  // Before paint, so a new countdown never shows a frame of the last one's progress.
+  useLayoutEffect(() => {
     progress.set(1 - remainingMs / totalMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdown]);
@@ -41,9 +40,23 @@ export function TimerBar({ totalMs, remainingMs, running, countdown, color = 'ti
       if (remainingMs <= 0) progress.set(1);
       return;
     }
-    progress.set(withTiming(1, { duration: remainingMs, easing: Easing.linear }));
+    // Shows time passing rather than decorating, so it runs even with reduce motion on, which
+    // would otherwise jump it straight to the end.
+    progress.set(withTiming(1, { duration: remainingMs, easing: Easing.linear, reduceMotion: ReduceMotion.Never }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, countdown]);
+
+  return progress;
+}
+
+type TimerBarProps = Countdown & {
+  /** The fill's color, e.g. muted for the get-ready countdown. */
+  color?: ThemeColor;
+};
+
+export function TimerBar({ color = 'tint', ...countdown }: TimerBarProps) {
+  const theme = useTheme();
+  const progress = useCountdownProgress(countdown);
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${Math.min(1, Math.max(0, progress.value)) * 100}%`,
@@ -52,7 +65,11 @@ export function TimerBar({ totalMs, remainingMs, running, countdown, color = 'ti
   return (
     <View
       accessibilityRole="progressbar"
-      accessibilityValue={{ min: 0, max: 100, now: Math.round((1 - remainingMs / totalMs) * 100) }}
+      accessibilityValue={{
+        min: 0,
+        max: 100,
+        now: Math.round((1 - countdown.remainingMs / countdown.totalMs) * 100),
+      }}
       style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
       <Animated.View style={[styles.fill, { backgroundColor: theme[color] }, fillStyle]} />
     </View>

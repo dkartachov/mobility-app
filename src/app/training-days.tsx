@@ -1,5 +1,6 @@
 import { useState, type ComponentProps } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { PanResponder, StyleSheet, View } from 'react-native';
+import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/card';
@@ -26,6 +27,11 @@ import {
 } from '@/lib/dates';
 
 const DAY_SIZE = 36;
+const MONTH_SLIDE_MS = 250;
+/** A sideways drag this long takes over from the page's scrolling, */
+const SWIPE_START = 12;
+/** and changes month once it's dragged this far. */
+const SWIPE_DISTANCE = 50;
 
 /** The seven days from a Monday, for the row of weekday initials. */
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) => addDays('2024-01-01', i));
@@ -38,23 +44,44 @@ export default function TrainingDaysScreen() {
   const [month, setMonth] = useState(currentMonth);
   const days = useMonthTrainingDays(month);
 
+  /** Which way the last change went, so the new month slides in from that side. */
+  const [direction, setDirection] = useState<1 | -1>(1);
+
   // Nothing to see before the first session or past the current month.
   const firstMonth = stats?.firstSessionDate ? startOfMonth(stats.firstSessionDate) : currentMonth;
+  const canGoBack = month > firstMonth;
+  const canGoForward = month < currentMonth;
   const trained = new Set(days?.map((day) => day.date));
   const sessions = days?.reduce((total, day) => total + day.sessions, 0) ?? 0;
   const seconds = days?.reduce((total, day) => total + day.seconds, 0) ?? 0;
+
+  const changeMonth = (by: 1 | -1) => {
+    if (by < 0 ? !canGoBack : !canGoForward) return;
+    setDirection(by);
+    setMonth(addMonths(month, by));
+  };
+
+  // Swiping the calendar sideways changes month too. Only clearly sideways drags count, so scrolling
+  // the page up and down over it still works.
+  const swipe = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, { dx, dy }) => Math.abs(dx) > SWIPE_START && Math.abs(dx) > Math.abs(dy) * 1.5,
+    onPanResponderRelease: (_, { dx }) => {
+      if (dx <= -SWIPE_DISTANCE) changeMonth(1);
+      else if (dx >= SWIPE_DISTANCE) changeMonth(-1);
+    },
+  });
 
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]}>
         <PageHeader title="Training days" />
-        <Card style={styles.calendar}>
+        <Card style={styles.calendar} {...swipe.panHandlers}>
           <View style={styles.monthRow}>
             <MonthButton
               label="Previous month"
               icon={{ ios: 'chevron.left', android: 'chevron_left' }}
-              disabled={month <= firstMonth}
-              onPress={() => setMonth(addMonths(month, -1))}
+              disabled={!canGoBack}
+              onPress={() => changeMonth(-1)}
             />
             <ThemedText type="smallBold" accessibilityLiveRegion="polite" style={styles.monthName}>
               {formatMonth(month)}
@@ -62,8 +89,8 @@ export default function TrainingDaysScreen() {
             <MonthButton
               label="Next month"
               icon={{ ios: 'chevron.right', android: 'chevron_right' }}
-              disabled={month >= currentMonth}
-              onPress={() => setMonth(addMonths(month, 1))}
+              disabled={!canGoForward}
+              onPress={() => changeMonth(1)}
             />
           </View>
           <View style={styles.week}>
@@ -75,15 +102,20 @@ export default function TrainingDaysScreen() {
               </View>
             ))}
           </View>
-          {monthWeeks(month).map((week, i) => (
-            <View key={i} style={styles.week}>
-              {week.map((date, j) => (
-                <View key={j} style={styles.cell}>
-                  {date && <Day date={date} trained={trained.has(date)} today={today} />}
-                </View>
-              ))}
-            </View>
-          ))}
+          <Animated.View
+            key={month}
+            entering={(direction > 0 ? FadeInRight : FadeInLeft).duration(MONTH_SLIDE_MS)}
+            style={styles.weeks}>
+            {monthWeeks(month).map((week, i) => (
+              <View key={i} style={styles.week}>
+                {week.map((date, j) => (
+                  <View key={j} style={styles.cell}>
+                    {date && <Day date={date} trained={trained.has(date)} today={today} />}
+                  </View>
+                ))}
+              </View>
+            ))}
+          </Animated.View>
         </Card>
         <Card style={styles.summary}>
           <MonthStat value={String(days?.length ?? 0)} label="Days trained" />
@@ -156,7 +188,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.three,
   },
   calendar: {
@@ -180,6 +213,9 @@ const styles = StyleSheet.create({
   },
   dimmed: {
     opacity: 0.4,
+  },
+  weeks: {
+    gap: Spacing.one,
   },
   week: {
     flexDirection: 'row',

@@ -22,8 +22,6 @@ const AVATAR_SIZE = 96;
 /** The milestone ring sits this far outside the avatar. */
 const RING_GAP = Spacing.one + Spacing.half;
 const RING_THICKNESS = 3;
-/** Matches the side padding of `Screen`. */
-const SCREEN_PADDING = Spacing.three + Spacing.one;
 /** Lets the tab finish appearing before the ring fills. */
 const ANIMATION_DELAY_MS = 200;
 
@@ -99,7 +97,7 @@ export default function ProfileScreen() {
       {stats && (
         <View style={styles.milestones}>
           <SectionHeader title="Milestones" action={{ label: 'See all', href: '/mobility-time' }} />
-          <MilestoneBadges totalSeconds={stats.totalSeconds} inset={SCREEN_PADDING} />
+          <MilestoneBadges totalSeconds={stats.totalSeconds} />
         </View>
       )}
     </Screen>

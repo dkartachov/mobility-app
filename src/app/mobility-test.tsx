@@ -11,6 +11,7 @@ import { showDialog } from '@/components/dialog';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
+import { Pill, ScoreChangePill } from '@/components/pill';
 import { ProgressBar } from '@/components/progress-bar';
 import { ScoreBars } from '@/components/score-bars';
 import { ScoreBreakdown } from '@/components/score-breakdown';
@@ -19,8 +20,8 @@ import { ScrollView } from '@/components/scroll-view';
 import { TestMeasurement } from '@/components/test-measurement';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing } from '@/constants/theme';
-import { formatScoreChange, SCORE_AREAS, SCORE_BAND_LABELS, scoreBand, scoreChange } from '@/data/mobility-score';
+import { Spacing } from '@/constants/theme';
+import { SCORE_AREAS, SCORE_BAND_LABELS, scoreBand, scoreChange } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS, METHOD_UNITS, SIDE_LABELS, TEST_STEPS } from '@/data/mobility-tests';
 import { logMobilityTest, useMobilityScore } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
@@ -263,21 +264,11 @@ function CardTitle({ icon, title }: { icon: ComponentProps<typeof IconBadge>['na
 }
 
 function SidePill({ label }: { label: string }) {
-  const theme = useTheme();
-
-  return (
-    <View style={[styles.sidePill, { backgroundColor: theme.tintSoft }]}>
-      <Icon name={{ ios: 'arrow.left.and.right', android: 'swap_horiz' }} color="tint" size={16} />
-      <ThemedText type="smallBold" themeColor="tint">
-        {label}
-      </ThemedText>
-    </View>
-  );
+  return <Pill kind="value" tone="accent" icon={{ ios: 'arrow.left.and.right', android: 'swap_horiz' }} label={label} />;
 }
 
 function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => void }) {
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
   // The test just saved is the latest one, so this is its score.
   const loaded = useMobilityScore();
   const score = saveFailed ? null : loaded;
@@ -300,13 +291,8 @@ function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => vo
             overall !== null && <ThemedText type="smallBold">{SCORE_BAND_LABELS[scoreBand(overall)]}</ThemedText>
           )}
           {overallChange !== null && (
-            <View
-              style={[styles.change, { backgroundColor: overallChange < 0 ? `${theme.danger}1F` : theme.tintSoft }]}>
-              <ThemedText
-                type="smallBold"
-                themeColor={overallChange > 0 ? 'tint' : overallChange < 0 ? 'danger' : 'textSecondary'}>
-                {formatScoreChange(overallChange)} since last test
-              </ThemedText>
+            <View style={styles.change}>
+              <ScoreChangePill change={overallChange} suffix=" since last test" />
             </View>
           )}
         </Animated.View>
@@ -340,11 +326,12 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   content: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.three,
   },
   progress: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.screen,
   },
   heading: {
     gap: Spacing.one,
@@ -360,7 +347,7 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   measurement: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.screen,
     paddingTop: Spacing.two,
   },
   introCard: {
@@ -369,15 +356,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two + Spacing.one,
-  },
-  sidePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one + Spacing.half,
-    paddingHorizontal: Spacing.two + Spacing.one,
-    paddingVertical: Spacing.one,
-    borderRadius: Radius.full,
+    gap: Spacing.twoAndHalf,
   },
   spinner: {
     width: 88,
@@ -389,14 +368,14 @@ const styles = StyleSheet.create({
   tip: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.two + Spacing.one,
+    gap: Spacing.twoAndHalf,
     paddingTop: Spacing.half,
   },
   tipText: {
     flex: 1,
   },
   footer: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.screen,
     paddingTop: Spacing.two,
   },
   footerRow: {
@@ -413,8 +392,5 @@ const styles = StyleSheet.create({
   },
   change: {
     marginTop: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Radius.full,
   },
 });

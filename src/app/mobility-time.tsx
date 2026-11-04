@@ -74,12 +74,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.three,
   },
   card: {
     gap: Spacing.three,
-    padding: Spacing.four - Spacing.one,
+    padding: Spacing.threeAndHalf,
   },
   header: {
     flexDirection: 'row',

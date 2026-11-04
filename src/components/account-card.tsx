@@ -59,6 +59,6 @@ const styles = StyleSheet.create({
   rowTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two + Spacing.one,
+    gap: Spacing.twoAndHalf,
   },
 });

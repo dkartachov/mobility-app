@@ -108,7 +108,8 @@ function RootNavigator() {
             <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
             <Stack.Screen name="settings" />
             <Stack.Screen name="training-days" />
-            <Stack.Screen name="workout" />
+            {/* Draws its own back button, so its summary can drop it without the header jumping away. */}
+            <Stack.Screen name="workout" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>
         {unlocked && greeting && <WelcomeOverlay greeting={greeting} />}

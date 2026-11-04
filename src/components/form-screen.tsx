@@ -25,7 +25,8 @@ export function FormScreen({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   content: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.four,
   },
 });

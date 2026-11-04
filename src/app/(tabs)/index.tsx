@@ -5,6 +5,8 @@ import { Screen } from '@/components/screen';
 import { StartTile } from '@/components/start-tile';
 import { Spacing } from '@/constants/theme';
 import { EXERCISES } from '@/data/exercises';
+import { useLastSession } from '@/db/sessions';
+import { formatDuration, formatRecentDay } from '@/lib/dates';
 import { DAILY_MINUTES } from '@/lib/workout';
 
 function greeting(hour = new Date().getHours()) {
@@ -14,8 +16,13 @@ function greeting(hour = new Date().getHours()) {
 }
 
 export default function StartScreen() {
+  const lastSession = useLastSession();
+  const subtitle = lastSession
+    ? `Last session ${formatRecentDay(lastSession.date)} · ${formatDuration(lastSession.durationSeconds)}`
+    : 'Pick a routine or browse exercises.';
+
   return (
-    <Screen eyebrow={greeting()} title="Ready to move?" subtitle="Pick a routine or browse exercises." gap={Spacing.three}>
+    <Screen eyebrow={greeting()} title="Ready to move?" subtitle={subtitle} gap={Spacing.three}>
       <StartTile
         title="Daily"
         subtitle="A quick guided routine"

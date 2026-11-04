@@ -176,11 +176,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.four,
   },
   footer: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.screen,
   },
   options: {
     flexDirection: 'row',
@@ -196,8 +197,8 @@ const styles = StyleSheet.create({
   },
   check: {
     position: 'absolute',
-    top: Spacing.two + Spacing.one,
-    right: Spacing.two + Spacing.one,
+    top: Spacing.twoAndHalf,
+    right: Spacing.twoAndHalf,
   },
   minutes: {
     fontSize: 40,

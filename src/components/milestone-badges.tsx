@@ -72,7 +72,7 @@ function useSvgId() {
  */
 export function MilestoneBadges({
   totalSeconds,
-  inset = Spacing.three,
+  inset = Spacing.screen,
 }: {
   totalSeconds: number;
   /** The screen's side padding, which the row runs out over so badges scroll off the edges. */

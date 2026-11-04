@@ -6,6 +6,7 @@ import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { Card } from '@/components/card';
 import { Icon } from '@/components/icon';
 import { MilestoneBar } from '@/components/milestone-bar';
+import { ScoreChangePill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
 import { Screen } from '@/components/screen';
 import { ScoreBars } from '@/components/score-bars';
@@ -13,7 +14,7 @@ import { ScoreRing } from '@/components/score-ring';
 import { ThemedText } from '@/components/themed-text';
 import { WeekStrip } from '@/components/week-strip';
 import { Radius, Spacing } from '@/constants/theme';
-import { formatScoreChange, NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
+import { NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
 import { useMobilityScore } from '@/db/mobility-tests';
 import { useProfile } from '@/db/profile';
 import { useStats, useWeekDays } from '@/db/sessions';
@@ -23,7 +24,7 @@ import { markCelebrated, wasCelebrated } from '@/lib/training-celebration';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Matches the side padding of `Screen`. */
-const SCREEN_PADDING = Spacing.three + Spacing.one;
+const SCREEN_PADDING = Spacing.screen;
 const TILE_GAP = Spacing.three;
 const TILE_PADDING = Spacing.three;
 /** Lets the tab finish appearing before the cards animate. */
@@ -132,23 +133,19 @@ export default function DashboardScreen() {
           onPress={() => router.push('/mobility-score')}>
           <View style={styles.scoreBody}>
             <ScoreRing score={score?.overall ?? null} size={ringSize} thickness={12} delayMs={ANIMATION_DELAY_MS} />
-            {scoreDelta !== null && (
-              <View
-                style={[styles.delta, { backgroundColor: scoreDelta < 0 ? `${theme.danger}1F` : theme.tintSoft }]}>
-                <ThemedText
-                  type="smallBold"
-                  themeColor={scoreDelta > 0 ? 'tint' : scoreDelta < 0 ? 'danger' : 'textSecondary'}>
-                  {formatScoreChange(scoreDelta)}
-                </ThemedText>
-              </View>
-            )}
+            {scoreDelta !== null && <ScoreChangePill change={scoreDelta} />}
           </View>
-          <ScoreBars
-            scores={score?.areas ?? NO_AREA_SCORES}
-            delayMs={ANIMATION_DELAY_MS}
-            barHeight={72}
-            barsOnly
-          />
+          {score === null ? (
+            // Before any test the bars would all be empty, so the space says what fills them instead.
+            <View style={[styles.firstTest, { backgroundColor: theme.tintSoft }]}>
+              <Icon name={{ ios: 'figure.flexibility', android: 'self_improvement' }} color="tint" size={22} />
+              <ThemedText type="smallBold" themeColor="tint" style={styles.firstTestText}>
+                Take your first test
+              </ThemedText>
+            </View>
+          ) : (
+            <ScoreBars scores={score?.areas ?? NO_AREA_SCORES} delayMs={ANIMATION_DELAY_MS} barHeight={72} barsOnly />
+          )}
         </DashboardTile>
       </View>
     </Screen>
@@ -193,7 +190,7 @@ function enterCard(order: number) {
 
 const styles = StyleSheet.create({
   trainingCard: {
-    gap: Spacing.two + Spacing.one,
+    gap: Spacing.twoAndHalf,
   },
   trainingHeader: {
     flexDirection: 'row',
@@ -229,10 +226,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
   },
-  delta: {
-    paddingHorizontal: Spacing.two + Spacing.one,
-    paddingVertical: Spacing.half,
-    borderRadius: Radius.full,
+  firstTest: {
+    alignItems: 'center',
+    gap: Spacing.one,
+    padding: Spacing.twoAndHalf,
+    borderRadius: Radius.medium,
+  },
+  firstTestText: {
+    textAlign: 'center',
   },
   timeBody: {
     gap: Spacing.two,

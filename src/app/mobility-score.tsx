@@ -6,6 +6,7 @@ import { Card } from '@/components/card';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
+import { ScoreChangePill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
 import { ScoreBars } from '@/components/score-bars';
 import { ScoreBreakdown } from '@/components/score-breakdown';
@@ -15,7 +16,7 @@ import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
-import { formatScoreChange, NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
+import { NO_AREA_SCORES, scoreChange } from '@/data/mobility-score';
 import { useMobilityScore, useTestSchedule, type TestSchedule } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateKey } from '@/lib/dates';
@@ -59,19 +60,7 @@ export default function MobilityScoreScreen() {
                 Take a flexibility test to get your score.
               </ThemedText>
             )}
-            {overallChange !== null && (
-              <View
-                style={[
-                  styles.change,
-                  { backgroundColor: overallChange < 0 ? `${theme.danger}1F` : theme.tintSoft },
-                ]}>
-                <ThemedText
-                  type="smallBold"
-                  themeColor={overallChange > 0 ? 'tint' : overallChange < 0 ? 'danger' : 'textSecondary'}>
-                  {formatScoreChange(overallChange)} since last test
-                </ThemedText>
-              </View>
-            )}
+            {overallChange !== null && <ScoreChangePill change={overallChange} suffix=" since last test" />}
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <ScoreBars
@@ -122,7 +111,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.three,
   },
   hero: {
@@ -132,11 +122,6 @@ const styles = StyleSheet.create({
   ring: {
     alignItems: 'center',
     gap: Spacing.three,
-  },
-  change: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Radius.full,
   },
   divider: {
     height: StyleSheet.hairlineWidth,

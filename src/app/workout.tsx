@@ -3,9 +3,23 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useReducer, useRef, useState, type ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { css, FadeInDown, ZoomIn } from 'react-native-reanimated';
+import Animated, {
+  css,
+  Easing,
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+  ZoomIn,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Burst } from '@/components/burst';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { showDialog } from '@/components/dialog';
@@ -15,13 +29,15 @@ import { IconBadge } from '@/components/icon-badge';
 import { InstructionList } from '@/components/instruction-list';
 import { MilestoneBar } from '@/components/milestone-bar';
 import { Pager } from '@/components/pager';
+import { Pill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
 import { promptForReminderIfDue } from '@/components/reminder-prompt';
 import { ScrollView } from '@/components/scroll-view';
+import { BackButton, HEADER_HEIGHT } from '@/components/stack-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimeoutOverlay } from '@/components/timeout-overlay';
-import { TimerBar } from '@/components/timer-bar';
+import { TimerBar, useCountdownProgress } from '@/components/timer-bar';
 import { Elevation, Radius, Spacing } from '@/constants/theme';
 import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
@@ -51,6 +67,14 @@ const TICK_MS = 250;
 const JUST_BELOW_SECONDS = 0.001;
 /** Leaves the full bar in view for a moment once the celebration has faded away. */
 const RETURN_DELAY_MS = 800;
+/** A hold's last seconds, counted down with a pulse. */
+const FINAL_SECONDS = 3;
+/** How long a new exercise takes to fade in. */
+const CHANGE_MS = 300;
+const SUMMARY_BADGE_SIZE = 96;
+/** The summary's burst waits for its check mark to zoom in. */
+const BURST_DELAY_MS = 250;
+const BURST_MS = 900;
 
 function parseMinutes(value: string | undefined) {
   const minutes = Number(value);
@@ -145,6 +169,20 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
   const exerciseNumber = steps.slice(0, state.index + 1).filter((s) => s.side !== 2).length;
   const gettingReady = state.phase === 'buffer';
   const timerLabel = finished ? 'Done' : state.paused ? 'Paused' : gettingReady ? 'Get ready' : '';
+  const countdown = { totalMs: phaseTotalMs, remainingMs: state.remainingMs, running, countdown: state.countdown };
+  // A two-sided exercise's progress segment fills one half per side.
+  const segmentSpan: [number, number] = step.side === 1 ? [0, 0.5] : step.side === 2 ? [0.5, 1] : [0, 1];
+
+  // The last seconds of a hold count down with a pulse of the clock and a tick.
+  const secondsLeft = Math.ceil(state.remainingMs / 1000);
+  const finalSeconds = state.phase === 'active' && running && secondsLeft > 0 && secondsLeft <= FINAL_SECONDS;
+  const clockScale = useSharedValue(1);
+  useEffect(() => {
+    if (!finalSeconds) return;
+    haptic.select();
+    clockScale.set(withSequence(withTiming(1.12, { duration: 120 }), withSpring(1, { damping: 12, stiffness: 220 })));
+  }, [finalSeconds, secondsLeft, clockScale]);
+  const clockStyle = useAnimatedStyle(() => ({ transform: [{ scale: clockScale.get() }] }));
 
   const complete = async () => {
     setCompleting(true);
@@ -158,36 +196,54 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
 
   return (
     <ThemedView style={styles.screen}>
+      {/* In place of the stack header, which this screen hides. Going back asks to cancel first. */}
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
+        <BackButton onPress={() => router.back()} />
+      </View>
       <View>
-        <ExerciseVideo photo={step.exercise.photo} animation={step.exercise.animation} />
+        {/* Fades in each new exercise, rather than snapping to it; the second side is the same exercise, so it stays. */}
+        <Animated.View key={step.exercise.id} entering={FadeIn.duration(CHANGE_MS)}>
+          <ExerciseVideo photo={step.exercise.photo} animation={step.exercise.animation} />
+        </Animated.View>
         {/* Dims slightly while getting ready, so it's clear the hold hasn't started. */}
         <Animated.View pointerEvents="none" style={[cssStyles.dim, { opacity: gettingReady ? 1 : 0 }]} />
       </View>
 
       <View style={styles.status}>
-        <WorkoutProgress count={exerciseCount} current={exerciseNumber} finished={finished} />
+        <WorkoutProgress
+          count={exerciseCount}
+          current={exerciseNumber}
+          finished={finished}
+          countdown={countdown}
+          filling={state.phase === 'active'}
+          span={segmentSpan}
+        />
         <View style={styles.tags}>
-          <Tag label={`Exercise ${exerciseNumber} of ${exerciseCount}`} />
-          <Tag label={step.exercise.active ? 'Active' : 'Passive'} />
-          {step.side && <Tag label={`Side ${step.side} of 2`} highlighted />}
+          <Pill label={`Exercise ${exerciseNumber} of ${exerciseCount}`} />
+          <Pill label={step.exercise.active ? 'Active' : 'Passive'} />
+          {step.side && <Pill label={`Side ${step.side} of 2`} tone="accent" />}
         </View>
       </View>
 
       {/* Takes up whatever space is left, so long names or instructions scroll instead of moving the timer. */}
       <Pager>
         <ScrollView key={state.index} contentContainerStyle={styles.page}>
-          <ThemedText type="title" accessibilityRole="header">
-            {step.exercise.name}
-          </ThemedText>
-          <View style={styles.stimulus}>
-            <ThemedText type="eyebrow" themeColor="textSecondary">
-              Stimulus
+          <Animated.View entering={FadeIn.duration(CHANGE_MS)} style={styles.pageContent}>
+            <ThemedText type="title" accessibilityRole="header">
+              {step.exercise.name}
             </ThemedText>
-            <ThemedText>{step.exercise.stimulus}</ThemedText>
-          </View>
+            <View style={styles.stimulus}>
+              <ThemedText type="eyebrow" themeColor="textSecondary">
+                Stimulus
+              </ThemedText>
+              <ThemedText>{step.exercise.stimulus}</ThemedText>
+            </View>
+          </Animated.View>
         </ScrollView>
         <ScrollView key={state.index} contentContainerStyle={styles.page}>
-          <InstructionList instructions={step.exercise.instructions} />
+          <Animated.View entering={FadeIn.duration(CHANGE_MS)} style={styles.pageContent}>
+            <InstructionList instructions={step.exercise.instructions} />
+          </Animated.View>
         </ScrollView>
       </Pager>
 
@@ -198,9 +254,15 @@ function WorkoutPlayer({ steps, bufferMs, plannedSeconds }: WorkoutPlayerProps) 
             {timerLabel}
           </ThemedText>
           <View style={styles.clockRow}>
-            <ThemedText type="stat" style={styles.clock} accessibilityLiveRegion="polite">
-              {formatClock(Math.ceil(state.remainingMs / 1000))}
-            </ThemedText>
+            <Animated.View style={clockStyle}>
+              <ThemedText
+                type="stat"
+                themeColor={finalSeconds ? 'tint' : 'text'}
+                style={styles.clock}
+                accessibilityLiveRegion="polite">
+                {formatClock(secondsLeft)}
+              </ThemedText>
+            </Animated.View>
             <TimeoutButton
               disabled={!running}
               onPress={() => dispatch({ type: 'startTimeout', seconds: getTimeoutSeconds() })}
@@ -285,6 +347,13 @@ function WorkoutSummary({ fromSeconds, toSeconds, onLeave }: WorkoutSummaryProps
   const celebrating = useRef(false);
   const reached = milestoneReached(fromSeconds, toSeconds);
   const stopsAtMilestone = reached !== null && !celebrated;
+  const theme = useTheme();
+
+  // Bursts as the check mark lands.
+  const burst = useSharedValue(0);
+  useEffect(() => {
+    burst.set(withDelay(BURST_DELAY_MS, withTiming(1, { duration: BURST_MS, easing: Easing.out(Easing.cubic) })));
+  }, [burst]);
 
   useFocusEffect(
     useCallback(() => {
@@ -310,11 +379,12 @@ function WorkoutSummary({ fromSeconds, toSeconds, onLeave }: WorkoutSummaryProps
   return (
     <ThemedView
       style={[styles.summary, { paddingTop: insets.top + Spacing.three, paddingBottom: insets.bottom + Spacing.three }]}>
-      {/* No back button or swipe: Done is the way out. */}
-      <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+      {/* No back button (the workout's own is gone with it) or swipe: Done is the way out. */}
+      <Stack.Screen options={{ gestureEnabled: false }} />
       <View style={styles.summaryContent}>
         <Animated.View entering={ZoomIn.springify()} style={styles.summaryBadge}>
-          <IconBadge name={{ ios: 'checkmark', android: 'check' }} size={96} />
+          <Burst progress={burst} size={SUMMARY_BADGE_SIZE} colors={[theme.tint, theme.trained]} reach={1.1} />
+          <IconBadge name={{ ios: 'checkmark', android: 'check' }} size={SUMMARY_BADGE_SIZE} />
         </Animated.View>
         <View style={styles.summaryTitle}>
           <ThemedText type="title" accessibilityRole="header" style={styles.centered}>
@@ -366,10 +436,16 @@ type ControlButtonProps = {
 function ControlButton({ label, icon, onPress, primary, disabled, glow, finishes }: ControlButtonProps) {
   const theme = useTheme();
   const scheme = useColorScheme();
+  // CSS animations don't follow the reduce motion setting themselves, so it gets a still halo instead.
+  const reducedMotion = useReducedMotion();
 
   return (
     <View>
-      {glow && <Animated.View style={[cssStyles.glow, { backgroundColor: theme.tint }]} />}
+      {glow && (
+        <Animated.View
+          style={[reducedMotion ? styles.stillGlow : cssStyles.glow, { backgroundColor: theme.tint }]}
+        />
+      )}
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -419,21 +495,20 @@ function TimeoutButton({ onPress, disabled }: { onPress: () => void; disabled: b
   );
 }
 
-/** A small pill label. `highlighted` uses the accent color for the current state. */
-function Tag({ label, highlighted }: { label: string; highlighted?: boolean }) {
-  const theme = useTheme();
+type WorkoutProgressProps = {
+  count: number;
+  current: number;
+  finished: boolean;
+  /** The step's countdown, which the current segment fills along with. */
+  countdown: Parameters<typeof useCountdownProgress>[0];
+  /** Whether the hold is on; the get-ready countdown doesn't fill anything. */
+  filling: boolean;
+  /** The part of the current segment this step fills, e.g. its second half for side 2. */
+  span: [number, number];
+};
 
-  return (
-    <View style={[styles.tag, { backgroundColor: highlighted ? theme.tintSoft : theme.backgroundSelected }]}>
-      <ThemedText type="eyebrow" themeColor={highlighted ? 'tint' : 'textSecondary'}>
-        {label}
-      </ThemedText>
-    </View>
-  );
-}
-
-/** One segment per exercise: done ones filled, the current one half-tinted. */
-function WorkoutProgress({ count, current, finished }: { count: number; current: number; finished: boolean }) {
+/** One segment per exercise: done ones filled, the current one filling as its hold runs. */
+function WorkoutProgress({ count, current, finished, countdown, filling, span }: WorkoutProgressProps) {
   const theme = useTheme();
 
   return (
@@ -444,36 +519,50 @@ function WorkoutProgress({ count, current, finished }: { count: number; current:
         return (
           <View
             key={i}
-            style={[
-              styles.segment,
-              { backgroundColor: done || active ? theme.tint : theme.backgroundSelected },
-              active && styles.activeSegment,
-            ]}
-          />
+            style={[styles.segment, { backgroundColor: done ? theme.tint : theme.backgroundSelected }]}>
+            {active && <SegmentFill countdown={countdown} filling={filling} span={span} />}
+          </View>
         );
       })}
     </View>
   );
 }
 
+function SegmentFill({ countdown, filling, span: [from, to] }: Pick<WorkoutProgressProps, 'countdown' | 'filling' | 'span'>) {
+  const theme = useTheme();
+  const progress = useCountdownProgress(countdown);
+  const fillStyle = useAnimatedStyle(() => {
+    const fraction = from + (to - from) * (filling ? Math.min(1, Math.max(0, progress.get())) : 0);
+    return { width: `${fraction * 100}%` };
+  });
+
+  return <Animated.View style={[styles.segmentFill, { backgroundColor: theme.tint }, fillStyle]} />;
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+  topBar: {
+    justifyContent: 'center',
+    minHeight: HEADER_HEIGHT,
+    paddingHorizontal: Spacing.screen,
+  },
   status: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.screen,
     paddingTop: Spacing.three,
     gap: Spacing.three,
   },
   page: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.three,
   },
   stimulus: {
     gap: Spacing.half,
   },
   footer: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.screen,
     gap: Spacing.three,
   },
   segments: {
@@ -484,20 +573,18 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 4,
     borderRadius: 2,
+    overflow: 'hidden',
   },
-  activeSegment: {
-    opacity: 0.45,
+  segmentFill: {
+    height: '100%',
   },
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
   },
-  tag: {
-    alignSelf: 'center',
-    paddingHorizontal: Spacing.two + Spacing.one,
-    paddingVertical: Spacing.one + Spacing.half,
-    borderRadius: Radius.full,
+  pageContent: {
+    gap: Spacing.three,
   },
   timer: {
     alignItems: 'center',
@@ -523,7 +610,7 @@ const styles = StyleSheet.create({
     right: 0,
     minHeight: 44,
     justifyContent: 'center',
-    paddingHorizontal: Spacing.two + Spacing.one,
+    paddingHorizontal: Spacing.twoAndHalf,
     borderRadius: Radius.full,
   },
   progress: {
@@ -552,9 +639,16 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.3,
   },
+  stillGlow: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 32,
+    opacity: 0.3,
+    transform: [{ scale: 1.3 }],
+  },
   summary: {
     flex: 1,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     justifyContent: 'space-between',
   },
   summaryContent: {

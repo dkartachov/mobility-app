@@ -8,7 +8,6 @@ import { ExerciseVideo } from '@/components/exercise-video';
 import { IconBadge } from '@/components/icon-badge';
 import { InstructionList } from '@/components/instruction-list';
 import { PageHeader } from '@/components/page-header';
-import { Pager } from '@/components/pager';
 import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -31,19 +30,18 @@ export default function ExerciseScreen() {
   return (
     <ThemedView style={styles.screen}>
       <Stack.Screen options={{ title: exercise.name }} />
-      {/* The video stays in place while you swipe between the cards below. */}
+      {/* The video stays in place while the details scroll below it. Once there's a second card (targeted
+          areas), put the pages in a `Pager` to swipe between them. */}
       <ExerciseVideo photo={exercise.photo} animation={exercise.animation} />
-      <Pager>
-        <PageScroll>
-          <PageHeader
-            eyebrow={[exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides']
-              .filter(Boolean)
-              .join(' · ')}
-            title={exercise.name}
-          />
-          <OverviewCard exercise={exercise} />
-        </PageScroll>
-      </Pager>
+      <PageScroll>
+        <PageHeader
+          eyebrow={[exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides']
+            .filter(Boolean)
+            .join(' · ')}
+          title={exercise.name}
+        />
+        <OverviewCard exercise={exercise} />
+      </PageScroll>
     </ThemedView>
   );
 }
@@ -91,7 +89,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   page: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.three,
   },
   stimulus: {

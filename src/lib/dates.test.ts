@@ -4,6 +4,7 @@ import {
   ageFromDateKey,
   daysBetween,
   formatDuration,
+  formatRecentDay,
   fromDateKey,
   monthWeeks,
   startOfMonth,
@@ -115,5 +116,23 @@ describe('ageFromDateKey', () => {
   it('gives the age on another day', () => {
     expect(ageFromDateKey('2000-10-28', '2010-10-27')).toBe(9);
     expect(ageFromDateKey('2000-10-28', '2010-10-28')).toBe(10);
+  });
+});
+
+describe('formatRecentDay', () => {
+  const today = '2026-10-28'; // A Wednesday.
+
+  it('says today and yesterday by name', () => {
+    expect(formatRecentDay(today, today)).toBe('today');
+    expect(formatRecentDay('2026-10-27', today)).toBe('yesterday');
+  });
+
+  it('gives the weekday within the last week, and the date before that', () => {
+    expect(formatRecentDay('2026-10-23', today)).toBe(
+      `on ${fromDateKey('2026-10-23').toLocaleDateString(undefined, { weekday: 'long' })}`
+    );
+    expect(formatRecentDay('2026-10-21', today)).toBe(
+      `on ${fromDateKey('2026-10-21').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+    );
   });
 });

@@ -184,7 +184,7 @@ function ValueSlider({
 
 const styles = StyleSheet.create({
   phone: {
-    gap: Spacing.two + Spacing.one,
+    gap: Spacing.twoAndHalf,
     paddingTop: Spacing.one,
   },
   reading: {

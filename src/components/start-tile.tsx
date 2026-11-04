@@ -1,6 +1,7 @@
 import { Image, type ImageSource } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { css, useReducedMotion } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { Radius, Spacing } from '@/constants/theme';
@@ -24,6 +25,7 @@ type StartTileProps = {
 /** Large tappable tile on the Start tab. */
 export function StartTile({ title, subtitle, onPress, tag, image, style }: StartTileProps) {
   const theme = useTheme();
+  const reducedMotion = useReducedMotion();
   const onImage = image !== undefined;
 
   return (
@@ -34,7 +36,10 @@ export function StartTile({ title, subtitle, onPress, tag, image, style }: Start
       style={[styles.tile, { backgroundColor: theme.backgroundElement }, style]}>
       {onImage && (
         <>
-          <Image source={image} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+          {/* Drifts slowly in and out, so the photo feels alive. A CSS animation, which doesn't follow reduce motion by itself. */}
+          <Animated.View style={reducedMotion ? StyleSheet.absoluteFill : cssStyles.drift}>
+            <Image source={image} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+          </Animated.View>
           {/* Clear at the top so the photo shows, dark at the bottom so the text reads. */}
           <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none">
             <Defs>
@@ -83,11 +88,11 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
     justifyContent: 'space-between',
-    padding: Spacing.four - Spacing.one,
+    padding: Spacing.threeAndHalf,
   },
   tag: {
     alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.two + Spacing.one,
+    paddingHorizontal: Spacing.twoAndHalf,
     paddingVertical: Spacing.one + Spacing.half,
     borderRadius: Radius.full,
   },
@@ -117,5 +122,20 @@ const styles = StyleSheet.create({
   onImageSecondary: {
     color: '#FFFFFF',
     opacity: 0.85,
+  },
+});
+
+/** Reanimated CSS animations, which React Native's `StyleSheet.create` doesn't type. */
+const cssStyles = css.create({
+  drift: {
+    ...StyleSheet.absoluteFill,
+    animationName: {
+      from: { transform: [{ scale: 1 }] },
+      to: { transform: [{ scale: 1.06 }] },
+    },
+    animationDuration: '20s',
+    animationIterationCount: 'infinite',
+    animationDirection: 'alternate',
+    animationTimingFunction: 'ease-in-out',
   },
 });

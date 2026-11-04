@@ -33,6 +33,16 @@ export function daysBetween(from: DateKey, to: DateKey): number {
   return Math.round(ms / 86_400_000);
 }
 
+/** A day in the past, said the way you would: "today", "yesterday", "on Monday" within the week, else "on Oct 12". */
+export function formatRecentDay(key: DateKey, today: DateKey = todayKey()): string {
+  const days = daysBetween(key, today);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  const date = fromDateKey(key);
+  if (days < 7) return `on ${date.toLocaleDateString(undefined, { weekday: 'long' })}`;
+  return `on ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+}
+
 export function formatDateKey(key: DateKey): string {
   return fromDateKey(key).toLocaleDateString(undefined, {
     year: 'numeric',

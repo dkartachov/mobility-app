@@ -6,20 +6,20 @@ import Animated, {
   Easing,
   FadeIn,
   FadeInDown,
-  useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSequence,
   withSpring,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { badgeLook } from '@/lib/badge-looks';
 
 import { BadgeCoin, useBadgeSpin } from './badge-coin';
+import { Burst } from './burst';
 import { Button } from './button';
 import { BadgeAura } from './milestone-badges';
 import { ThemedText } from './themed-text';
@@ -29,7 +29,6 @@ const BADGE_SIZE = 200;
 /** Whole turns, so the spin always ends with the badge flat and facing the front. */
 const SPIN_TURNS = 5;
 const SPIN_MS = 3000;
-const BURST_DOTS = 16;
 const BURST_MS = 900;
 
 type MilestoneRevealProps = {
@@ -45,6 +44,7 @@ export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
   const rotation = useSharedValue(0);
   const scale = useSharedValue(0);
   const burst = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const land = () => {
@@ -79,11 +79,10 @@ export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
           accessibilityLabel={`${hours} ${hours === 1 ? 'hour' : 'hours'} milestone badge`}
           style={styles.stage}
           {...(landed ? spinner.panHandlers : {})}>
-          {landed && <Animated.View style={[cssStyles.halo, { backgroundColor: look.accent }]} />}
+          {/* A CSS animation, which doesn't follow the reduce motion setting by itself. */}
+          {landed && !reducedMotion && <Animated.View style={[cssStyles.halo, { backgroundColor: look.accent }]} />}
           {landed && <BadgeAura hours={hours} size={BADGE_SIZE} />}
-          {Array.from({ length: BURST_DOTS }, (_, i) => (
-            <BurstDot key={i} index={i} progress={burst} color={look.accent} />
-          ))}
+          <Burst progress={burst} size={BADGE_SIZE} colors={[look.accent]} />
           <BadgeCoin hours={hours} size={BADGE_SIZE} rotation={rotation} scale={scale} />
         </View>
 
@@ -111,27 +110,11 @@ export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
   );
 }
 
-/** Thrown out from behind the badge as it lands, every other one further and larger. */
-function BurstDot({ index, progress, color }: { index: number; progress: SharedValue<number>; color: string }) {
-  const angle = (index / BURST_DOTS) * 2 * Math.PI;
-  const distance = BADGE_SIZE * (index % 2 === 0 ? 0.85 : 0.68);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: progress.value === 0 ? 0 : 1 - progress.value,
-    transform: [
-      { translateX: Math.cos(angle) * distance * progress.value },
-      { translateY: Math.sin(angle) * distance * progress.value },
-      { scale: (index % 2 === 0 ? 1 : 0.6) * (1 - progress.value / 2) },
-    ],
-  }));
-
-  return <Animated.View style={[styles.dot, { backgroundColor: color }, style]} />;
-}
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
   },
   content: {
     flex: 1,
@@ -142,14 +125,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: BADGE_SIZE,
     height: BADGE_SIZE,
-  },
-  dot: {
-    position: 'absolute',
-    left: BADGE_SIZE / 2 - 7,
-    top: BADGE_SIZE / 2 - 7,
-    width: 14,
-    height: 14,
-    borderRadius: Radius.full,
   },
   caption: {
     minHeight: 26,

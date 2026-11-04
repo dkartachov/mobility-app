@@ -37,11 +37,11 @@ export function Screen({ title, subtitle, eyebrow, headerAction, gap = Spacing.f
           flexGrow: 1,
           paddingTop: insets.top + Spacing.four,
           paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
-          paddingLeft: insets.left + Spacing.three + Spacing.one,
-          paddingRight: insets.right + Spacing.three + Spacing.one,
+          paddingLeft: insets.left + Spacing.screen,
+          paddingRight: insets.right + Spacing.screen,
         },
       ]}>
-      <PageHeader title={title} subtitle={subtitle} eyebrow={eyebrow} action={headerAction} />
+      <PageHeader title={title} subtitle={subtitle} eyebrow={eyebrow} action={headerAction} titleInHeader={false} />
       {children}
     </ScrollView>
   );

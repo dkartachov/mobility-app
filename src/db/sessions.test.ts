@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { createTestDb } from '@/test-utils/sqlite';
 
-import { getMonthTrainingDays, getStats, getTotalSeconds, getWeekDays, logSession } from './sessions';
+import { getLastSession, getMonthTrainingDays, getStats, getTotalSeconds, getWeekDays, logSession } from './sessions';
 
 describe('session queries', () => {
   let db: SQLiteDatabase;
@@ -23,6 +23,13 @@ describe('session queries', () => {
       firstSessionDate: null,
     });
     expect(await getTotalSeconds(db)).toBe(0);
+    expect(await getLastSession(db)).toBeNull();
+  });
+
+  it('finds the latest session, whatever order they were logged in', async () => {
+    await logSession(db, { startedAt: new Date(2026, 9, 27, 9), durationSeconds: 900 });
+    await logSession(db, { startedAt: new Date(2026, 9, 25, 9), durationSeconds: 480 });
+    expect(await getLastSession(db)).toEqual({ date: '2026-10-27', durationSeconds: 900 });
   });
 
   it('only counts a session from today as training today', async () => {

@@ -64,6 +64,20 @@ export function useStats() {
   return useDbQuery(getStats, ['sessions']);
 }
 
+export type LastSession = { date: DateKey; durationSeconds: number };
+
+/** The most recent session, or `null` before any. */
+export async function getLastSession(db: SQLiteDatabase): Promise<LastSession | null> {
+  const row = await db.getFirstAsync<{ local_date: DateKey; duration_seconds: number }>(
+    'SELECT local_date, duration_seconds FROM sessions ORDER BY started_at DESC LIMIT 1'
+  );
+  return row ? { date: row.local_date, durationSeconds: row.duration_seconds } : null;
+}
+
+export function useLastSession() {
+  return useDbQuery(getLastSession, ['sessions']);
+}
+
 export const WEEK_DAYS = 7;
 
 /** This week from Monday to Sunday, each day with whether it had a session. */

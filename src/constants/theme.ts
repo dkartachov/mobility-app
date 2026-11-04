@@ -14,6 +14,8 @@ export const Colors = {
     backgroundElement: '#FFFFFF',
     backgroundSelected: '#E3EEEC',
     border: '#DCE6E4',
+    /** Fainter than `border`, for outlining cards rather than dividing things. */
+    borderSubtle: '#E8EFEE',
     tint: '#0F8F82',
     tintSoft: '#D5F0EC',
     onTint: '#FFFFFF',
@@ -24,9 +26,11 @@ export const Colors = {
     text: '#F2F7F6',
     textSecondary: '#9EB8B4',
     background: '#0A1E1D',
-    backgroundElement: '#132E2B',
-    backgroundSelected: '#1C3D39',
+    // A step lighter than the background, so cards stand out from it as well as by their outline.
+    backgroundElement: '#153330',
+    backgroundSelected: '#1E413C',
     border: '#254743',
+    borderSubtle: '#1E3B38',
     tint: '#2CC5B4',
     tintSoft: '#0F423C',
     onTint: '#00201D',
@@ -59,10 +63,14 @@ export const Spacing = {
   half: 2,
   one: 4,
   two: 8,
+  twoAndHalf: 12,
   three: 16,
+  threeAndHalf: 20,
   four: 24,
   five: 32,
   six: 64,
+  /** Side padding of every screen, so content doesn't shift sideways between them. */
+  screen: 20,
 } as const;
 
 /** Native tabs draw over screen content, so scrollable screens pad their bottom by this much. */
@@ -86,6 +94,6 @@ export const Elevation = {
   },
   dark: {
     borderWidth: 1,
-    borderColor: '#1E3B38',
+    borderColor: Colors.dark.borderSubtle,
   },
 } as const;

@@ -10,6 +10,7 @@ import { ExercisePhoto } from '@/components/exercise-photo';
 import { TextField } from '@/components/field';
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/page-header';
+import { Pill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
 import { FlatList, ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
@@ -134,7 +135,6 @@ export default function LibraryScreen() {
 }
 
 function ExerciseTile({ exercise }: { exercise: Exercise }) {
-  const theme = useTheme();
   const tags = [exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides'].filter(
     (tag): tag is string => Boolean(tag)
   );
@@ -151,11 +151,7 @@ function ExerciseTile({ exercise }: { exercise: Exercise }) {
           </ThemedText>
           <View style={styles.tags}>
             {tags.map((tag) => (
-              <View key={tag} style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
-                <ThemedText type="eyebrow" themeColor="textSecondary" style={styles.tagText}>
-                  {tag}
-                </ThemedText>
-              </View>
+              <Pill key={tag} label={tag} size="small" />
             ))}
           </View>
         </View>
@@ -167,7 +163,8 @@ function ExerciseTile({ exercise }: { exercise: Exercise }) {
 
 const styles = StyleSheet.create({
   content: {
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.screen,
+    paddingVertical: Spacing.three,
     gap: Spacing.three,
   },
   header: {
@@ -184,11 +181,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipList: {
-    marginHorizontal: -Spacing.three,
+    marginHorizontal: -Spacing.screen,
   },
   chips: {
     gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.screen,
   },
   empty: {
     alignItems: 'center',
@@ -221,16 +218,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.one + Spacing.half,
-  },
-  tag: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-    borderRadius: Radius.full,
-  },
-  // A little smaller than a regular eyebrow, to fit beside the photo, but not so small it's hard to read.
-  tagText: {
-    fontSize: 11,
-    lineHeight: 16,
-    letterSpacing: 0.6,
   },
 });
