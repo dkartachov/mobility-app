@@ -1,12 +1,13 @@
 import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, type CSSStyle } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const SPRING = { damping: 18, stiffness: 320, mass: 0.6 } as const;
 
 type PressableScaleProps = Omit<PressableProps, 'style'> & {
-  style?: StyleProp<ViewStyle>;
+  /** Also takes Reanimated CSS styles, e.g. transitions from `css.create`. */
+  style?: StyleProp<ViewStyle | CSSStyle<ViewStyle>>;
   /** How far the content shrinks while held. */
   pressedScale?: number;
 };
