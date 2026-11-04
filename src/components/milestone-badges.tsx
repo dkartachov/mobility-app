@@ -70,7 +70,14 @@ function useSvgId() {
  * the latest reached one first, so what's next is in view. Reached ones open on their own screen,
  * which is where their effects play; here they're drawn still.
  */
-export function MilestoneBadges({ totalSeconds }: { totalSeconds: number }) {
+export function MilestoneBadges({
+  totalSeconds,
+  inset = Spacing.three,
+}: {
+  totalSeconds: number;
+  /** The screen's side padding, which the row runs out over so badges scroll off the edges. */
+  inset?: number;
+}) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const reachedCount = MILESTONE_HOURS.filter((hours) => totalSeconds >= hours * 3600).length;
 
@@ -81,8 +88,8 @@ export function MilestoneBadges({ totalSeconds }: { totalSeconds: number }) {
       onContentSizeChange={() =>
         scrollRef.current?.scrollTo({ x: Math.max(0, reachedCount - 1) * (BADGE_SIZE + BADGE_GAP), animated: false })
       }
-      style={styles.list}
-      contentContainerStyle={styles.content}>
+      style={{ marginHorizontal: -inset }}
+      contentContainerStyle={[styles.content, { paddingHorizontal: inset }]}>
       {MILESTONE_HOURS.map((hours, i) => (
         <MilestoneBadge key={hours} hours={hours} reached={i < reachedCount} />
       ))}
@@ -328,14 +335,8 @@ function MilestoneBadge({ hours, reached }: { hours: number; reached: boolean })
 }
 
 const styles = StyleSheet.create({
-  // Runs to the screen's edges, so badges scroll off them instead of being cut short inside the
-  // padding.
-  list: {
-    marginHorizontal: -Spacing.three,
-  },
   content: {
     gap: BADGE_GAP,
-    paddingHorizontal: Spacing.three,
   },
   badge: {
     width: BADGE_SIZE,

@@ -18,6 +18,7 @@ describe('session queries', () => {
     expect(await getStats(db)).toEqual({
       totalSeconds: 0,
       sessionCount: 0,
+      trainedDayCount: 0,
       trainedToday: false,
       firstSessionDate: null,
     });
@@ -56,6 +57,7 @@ describe('session queries', () => {
     expect(await getStats(db)).toEqual({
       totalSeconds: 2280,
       sessionCount: 4,
+      trainedDayCount: 3,
       trainedToday: true,
       firstSessionDate: '2026-10-26',
     });

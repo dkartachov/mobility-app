@@ -8,6 +8,8 @@ import { useDbQuery } from './use-db-query';
 export type Stats = {
   totalSeconds: number;
   sessionCount: number;
+  /** Days with at least one session. */
+  trainedDayCount: number;
   trainedToday: boolean;
   /** Day of the very first session, `null` before any. */
   firstSessionDate: DateKey | null;
@@ -39,10 +41,12 @@ export async function getStats(db: SQLiteDatabase): Promise<Stats> {
   const row = await db.getFirstAsync<{
     total: number | null;
     count: number;
+    days: number;
     today: number | null;
     first: string | null;
   }>(
-    `SELECT SUM(duration_seconds) AS total, COUNT(*) AS count, SUM(local_date = ?) AS today, MIN(local_date) AS first
+    `SELECT SUM(duration_seconds) AS total, COUNT(*) AS count, COUNT(DISTINCT local_date) AS days,
+       SUM(local_date = ?) AS today, MIN(local_date) AS first
      FROM sessions`,
     todayKey()
   );
@@ -50,6 +54,7 @@ export async function getStats(db: SQLiteDatabase): Promise<Stats> {
   return {
     totalSeconds: row?.total ?? 0,
     sessionCount: row?.count ?? 0,
+    trainedDayCount: row?.days ?? 0,
     trainedToday: (row?.today ?? 0) > 0,
     firstSessionDate: row?.first ?? null,
   };
