@@ -31,7 +31,7 @@ export const getFastWorkouts = fastWorkouts.get;
 export const setFastWorkouts = fastWorkouts.set;
 export const useFastWorkouts = fastWorkouts.use;
 
-/** Next works in flexibility tests without a measurement; skipped measurements save as 0. */
+/** Next works in flexibility tests without a measurement, and the warm-up can be skipped; skipped measurements save as 0. */
 const skipTestMeasurements = devSwitch('dev.skipTestMeasurements');
 export const setSkipTestMeasurements = skipTestMeasurements.set;
 export const useSkipTestMeasurements = skipTestMeasurements.use;

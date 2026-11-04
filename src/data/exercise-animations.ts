@@ -1428,3 +1428,47 @@ export const LEG_SWINGS: FigureClip = {
     { ms: 800, pose: LEG_SWING_BACK, swing: true, ease: 'out' },
   ],
 };
+
+// --- Marching: standing tall, knees lifting to hip height in turn, arms swinging opposite ---
+
+/**
+ * A hand on a nearly straight arm at this angle from the shoulder, in screen degrees (90 is down).
+ * `x` nudges the far arm's arc over, like `armAt`, while keeping the hand in reach.
+ */
+const swingingHand = (degrees: number, x = 0): Extremity => {
+  const radians = (degrees * Math.PI) / 180;
+  const [shoulderX, shoulderY] = STANDING_SHOULDER;
+  return [shoulderX + x + 140 * Math.cos(radians), shoulderY + 140 * Math.sin(radians), -degrees];
+};
+/** A foot lifted with the thigh level in front and the shin hanging under the knee. */
+const liftedFoot = (x = 0): Extremity => [STANDING_TALL.hip[0] + 92 + x, STANDING_TALL.hip[1] + 112, -15];
+
+const MARCH_STAND: Pose = {
+  ...STANDING_TALL,
+  nearHand: swingingHand(90),
+  farHand: swingingHand(90, 8),
+};
+const MARCH_NEAR_UP: Pose = {
+  ...STANDING_TALL,
+  nearFoot: liftedFoot(),
+  nearHand: swingingHand(115),
+  farHand: swingingHand(60, 8),
+};
+const MARCH_FAR_UP: Pose = {
+  ...STANDING_TALL,
+  farFoot: liftedFoot(8),
+  nearHand: swingingHand(60),
+  farHand: swingingHand(115, 8),
+};
+
+export const MARCHING: FigureClip = {
+  view: 'side',
+  stillFrame: 1,
+  keyframes: [
+    { ms: 0, pose: MARCH_STAND },
+    { ms: 450, pose: MARCH_NEAR_UP, swing: true },
+    { ms: 450, pose: MARCH_STAND, swing: true },
+    { ms: 450, pose: MARCH_FAR_UP, swing: true },
+    { ms: 450, pose: MARCH_STAND, swing: true },
+  ],
+};
