@@ -5,7 +5,7 @@
 
 /** Fill in before release. */
 export const DEVELOPER_NAME = 'Hogos';
-export const CONTACT_EMAIL = 'kartachovd@gmail.com';
+export const CONTACT_EMAIL = 'pliemobility@gmail.com';
 export const POLICY_UPDATED = '6 November 2026';
 
 export type PolicySection = {
