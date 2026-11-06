@@ -36,8 +36,11 @@ const COLORS = { background: '#E3EEEC', ground: '#D8E6E3', mat: '#D0E6E2', near:
 const VIEW_BOX = `0 0 ${SCENE.width} ${SCENE.height}`;
 const HEAD_RADIUS = 30;
 
-/** Loops a clip's time for as long as it's on screen, or holds its key pose if reduced motion is on. */
-function useClipTime(clip: FigureClip | HandClip) {
+/**
+ * Loops a clip's time for as long as it's on screen, or holds its key pose if reduced motion is on.
+ * While not `playing` it waits on its first frame, and starts from the beginning once it is.
+ */
+function useClipTime(clip: FigureClip | HandClip, playing: boolean) {
   const reducedMotion = useReducedMotion();
   const time = useSharedValue(keyframeTime(clip, clip.stillFrame));
 
@@ -46,17 +49,18 @@ function useClipTime(clip: FigureClip | HandClip) {
       time.set(keyframeTime(clip, clip.stillFrame));
       return;
     }
-    const duration = clipDuration(clip);
     time.set(0);
+    if (!playing) return;
+    const duration = clipDuration(clip);
     time.set(withRepeat(withTiming(duration, { duration, easing: Easing.linear }), -1, false));
     return () => cancelAnimation(time);
-  }, [clip, reducedMotion, time]);
+  }, [clip, playing, reducedMotion, time]);
 
   return time;
 }
 
-export function ExerciseFigure({ clip }: { clip: FigureClip }) {
-  const time = useClipTime(clip);
+export function ExerciseFigure({ clip, playing = true }: { clip: FigureClip; playing?: boolean }) {
+  const time = useClipTime(clip, playing);
   const viewBox = figureViewBox(clip);
 
   const figure = useDerivedValue(() => solveFigure(poseAt(clip, time.get()), clip));
@@ -96,6 +100,9 @@ export function ExerciseFigure({ clip }: { clip: FigureClip }) {
           <AnimatedPath animatedProps={torso} stroke={COLORS.near} strokeWidth={38} {...LIMB} />
           <AnimatedCircle animatedProps={head} r={HEAD_RADIUS} fill={COLORS.near} />
           <AnimatedPath animatedProps={nearLeg} stroke={COLORS.near} strokeWidth={26} {...LIMB} />
+          {clip.outlineNearArm && (
+            <AnimatedPath animatedProps={nearArm} stroke={COLORS.background} strokeWidth={32} {...LIMB} />
+          )}
           <AnimatedPath animatedProps={nearArm} stroke={COLORS.near} strokeWidth={22} {...LIMB} />
           {clip.band && <AnimatedPath animatedProps={band} stroke={COLORS.band} strokeWidth={10} {...LIMB} />}
         </Svg>
@@ -105,8 +112,8 @@ export function ExerciseFigure({ clip }: { clip: FigureClip }) {
 }
 
 /** A single finger up close, as this exercise is all in the hand. */
-export function ExerciseHand({ clip }: { clip: HandClip }) {
-  const time = useClipTime(clip);
+export function ExerciseHand({ clip, playing = true }: { clip: HandClip; playing?: boolean }) {
+  const time = useClipTime(clip, playing);
   const finger = useAnimatedProps(() => ({ d: solveFinger(clip, time.get()) }));
   const [wristX, wristY] = FINGER.wrist;
   const [knuckleX, knuckleY] = FINGER.knuckle;

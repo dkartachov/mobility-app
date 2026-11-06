@@ -1,4 +1,4 @@
-import { EXERCISES, getExercise, searchExercises } from './exercises';
+import { EXERCISES, getExercise, getExercises, searchExercises } from './exercises';
 
 describe('EXERCISES', () => {
   it('has unique ids', () => {
@@ -32,6 +32,12 @@ describe('getExercise', () => {
   it('returns undefined for unknown or missing ids', () => {
     expect(getExercise('nope')).toBeUndefined();
     expect(getExercise(undefined)).toBeUndefined();
+  });
+});
+
+describe('getExercises', () => {
+  it('keeps the order given and skips unknown ids', () => {
+    expect(getExercises(['pancake', 'nope', 'butterfly']).map((e) => e.id)).toEqual(['pancake', 'butterfly']);
   });
 });
 

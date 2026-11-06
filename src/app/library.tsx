@@ -129,12 +129,13 @@ export default function LibraryScreen() {
           </View>
         </View>
       }
-      renderItem={({ item }) => <ExerciseTile exercise={item} />}
+      renderItem={({ item }) => <ExerciseTile exercise={item} list={results} />}
     />
   );
 }
 
-function ExerciseTile({ exercise }: { exercise: Exercise }) {
+/** Opens the exercise, and lets you swipe on through the rest of the list it was picked from. */
+function ExerciseTile({ exercise, list }: { exercise: Exercise; list: readonly Exercise[] }) {
   const tags = [exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides'].filter(
     (tag): tag is string => Boolean(tag)
   );
@@ -142,7 +143,12 @@ function ExerciseTile({ exercise }: { exercise: Exercise }) {
   return (
     <PressableScale
       accessibilityRole="button"
-      onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: exercise.id } })}>
+      onPress={() =>
+        router.push({
+          pathname: '/exercise/[id]',
+          params: { id: exercise.id, list: list.map((item) => item.id).join(',') },
+        })
+      }>
       <Card style={styles.tile}>
         <ExercisePhoto source={exercise.photo} style={styles.photo} />
         <View style={styles.text}>

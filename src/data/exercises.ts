@@ -7,31 +7,69 @@ import {
   ACTIVE_STRAIGHT_LEG_RAISE,
   ANKLE_MOBILIZATION,
   BACK_LYING_REVERSE_PIGEON,
+  BEHIND_THE_BACK_CHEST_OPENER,
   BELLY_DOWN_FOOT_SPLAY,
   BLACKBURN,
+  BOTTOM_SQUAT,
   BOTTOM_SQUAT_ROTATION,
+  BUTTERFLY,
   CAT_COW,
   COBRA_TO_PRAYER,
   COSSACK_SQUAT,
+  COUCH_STRETCH,
+  COW_FACE_ARMS,
+  CROSS_BODY_SHOULDER_STRETCH,
+  DOWNWARD_FACING_DOG,
   DOWNWARD_FACING_DOG_TO_COBRA,
   ELEPHANT_WALK,
+  FIGURE_FOUR_STRETCH,
   FINGER_TENDON_GLIDES,
   FLOOR_ANGELS,
   FROG_ROCKS,
+  FROG_STRETCH,
+  HALF_KNEELING_FROG_STRETCH,
+  HALF_SPINAL_TWIST,
+  HALF_TWISTED_LIZARD,
+  HAPPY_BABY,
   HIP_CIRCLES,
   HORSE_STANCE,
   INCHWORM,
+  KNEELING_WRIST_STRETCH,
+  KNIGHT_STRETCH,
   KNIGHT_TO_HAMSTRING,
   LEG_SWINGS,
+  LIZARD_POSE,
+  LYING_HAMSTRING_STRETCH,
+  LYING_KNEE_HUG,
   LYING_WINDSHIELD_WIPER_HOLD,
+  MANUAL_EXTENSOR_FOREARM_STRETCH,
+  MANUAL_FLEXOR_FOREARM_STRETCH,
+  NECK_SIDE_STRETCH,
+  NINETY_TO_NINETY,
   NINETY_TO_NINETY_ROTATIONS,
   OPEN_BOOK,
+  OVERHEAD_TRICEPS_STRETCH,
+  PANCAKE,
+  PEC_STRETCH_ON_THE_GROUND,
   PIGEON_STRETCH,
+  PRAYER_POSE,
+  PUPPY_POSE,
+  PYRAMID_STRETCH,
+  RESTING_COSSACK_SQUAT,
+  REVERSE_PRAYER,
   REVERSE_SCORPION,
+  REVERSE_TABLETOP,
   SCAP_MOBILIZATION,
+  SEATED_PIKE_STRETCH,
+  SEATED_SHOULDER_EXTENSION,
+  SEATED_STRADDLE_SIDE_BEND,
   SHOULDER_CIRCLES,
   SHOULDER_PASS_THROUGHS,
+  SLEEPER_STRETCH,
   SQUAT_TO_STAND,
+  STANDING_FORWARD_FOLD,
+  THE_BREAKDANCER,
+  THE_SAGITTARIUS,
   THREAD_THE_NEEDLE,
   THREE_LEGGED_DOWNWARD_FACING_DOG,
   WORLDS_GREATEST_STRETCH,
@@ -98,6 +136,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/90-to-90.png'),
+    animation: NINETY_TO_NINETY,
   },
   {
     id: 'butterfly',
@@ -110,6 +149,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lean forward for a deeper stretch',
     ],
     photo: require('@/assets/images/exercises/butterfly.png'),
+    animation: BUTTERFLY,
   },
   {
     id: 'bottom-squat',
@@ -122,6 +162,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Push your knees out with your elbows and hold',
     ],
     photo: require('@/assets/images/exercises/bottom-squat.png'),
+    animation: BOTTOM_SQUAT,
   },
   {
     id: 'downward-facing-dog',
@@ -134,6 +175,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Push the floor away, let your heels sink and hold',
     ],
     photo: require('@/assets/images/exercises/downward-dog.jpg'),
+    animation: DOWNWARD_FACING_DOG,
     oneMinuteOnly: true,
   },
   {
@@ -147,6 +189,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax your opposite arm, and place the back of your hand on the ground',
     ],
     photo: require('@/assets/images/exercises/the-sagittarius.png'),
+    animation: THE_SAGITTARIUS,
     twoSided: true,
   },
   {
@@ -160,6 +203,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Rock back and forth or hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/half-kneeling-frog-stretch.png'),
+    animation: HALF_KNEELING_FROG_STRETCH,
     twoSided: true,
   },
   {
@@ -173,6 +217,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/pec-stretch-on-the-ground.png'),
+    animation: PEC_STRETCH_ON_THE_GROUND,
     twoSided: true,
   },
   {
@@ -186,6 +231,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax into the bottom position, then switch sides',
     ],
     photo: require('@/assets/images/exercises/resting-cossack-squat.png'),
+    animation: RESTING_COSSACK_SQUAT,
     twoSided: true,
   },
   {
@@ -199,6 +245,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax and let your chest sink toward the floor',
     ],
     photo: require('@/assets/images/exercises/pancake.png'),
+    animation: PANCAKE,
   },
   {
     id: 'active-pancake',
@@ -226,6 +273,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Twist toward the bent knee and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/half-spinal-twist.png'),
+    animation: HALF_SPINAL_TWIST,
     twoSided: true,
   },
   {
@@ -239,6 +287,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Roll forward and grab the foot of the extended leg, then hold and switch sides',
     ],
     photo: require('@/assets/images/exercises/the-breakdancer.png'),
+    animation: THE_BREAKDANCER,
     twoSided: true,
   },
   {
@@ -297,6 +346,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/manual-extensor-forearm-stretch.png'),
+    animation: MANUAL_EXTENSOR_FOREARM_STRETCH,
     twoSided: true,
   },
   {
@@ -355,6 +405,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Pull the foot toward your glute, twist open and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/half-twisted-lizard.png'),
+    animation: HALF_TWISTED_LIZARD,
     twoSided: true,
   },
   {
@@ -382,6 +433,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Let your forehead and chest sink toward the floor and hold',
     ],
     photo: require('@/assets/images/exercises/prayer-pose.png'),
+    animation: PRAYER_POSE,
   },
   {
     id: 'knight-stretch',
@@ -394,6 +446,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Shift your hips forward and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/knight-stretch.png'),
+    animation: KNIGHT_STRETCH,
     twoSided: true,
   },
   {
@@ -482,6 +535,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/manual-flexor-forearm-stretch.png'),
+    animation: MANUAL_FLEXOR_FOREARM_STRETCH,
     twoSided: true,
   },
   {
@@ -495,6 +549,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Stop when you feel it in your forearms and hold',
     ],
     photo: require('@/assets/images/exercises/kneeling-wrist-stretch.png'),
+    animation: KNEELING_WRIST_STRETCH,
   },
   {
     id: 'reverse-prayer',
@@ -507,6 +562,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, keeping your shoulders relaxed',
     ],
     photo: require('@/assets/images/exercises/reverse-prayer.png'),
+    animation: REVERSE_PRAYER,
   },
   {
     id: 'wrist-rocks',
@@ -549,6 +605,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold without forcing it, then switch sides',
     ],
     photo: require('@/assets/images/exercises/sleeper-stretch.png'),
+    animation: SLEEPER_STRETCH,
     twoSided: true,
   },
   {
@@ -562,6 +619,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep your hips high, rest your forehead down and hold',
     ],
     photo: require('@/assets/images/exercises/puppy-pose.png'),
+    animation: PUPPY_POSE,
   },
   {
     id: 'floor-angels',
@@ -619,6 +677,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep your hips in line with your knees and hold',
     ],
     photo: require('@/assets/images/exercises/frog-stretch.png'),
+    animation: FROG_STRETCH,
   },
   {
     id: 'lizard-pose',
@@ -631,6 +690,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Let your hips sink and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/lizard-pose.png'),
+    animation: LIZARD_POSE,
     twoSided: true,
   },
   {
@@ -659,6 +719,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/seated-straddle-side-bend.png'),
+    animation: SEATED_STRADDLE_SIDE_BEND,
     twoSided: true,
   },
   {
@@ -672,6 +733,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Reach the other hand toward the floor and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/neck-side-stretch.png'),
+    animation: NECK_SIDE_STRETCH,
     twoSided: true,
   },
   {
@@ -716,6 +778,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/cross-body-shoulder-stretch.png'),
+    animation: CROSS_BODY_SHOULDER_STRETCH,
     twoSided: true,
   },
   {
@@ -729,6 +792,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep your ribs down and hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/overhead-triceps-stretch.png'),
+    animation: OVERHEAD_TRICEPS_STRETCH,
     twoSided: true,
   },
   {
@@ -742,6 +806,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Stand tall and hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/cow-face-arms.png'),
+    animation: COW_FACE_ARMS,
     twoSided: true,
   },
   {
@@ -755,6 +820,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Open your chest, squeeze your glutes and hold',
     ],
     photo: require('@/assets/images/exercises/reverse-tabletop.png'),
+    animation: REVERSE_TABLETOP,
     oneMinuteOnly: true,
   },
   {
@@ -768,6 +834,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lift your hands away from your back and hold',
     ],
     photo: require('@/assets/images/exercises/behind-the-back-chest-opener.png'),
+    animation: BEHIND_THE_BACK_CHEST_OPENER,
   },
   {
     id: 'hip-circles',
@@ -795,6 +862,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Pull it toward your chest, let the crossed knee open out and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/figure-four-stretch.png'),
+    animation: FIGURE_FOUR_STRETCH,
     twoSided: true,
   },
   {
@@ -808,6 +876,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Gently pull your knees toward the floor, keep your lower back down and hold',
     ],
     photo: require('@/assets/images/exercises/happy-baby.png'),
+    animation: HAPPY_BABY,
   },
   {
     id: 'cossack-squat',
@@ -866,6 +935,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Squeeze the glute of the back leg and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/couch-stretch.png'),
+    animation: COUCH_STRETCH,
     twoSided: true,
   },
   {
@@ -879,6 +949,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax a little deeper with each breath and hold',
     ],
     photo: require('@/assets/images/exercises/standing-forward-fold.png'),
+    animation: STANDING_FORWARD_FOLD,
   },
   {
     id: 'pyramid-stretch',
@@ -891,6 +962,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Rest your hands on the floor or your shin and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/pyramid-stretch.png'),
+    animation: PYRAMID_STRETCH,
     twoSided: true,
   },
   {
@@ -905,6 +977,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Gently pull the leg closer and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/lying-hamstring-stretch.png'),
+    animation: LYING_HAMSTRING_STRETCH,
     twoSided: true,
   },
   {
@@ -963,6 +1036,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax into the fold and hold',
     ],
     photo: require('@/assets/images/exercises/seated-pike-stretch.png'),
+    animation: SEATED_PIKE_STRETCH,
   },
   {
     id: 'seated-shoulder-extension',
@@ -975,6 +1049,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lift your chest and stop when you feel it in the front of your shoulders, then hold',
     ],
     photo: require('@/assets/images/exercises/seated-shoulder-extension.png'),
+    animation: SEATED_SHOULDER_EXTENSION,
     oneMinuteOnly: true,
   },
   {
@@ -1004,6 +1079,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep the other leg flat on the floor and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/lying-knee-hug.png'),
+    animation: LYING_KNEE_HUG,
     twoSided: true,
   },
   {
@@ -1070,6 +1146,11 @@ export const EXERCISES = [...ALL_EXERCISES].sort((a, b) =>
 
 export function getExercise(id: string | undefined) {
   return EXERCISES.find((exercise) => exercise.id === id);
+}
+
+/** The exercises with these ids, in the same order, skipping any that don't exist. */
+export function getExercises(ids: readonly string[]) {
+  return ids.flatMap((id) => getExercise(id) ?? []);
 }
 
 export function searchExercises(query: string) {

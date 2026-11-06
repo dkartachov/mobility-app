@@ -1,4 +1,15 @@
-import type { Extremity, FigureClip, HandClip, HandPose, Point, Pose } from '@/lib/figure-rig';
+import {
+  BONES,
+  solveJoint,
+  type Bend,
+  type Extremity,
+  type FigureClip,
+  type HandClip,
+  type HandPose,
+  type Keyframe,
+  type Point,
+  type Pose,
+} from '@/lib/figure-rig';
 
 /** A flat foot's ankle height and a wrist's height with the palm on the floor. */
 const ANKLE_Y = 456;
@@ -1787,4 +1798,906 @@ export const OVERHEAD_REACH: FigureClip = {
     { ms: 900, pose: OVERHEAD_DOWN },
     { ms: 1800, pose: OVERHEAD_UP, swing: true },
   ],
+};
+
+// ===== Passive stretches: each moves from a start position into the stretch, holds it, and comes back out =====
+
+const flipEase = (ease: Keyframe['ease']): Keyframe['ease'] => (ease === 'in' ? 'out' : ease === 'out' ? 'in' : ease);
+
+/**
+ * Pauses on `start`, moves through `moves` into the stretch, holds it, then retraces the same moves
+ * back out to `start`, so the loop closes. The still frame is the stretch itself.
+ */
+const intoHold = (start: Pose, moves: readonly Keyframe[], holdMs = 3500): Pick<FigureClip, 'keyframes' | 'stillFrame'> => {
+  const stretch = moves[moves.length - 1].pose;
+  const back = moves
+    .map((move, i) => ({ ...move, ease: flipEase(move.ease), pose: i === 0 ? start : moves[i - 1].pose }))
+    .reverse();
+  return {
+    stillFrame: moves.length + 1,
+    keyframes: [{ ms: 0, pose: start }, { ms: 500, pose: start }, ...moves, { ms: holdMs, pose: stretch }, ...back],
+  };
+};
+
+/** Where a knee goes for a leg from this hip to this ankle, for poses that place their knees. */
+const kneeOf = (hip: Point, foot: Extremity, bend: Bend = 1): Point =>
+  solveJoint(hip, [foot[0], foot[1]], BONES.thigh, BONES.shin, bend);
+
+/** Zoomed in on someone lying on their back, head to the left. */
+const LYING_CAMERA = { zoom: 1.5, focus: [440, 380] } satisfies Partial<FigureClip>;
+
+// --- Seated pike stretch: legs straight together, folding forward to reach the toes ---
+
+const PIKE_FOLDED: Pose = {
+  ...SIT_REACH_UP,
+  torso: 35,
+  arch: 12,
+  neck: -10,
+  nearHand: [586, 412, -80],
+  farHand: [592, 414, -80],
+};
+
+export const SEATED_PIKE_STRETCH: FigureClip = {
+  view: 'side',
+  ...intoHold(SIT_REACH_UP, [{ ms: 1800, pose: PIKE_FOLDED }]),
+};
+
+// --- The Breakdancer: from the front, one leg long, the other foot against its inner thigh, folding toward the long leg ---
+
+const BREAKDANCER_SIT: Pose = {
+  ...PANCAKE_UP,
+  nearHand: [440, 430, -90],
+  farHand: [520, 430, -90],
+  farFoot: [505, 452, 180],
+  knees: [
+    [368, 438.5],
+    [590, 425],
+  ],
+};
+const BREAKDANCER_FOLDED: Pose = {
+  ...BREAKDANCER_SIT,
+  torso: 150,
+  torsoLength: 110,
+  arch: 0,
+  neck: 165,
+  nearHand: [285, 440, 180],
+  farHand: [300, 432, 180],
+};
+
+export const THE_BREAKDANCER: FigureClip = {
+  view: 'above',
+  straightArms: true,
+  widths: { shoulder: 30, hip: 14 },
+  ...intoHold(BREAKDANCER_SIT, [{ ms: 1800, pose: BREAKDANCER_FOLDED }]),
+};
+
+// --- Pancake: the active pancake's fold, held at the bottom ---
+
+export const PANCAKE: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 30, hip: 14 },
+  legBends: [-1, 1],
+  armBends: [-1, 1],
+  ...intoHold(PANCAKE_UP, [{ ms: 2000, pose: PANCAKE_FOLDED }]),
+};
+
+// --- Butterfly: from the front, soles together, the knees lowering out to the sides as the chest leans in ---
+
+const BUTTERFLY_UP: Pose = {
+  hip: [480, 425],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearHand: [468, 448, -60],
+  farHand: [492, 448, -120],
+  nearFoot: [445, 455, 0],
+  farFoot: [515, 455, 180],
+  knees: [
+    [415, 365],
+    [545, 365],
+  ],
+};
+const BUTTERFLY_DOWN: Pose = {
+  ...BUTTERFLY_UP,
+  torsoLength: 95,
+  neckLength: 30,
+  knees: [
+    [365, 440],
+    [595, 440],
+  ],
+};
+
+export const BUTTERFLY: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 30, hip: 14 },
+  armBends: [-1, 1],
+  ...intoHold(BUTTERFLY_UP, [{ ms: 2000, pose: BUTTERFLY_DOWN }]),
+};
+
+// --- 90 to 90: from the front, both knees drop to one side, then the chest leans over the front shin ---
+
+/** Folding out over the front shin, on the figure's right, the straight arms reaching along it, as in the Breakdancer. */
+const NINETY_LEAN: Pose = {
+  ...ROTATIONS_LEFT,
+  torso: 150,
+  torsoLength: 110,
+  neck: 165,
+  nearHand: [330, 445, 180],
+  farHand: [345, 437, 180],
+};
+
+export const NINETY_TO_NINETY: FigureClip = {
+  view: 'above',
+  straightArms: true,
+  widths: { shoulder: 28, hip: 16 },
+  ...intoHold(ROTATIONS_UP, [
+    { ms: 1400, pose: ROTATIONS_LEFT },
+    { ms: 1400, pose: NINETY_LEAN },
+  ]),
+};
+
+// --- Bottom squat: from the front, sinking from standing into a deep squat, elbows pushing the knees out ---
+
+const SQUAT_STAND: Pose = {
+  hip: [480, 270],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearHand: [440, 290, -95],
+  farHand: [520, 290, -85],
+  nearFoot: [395, ANKLE_Y, 180],
+  farFoot: [565, ANKLE_Y, 0],
+};
+/** The arms hang loose in front, between the knees. */
+const SQUAT_BOTTOM: Pose = {
+  ...SQUAT_STAND,
+  hip: [480, 400],
+  torsoLength: 100,
+  nearHand: [458, 445, -90],
+  farHand: [502, 445, -90],
+};
+
+export const BOTTOM_SQUAT: FigureClip = {
+  view: 'side',
+  widths: { shoulder: 28, hip: 16 },
+  legBends: [-1, 1],
+  armBends: [1, -1],
+  ...intoHold(SQUAT_STAND, [{ ms: 2000, pose: SQUAT_BOTTOM }]),
+};
+
+// --- Resting Cossack squat: from a wide stance, sinking over one leg and resting at the bottom ---
+
+const COSSACK_STAND: Pose = {
+  ...COSSACK_MIDDLE,
+  hip: [480, 300],
+  nearHand: [466, 228, 0],
+  farHand: [494, 228, 180],
+};
+
+export const RESTING_COSSACK_SQUAT: FigureClip = {
+  view: 'side',
+  widths: { shoulder: 28, hip: 18 },
+  legBends: [-1, 1],
+  armBends: [1, -1],
+  ...intoHold(COSSACK_STAND, [{ ms: 2000, pose: COSSACK_NEAR }]),
+};
+
+// --- Half kneeling frog: from above on all fours, one leg slides out straight to the side, then the hips rock back ---
+
+const HALF_FROG_BASE = {
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  // Arms pointing down at the floor look short from above.
+  nearHand: [540, 240, 0],
+  farHand: [540, 300, 0],
+  farFoot: [315, 288, 180],
+} satisfies Partial<Pose>;
+
+const HALF_FROG_ALL_FOURS: Pose = {
+  ...HALF_FROG_BASE,
+  hip: [400, 270],
+  nearFoot: [315, 252, 180],
+  knees: [
+    [405, 252],
+    [405, 288],
+  ],
+};
+const HALF_FROG_LEG_OUT: Pose = {
+  ...HALF_FROG_BASE,
+  hip: [400, 270],
+  nearFoot: [400, 75, 90],
+  knees: [
+    [400, 163.5],
+    [405, 288],
+  ],
+};
+const HALF_FROG_BACK: Pose = {
+  ...HALF_FROG_LEG_OUT,
+  hip: [330, 270],
+  knees: [
+    [365, 163.5],
+    [405, 288],
+  ],
+};
+
+export const HALF_KNEELING_FROG_STRETCH: FigureClip = {
+  view: 'above',
+  straightArms: true,
+  widths: { shoulder: 24, hip: 18 },
+  ...intoHold(HALF_FROG_ALL_FOURS, [
+    { ms: 1500, pose: HALF_FROG_LEG_OUT, step: true },
+    { ms: 1800, pose: HALF_FROG_BACK },
+  ]),
+};
+
+// --- Prayer pose: from sitting on the heels, folding forward with the arms reaching out long ---
+
+const SITTING_ON_HEELS: Pose = {
+  hip: [362, 392],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearHand: [430, 395, -20],
+  farHand: [438, 395, -20],
+  nearFoot: [340, 452, 180],
+  farFoot: [348, 452, 180],
+};
+
+export const PRAYER_POSE: FigureClip = {
+  view: 'side',
+  ...intoHold(SITTING_ON_HEELS, [{ ms: 2000, pose: PRAYER, swing: true }]),
+};
+
+// --- Puppy pose: from all fours, the hands walk forward and the chest melts down, hips over the knees ---
+
+const PUPPY_WALKING: Pose = {
+  ...ALL_FOURS,
+  torso: 15,
+  nearHand: [590, WRIST_Y, 0],
+  farHand: [598, WRIST_Y, 0],
+};
+const PUPPY: Pose = {
+  ...ALL_FOURS,
+  torso: -22,
+  arch: -6,
+  neck: -20,
+  nearHand: [645, WRIST_Y, 0],
+  farHand: [653, WRIST_Y, 0],
+};
+
+export const PUPPY_POSE: FigureClip = {
+  view: 'side',
+  ...intoHold(ALL_FOURS, [
+    { ms: 1000, pose: PUPPY_WALKING, step: true },
+    { ms: 1600, pose: PUPPY },
+  ]),
+};
+
+// --- Downward facing dog: from the knees with the toes tucked, the hips lift up and back ---
+
+const DOG_KNEES_DOWN: Pose = {
+  hip: [400, 356],
+  torso: 5,
+  arch: 0,
+  neck: 0,
+  nearHand: [620, WRIST_Y, 0],
+  farHand: [628, WRIST_Y, 0],
+  nearFoot: [300, 436, -28],
+  farFoot: [308, 436, -28],
+};
+
+export const DOWNWARD_FACING_DOG: FigureClip = {
+  view: 'side',
+  ...intoHold(DOG_KNEES_DOWN, [{ ms: 2000, pose: DOG }]),
+};
+
+// --- Frog stretch: from above on all fours, the knees slide out wide, then the hips sink back ---
+
+const FROG_ALL_FOURS: Pose = {
+  ...FROG_BASE,
+  hip: [420, 270],
+  nearFoot: [330, 245, 180],
+  // -180 rather than 180, so the foot turns out the short way to -90 instead of spinning round.
+  farFoot: [330, 295, -180],
+  knees: [
+    [420, 245],
+    [420, 295],
+  ],
+};
+
+export const FROG_STRETCH: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 24, hip: 18 },
+  armBends: [1, -1],
+  ...intoHold(FROG_ALL_FOURS, [
+    { ms: 1600, pose: FROG_FORWARD, step: true },
+    { ms: 1600, pose: FROG_BACK },
+  ]),
+};
+
+// --- Knight stretch: the back knee stays planted as the hips shift forward ---
+
+/** The back knee on the floor, with its shin lying flat behind it. */
+const BACK_KNEE: Point = [390, 456];
+
+const KNIGHT_UPRIGHT: Pose = { ...KNIGHT, knees: [kneeOf(KNIGHT.hip, KNIGHT.nearFoot), BACK_KNEE] };
+const KNIGHT_FORWARD_HIP: Point = [460, 385];
+const KNIGHT_FORWARD: Pose = {
+  ...KNIGHT,
+  hip: KNIGHT_FORWARD_HIP,
+  nearHand: [540, 362, -30],
+  farHand: [548, 362, -30],
+  knees: [kneeOf(KNIGHT_FORWARD_HIP, KNIGHT.nearFoot), BACK_KNEE],
+};
+
+export const KNIGHT_STRETCH: FigureClip = {
+  view: 'side',
+  ...intoHold(KNIGHT_UPRIGHT, [{ ms: 1800, pose: KNIGHT_FORWARD }]),
+};
+
+// --- Lizard pose: from the knight, the front foot steps out past the hands and the hips sink low ---
+
+const LIZARD_HIP: Point = [470, 400];
+const LIZARD_FRONT_FOOT: Extremity = [575, ANKLE_Y, 0];
+const LIZARD: Pose = {
+  hip: LIZARD_HIP,
+  torso: 12,
+  arch: 0,
+  neck: 5,
+  nearHand: [690, WRIST_Y, 0],
+  farHand: [698, WRIST_Y, 0],
+  nearFoot: LIZARD_FRONT_FOOT,
+  farFoot: KNIGHT.farFoot,
+  knees: [kneeOf(LIZARD_HIP, LIZARD_FRONT_FOOT), BACK_KNEE],
+};
+
+export const LIZARD_POSE: FigureClip = {
+  view: 'side',
+  ...intoHold(KNIGHT_UPRIGHT, [{ ms: 2000, pose: LIZARD, step: true }]),
+};
+
+// --- Half-twisted lizard: from the lizard, the back foot comes up and the near hand reaches back to hold it ---
+
+const TWISTED_LIZARD: Pose = {
+  ...LIZARD,
+  torso: 45,
+  arch: 0,
+  neck: 110,
+  nearHand: [432, 380, 100],
+  farHand: [600, WRIST_Y, 0],
+  farFoot: [430, 382, 100],
+};
+
+export const HALF_TWISTED_LIZARD: FigureClip = {
+  view: 'side',
+  ...intoHold(KNIGHT_UPRIGHT, [
+    { ms: 2000, pose: LIZARD, step: true },
+    { ms: 1800, pose: TWISTED_LIZARD },
+  ]),
+};
+
+// --- Couch stretch: back to a wall with that shin up against it, the chest lifting from the floor to upright ---
+
+const COUCH_KNEE: Point = [262, 456];
+const COUCH_FRONT_FOOT: Extremity = [500, ANKLE_Y, 0];
+const COUCH_LEAN_HIP: Point = [330, 382];
+const COUCH_UP_HIP: Point = [338, 391];
+
+const COUCH_LEAN: Pose = {
+  hip: COUCH_LEAN_HIP,
+  torso: 35,
+  arch: 0,
+  neck: 20,
+  nearHand: [470, WRIST_Y, 0],
+  farHand: [478, WRIST_Y, 0],
+  nearFoot: COUCH_FRONT_FOOT,
+  // The top of the back foot rests on the wall, toes pointing up.
+  farFoot: [262, 356, 90],
+  knees: [kneeOf(COUCH_LEAN_HIP, COUCH_FRONT_FOOT), COUCH_KNEE],
+};
+const COUCH_UP: Pose = {
+  ...COUCH_LEAN,
+  hip: COUCH_UP_HIP,
+  torso: 92,
+  neck: 90,
+  nearHand: [440, 360, -30],
+  farHand: [448, 360, -30],
+  knees: [kneeOf(COUCH_UP_HIP, COUCH_FRONT_FOOT), COUCH_KNEE],
+};
+
+export const COUCH_STRETCH: FigureClip = {
+  view: 'side',
+  scenery: [{ x: 210, y: 40, width: 40, height: 430 }],
+  ...intoHold(COUCH_LEAN, [{ ms: 2000, pose: COUCH_UP }]),
+};
+
+// --- Standing forward fold: hinging from standing until the head and arms hang ---
+
+const FORWARD_FOLD: Pose = {
+  ...STANDING_TALL,
+  hip: [440, 277],
+  torso: -18,
+  arch: 20,
+  neck: -75,
+  nearHand: [505, 440, -100],
+  farHand: [513, 440, -100],
+};
+
+export const STANDING_FORWARD_FOLD: FigureClip = {
+  view: 'side',
+  ...intoHold(STANDING_TALL, [{ ms: 2000, pose: FORWARD_FOLD }]),
+};
+
+// --- Pyramid stretch: feet a long step apart, legs straight, hinging over the front leg ---
+
+const PYRAMID_UP: Pose = {
+  hip: [470, 285],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearHand: [475, 305, -90],
+  farHand: [483, 305, -90],
+  nearFoot: [570, ANKLE_Y, 0],
+  farFoot: [375, ANKLE_Y, -10],
+};
+const PYRAMID_FOLDED: Pose = {
+  ...PYRAMID_UP,
+  hip: [465, 290],
+  torso: -8,
+  arch: 6,
+  neck: -40,
+  nearHand: [585, 440, -60],
+  farHand: [593, 440, -60],
+};
+
+export const PYRAMID_STRETCH: FigureClip = {
+  view: 'side',
+  ...intoHold(PYRAMID_UP, [{ ms: 2000, pose: PYRAMID_FOLDED }]),
+};
+
+// --- Lying hamstring stretch: the straight leg raise's band pull, held at the top ---
+
+export const LYING_HAMSTRING_STRETCH: FigureClip = {
+  view: 'side',
+  armBends: [1, 1],
+  band: ['nearHand', 'nearFoot'],
+  ...LYING_CAMERA,
+  ...intoHold(STRAP_DOWN, [{ ms: 1800, pose: STRAP_UP, swing: true }]),
+};
+
+// --- Lying knee hug: the knee to chest test's pull, held ---
+
+export const LYING_KNEE_HUG: FigureClip = {
+  view: 'side',
+  armBends: [1, 1],
+  ...LYING_CAMERA,
+  ...intoHold(LEG_RAISE_DOWN, [{ ms: 1600, pose: KNEE_TO_CHEST_IN }]),
+};
+
+// --- Happy baby: lying on the back, the knees come up toward the armpits and the hands hold the feet ---
+
+const HAPPY_BABY_START: Pose = {
+  ...LEG_RAISE_DOWN,
+  nearFoot: [560, ANKLE_Y, 0],
+  farFoot: [568, ANKLE_Y, 0],
+};
+const HAPPY_BABY_HOLD: Pose = {
+  ...LEG_RAISE_DOWN,
+  nearHand: [372, 318, 0],
+  farHand: [380, 318, 0],
+  nearFoot: [372, 300, 0],
+  farFoot: [380, 300, 0],
+  // The knees open out past the chest toward the armpits, so the thighs look short from the side.
+  knees: [
+    [372, 395],
+    [380, 395],
+  ],
+};
+
+export const HAPPY_BABY: FigureClip = {
+  view: 'side',
+  armBends: [1, 1],
+  ...LYING_CAMERA,
+  ...intoHold(
+    {
+      ...HAPPY_BABY_START,
+      knees: [kneeOf(LEG_RAISE_DOWN.hip, HAPPY_BABY_START.nearFoot), kneeOf(LEG_RAISE_DOWN.hip, HAPPY_BABY_START.farFoot)],
+    },
+    [{ ms: 2000, pose: HAPPY_BABY_HOLD }]
+  ),
+};
+
+// --- Figure four: lying on the back, one ankle crosses over the other knee, then that leg pulls in ---
+
+const FIGURE_FOUR_HIP: Point = [440, 446];
+const FIGURE_FOUR_FAR_FOOT: Extremity = [568, ANKLE_Y, 0];
+const FIGURE_FOUR_FAR_KNEE = kneeOf(FIGURE_FOUR_HIP, FIGURE_FOUR_FAR_FOOT);
+
+const FIGURE_FOUR_START: Pose = {
+  ...HAPPY_BABY_START,
+  knees: [kneeOf(FIGURE_FOUR_HIP, HAPPY_BABY_START.nearFoot), FIGURE_FOUR_FAR_KNEE],
+};
+/** The near ankle rests across the far knee, the near knee opening toward the camera. */
+const FIGURE_FOUR_CROSSED: Pose = {
+  ...FIGURE_FOUR_START,
+  nearFoot: [FIGURE_FOUR_FAR_KNEE[0] + 8, FIGURE_FOUR_FAR_KNEE[1] + 4, 0],
+  knees: [[505, 420], FIGURE_FOUR_FAR_KNEE],
+};
+const FIGURE_FOUR_PULLED_FOOT: Extremity = [470, 330, 0];
+const FIGURE_FOUR_PULLED_KNEE = kneeOf(FIGURE_FOUR_HIP, FIGURE_FOUR_PULLED_FOOT);
+const FIGURE_FOUR_PULLED: Pose = {
+  ...FIGURE_FOUR_START,
+  nearHand: [410, 392, -20],
+  farHand: [416, 396, -20],
+  nearFoot: [FIGURE_FOUR_PULLED_KNEE[0] + 18, FIGURE_FOUR_PULLED_KNEE[1] + 2, 0],
+  farFoot: FIGURE_FOUR_PULLED_FOOT,
+  knees: [[470, 395], FIGURE_FOUR_PULLED_KNEE],
+};
+
+export const FIGURE_FOUR_STRETCH: FigureClip = {
+  view: 'side',
+  armBends: [1, 1],
+  ...LYING_CAMERA,
+  ...intoHold(FIGURE_FOUR_START, [
+    { ms: 1400, pose: FIGURE_FOUR_CROSSED },
+    { ms: 1600, pose: FIGURE_FOUR_PULLED },
+  ]),
+};
+
+// --- The Sagittarius: from above, lying on the side, the top knee comes up to 90° and the bottom arm opens out ---
+
+const SAGITTARIUS_BASE = {
+  hip: [390, 270],
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  nearFoot: [190.1, 270, 180],
+} satisfies Partial<Pose>;
+
+const SAGITTARIUS_FLAT: Pose = {
+  ...SAGITTARIUS_BASE,
+  nearHand: [400, 262, 180],
+  farHand: [400, 278, 180],
+  farFoot: [190.1, 270, 180],
+  knees: [
+    [290, 270],
+    [290, 270],
+  ],
+};
+const SAGITTARIUS_KNEE_UP: Pose = {
+  ...SAGITTARIUS_BASE,
+  nearHand: [412, 176, 0],
+  farHand: [412, 172, 0],
+  farFoot: [300, 170, 180],
+  knees: [
+    [290, 270],
+    [400, 170],
+  ],
+};
+const SAGITTARIUS_OPEN: Pose = { ...SAGITTARIUS_KNEE_UP, nearHand: [515, 418, -90] };
+
+export const THE_SAGITTARIUS: FigureClip = {
+  view: 'above',
+  straightArms: true,
+  ...intoHold(SAGITTARIUS_FLAT, [
+    { ms: 1500, pose: SAGITTARIUS_KNEE_UP },
+    { ms: 2000, pose: SAGITTARIUS_OPEN, swing: true },
+  ]),
+};
+
+// --- Half spinal twist: one leg long, the other foot planted across it; the arm hugs the knee and the chest turns ---
+
+const SPINAL_TWIST_SIT: Pose = {
+  ...SIT_REACH_UP,
+  nearHand: [395, WRIST_Y, 0],
+  farHand: [403, WRIST_Y, 0],
+  farFoot: [480, ANKLE_Y, 0],
+};
+const SPINAL_TWIST: Pose = {
+  ...SPINAL_TWIST_SIT,
+  torso: 96,
+  neck: 115,
+  nearHand: [455, 375, -90],
+  farHand: [300, WRIST_Y, 180],
+};
+
+export const HALF_SPINAL_TWIST: FigureClip = {
+  view: 'side',
+  ...intoHold(SPINAL_TWIST_SIT, [{ ms: 1800, pose: SPINAL_TWIST }]),
+};
+
+// --- Seated straddle side bend: from the front, leaning sideways over one leg with the other arm overhead ---
+
+/** A touch narrower than the pancake, as tipping the hips sideways moves them away from the near foot. */
+const STRADDLE_UP: Pose = { ...PANCAKE_UP, nearFoot: [275, 452, 110], farFoot: [685, 452, 70] };
+/**
+ * Bending toward the far leg, so the arm reaching overhead is the near one, drawn in front of the
+ * head rather than disappearing behind it.
+ */
+const STRADDLE_SIDE_BEND: Pose = {
+  ...STRADDLE_UP,
+  torso: 55,
+  arch: 8,
+  neck: 45,
+  nearHand: [655, 228, 30],
+  farHand: [630, 445, -90],
+};
+
+export const SEATED_STRADDLE_SIDE_BEND: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 30, hip: 14 },
+  legBends: [-1, 1],
+  armBends: [-1, 1],
+  ...intoHold(STRADDLE_UP, [{ ms: 2000, pose: STRADDLE_SIDE_BEND, swing: true }]),
+};
+
+// --- Pec stretch on the ground: from above, face down with one arm out; the other side rolls over it ---
+
+const PEC_ARMS = { nearHand: [515, 102, 90], farHand: [520, 350, -60], neck: 0 } satisfies Partial<Pose>;
+const PEC_FLAT: Pose = { ...SCORPION_FLAT, ...PEC_ARMS };
+const PEC_ROLLING: Pose = { ...SCORPION_FAR_RISING, ...PEC_ARMS };
+const PEC_ROLLED: Pose = { ...SCORPION_FAR_ACROSS, ...PEC_ARMS, neck: -20 };
+
+export const PEC_STRETCH_ON_THE_GROUND: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 20, hip: 14 },
+  armBends: [1, -1],
+  ...intoHold(PEC_FLAT, [
+    { ms: 900, pose: PEC_ROLLING, ease: 'in' },
+    { ms: 900, pose: PEC_ROLLED, ease: 'out' },
+  ]),
+};
+
+// --- Sleeper stretch: from above, lying on the side; the top hand presses the bottom forearm down toward the feet ---
+
+const SLEEPER_BASE = {
+  hip: [390, 270],
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  nearFoot: [250, 215, 180],
+  farFoot: [256, 211, 180],
+  // Knees bent a little in front, stacked one on the other.
+  knees: [
+    [340, 185],
+    [345, 181],
+  ],
+} satisfies Partial<Pose>;
+
+/** The bottom forearm points up at the camera, so it looks short from above. */
+const SLEEPER_START: Pose = {
+  ...SLEEPER_BASE,
+  nearHand: [515, 186, 90],
+  farHand: [508, 184, 180],
+  elbows: [
+    [515, 195],
+    [472, 220],
+  ],
+};
+const SLEEPER_PRESSED: Pose = {
+  ...SLEEPER_BASE,
+  nearHand: [440, 195, 180],
+  farHand: [452, 202, 180],
+  elbows: [
+    [515, 195],
+    [478, 252],
+  ],
+};
+
+export const SLEEPER_STRETCH: FigureClip = {
+  view: 'above',
+  ...intoHold(SLEEPER_START, [{ ms: 1800, pose: SLEEPER_PRESSED }]),
+};
+
+// --- Shared by the standing arm stretches: from the front, arms hanging with the elbows placed ---
+
+const ARMS_HANGING: Pose = {
+  ...STANDING_FRONT,
+  nearHand: [451, 284, -90],
+  farHand: [511, 284, -90],
+  elbows: [
+    [450, 209],
+    [510, 209],
+  ],
+};
+const STANDING_FRONT_CLIP = {
+  view: 'side',
+  widths: STANDING_FRONT_WIDTHS,
+  legBends: [-1, 1],
+  zoom: 1.3,
+  focus: [480, 190],
+} satisfies Partial<FigureClip>;
+
+// --- Cross-body shoulder stretch: one straight arm across the chest, the other forearm pulling it in ---
+
+const CROSS_BODY: Pose = {
+  ...STANDING_FRONT,
+  // Pointing partly into the screen across the chest, so the straight arm looks short.
+  nearHand: [552, 150, 10],
+  farHand: [500, 156, 150],
+  elbows: [
+    [502, 142],
+    [542, 212],
+  ],
+};
+
+export const CROSS_BODY_SHOULDER_STRETCH: FigureClip = {
+  ...STANDING_FRONT_CLIP,
+  ...intoHold(ARMS_HANGING, [{ ms: 1800, pose: CROSS_BODY }]),
+};
+
+// --- Overhead triceps stretch: from behind, one hand drops behind the head and the other pulls that elbow in ---
+
+const TRICEPS_ARM_UP: Pose = {
+  ...ARMS_HANGING,
+  nearHand: [482, 112, -60],
+  elbows: [
+    [445, 60],
+    [510, 209],
+  ],
+};
+const TRICEPS_PULL: Pose = {
+  ...TRICEPS_ARM_UP,
+  farHand: [452, 52, 180],
+  elbows: [
+    [445, 60],
+    [525, 72],
+  ],
+};
+
+export const OVERHEAD_TRICEPS_STRETCH: FigureClip = {
+  ...STANDING_FRONT_CLIP,
+  ...intoHold(ARMS_HANGING, [
+    { ms: 1500, pose: TRICEPS_ARM_UP },
+    { ms: 1200, pose: TRICEPS_PULL },
+  ]),
+};
+
+// --- Neck side stretch: the head tilts toward one shoulder, that hand resting on it, the other arm reaching down ---
+
+const NECK_TILTED: Pose = {
+  ...ARMS_HANGING,
+  neck: 125,
+  nearHand: [470, 66, 0],
+  farHand: [520, 298, -90],
+  elbows: [
+    [395, 88],
+    [514, 214],
+  ],
+};
+
+export const NECK_SIDE_STRETCH: FigureClip = {
+  ...STANDING_FRONT_CLIP,
+  ...intoHold(ARMS_HANGING, [{ ms: 1800, pose: NECK_TILTED }]),
+};
+
+// --- Cow face arms: from behind, the top hand drops down the neck and the bottom hand climbs the back to meet it ---
+
+/**
+ * Both elbows point well out, the top one high over the head and the bottom one low at the side,
+ * so their shapes still show where the forearms pass behind the head and across the back.
+ */
+const COW_FACE: Pose = {
+  ...ARMS_HANGING,
+  nearHand: [482, 150, 60],
+  farHand: [486, 112, -110],
+  elbows: [
+    [428, 218],
+    [538, 58],
+  ],
+};
+
+export const COW_FACE_ARMS: FigureClip = {
+  ...STANDING_FRONT_CLIP,
+  outlineNearArm: true,
+  zoom: 1.7,
+  focus: [480, 155],
+  ...intoHold(ARMS_HANGING, [{ ms: 2000, pose: COW_FACE }]),
+};
+
+// --- Behind the back chest opener: hands linked behind, the straight arms lift away from the back ---
+
+const chestOpenerAt = (degrees: number): Pose => ({
+  ...STANDING_TALL,
+  nearHand: armAt(STANDING_SHOULDER, degrees),
+  farHand: armAt(STANDING_SHOULDER, degrees, 8),
+});
+const CHEST_OPENER_LIFTED: Pose = { ...chestOpenerAt(130), arch: -6, neck: 95 };
+
+export const BEHIND_THE_BACK_CHEST_OPENER: FigureClip = {
+  view: 'side',
+  straightArms: true,
+  zoom: 1.2,
+  focus: [480, 230],
+  ...intoHold(chestOpenerAt(95), [
+    { ms: 1000, pose: chestOpenerAt(110), swing: true },
+    { ms: 1500, pose: CHEST_OPENER_LIFTED, swing: true },
+  ]),
+};
+
+// --- Reverse tabletop: from sitting with the hands behind, the hips lift until the body is flat ---
+
+const TABLETOP_SIT: Pose = {
+  hip: [390, 446],
+  torso: 115,
+  arch: 0,
+  neck: 105,
+  nearHand: [330, WRIST_Y, 0],
+  farHand: [338, WRIST_Y, 0],
+  nearFoot: [550, ANKLE_Y, 0],
+  farFoot: [558, ANKLE_Y, 0],
+};
+const TABLETOP: Pose = { ...TABLETOP_SIT, hip: [455, 345], torso: 170, neck: 180 };
+
+export const REVERSE_TABLETOP: FigureClip = {
+  view: 'side',
+  ...intoHold(TABLETOP_SIT, [{ ms: 1800, pose: TABLETOP }]),
+};
+
+// --- Seated shoulder extension: legs long, hands planted behind, the hips slide forward away from them ---
+
+const SHOULDER_EXTENSION_START: Pose = {
+  hip: [370, 446],
+  torso: 100,
+  arch: 0,
+  neck: 95,
+  nearHand: [330, WRIST_Y, 180],
+  farHand: [338, WRIST_Y, 180],
+  nearFoot: [569.9, 446, 90],
+  farFoot: [569.9, 446, 90],
+};
+const SHOULDER_EXTENSION: Pose = {
+  ...SHOULDER_EXTENSION_START,
+  hip: [405, 446],
+  torso: 92,
+  neck: 90,
+  nearFoot: [604.9, 446, 90],
+  farFoot: [604.9, 446, 90],
+};
+
+export const SEATED_SHOULDER_EXTENSION: FigureClip = {
+  view: 'side',
+  zoom: 1.4,
+  focus: [450, 370],
+  ...intoHold(SHOULDER_EXTENSION_START, [{ ms: 1800, pose: SHOULDER_EXTENSION }]),
+};
+
+// --- Kneeling wrist stretches: on all fours with the fingers pointing back at the knees, the hips shift back ---
+
+const FINGERS_BACK: Pose = { ...ALL_FOURS, nearHand: [510, 451, 180], farHand: [518, 451, 180] };
+
+export const KNEELING_WRIST_STRETCH: FigureClip = {
+  view: 'side',
+  ...intoHold(FINGERS_BACK, [{ ms: 1800, pose: { ...FINGERS_BACK, hip: [358, 363], torso: 24, neck: 25 } }]),
+};
+
+/** The same, on the backs of the hands, so it leans back less. */
+export const REVERSE_PRAYER: FigureClip = {
+  view: 'side',
+  ...intoHold(FINGERS_BACK, [{ ms: 1800, pose: { ...FINGERS_BACK, hip: [372, 362], torso: 24, neck: 22 } }]),
+};
+
+// --- Manual forearm stretches: one arm held out straight, the other hand bending its wrist down ---
+
+const FOREARM_CAMERA = { view: 'side', zoom: 1.5, focus: [560, 180] } satisfies Partial<FigureClip>;
+
+const FOREARM_REACH: Pose = { ...STANDING_TALL, nearHand: [628, 138, 0], farHand: [600, 160, -20] };
+
+/** The other hand presses on the back of the hand, palm down. */
+export const MANUAL_EXTENSOR_FOREARM_STRETCH: FigureClip = {
+  ...FOREARM_CAMERA,
+  ...intoHold(STANDING_TALL, [
+    { ms: 1200, pose: FOREARM_REACH, swing: true },
+    { ms: 1200, pose: { ...FOREARM_REACH, nearHand: [628, 138, -100], farHand: [628, 124, -100] } },
+  ]),
+};
+
+/** The other hand pulls the fingers down and back from underneath, palm up. */
+export const MANUAL_FLEXOR_FOREARM_STRETCH: FigureClip = {
+  ...FOREARM_CAMERA,
+  ...intoHold(STANDING_TALL, [
+    { ms: 1200, pose: FOREARM_REACH, swing: true },
+    { ms: 1200, pose: { ...FOREARM_REACH, nearHand: [628, 138, -110], farHand: [622, 165, 160] } },
+  ]),
 };

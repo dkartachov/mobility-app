@@ -89,8 +89,8 @@ describe('poseAt', () => {
 });
 
 describe('exercise animations', () => {
-  it('covers every active exercise', () => {
-    expect(EXERCISES.filter((e) => e.active && !e.animation).map((e) => e.id)).toEqual([]);
+  it('covers every exercise', () => {
+    expect(EXERCISES.filter((e) => !e.animation).map((e) => e.id)).toEqual([]);
   });
 
   describe.each(animated.map((e) => [e.id, e.animation] as const))('%s', (_, clip) => {

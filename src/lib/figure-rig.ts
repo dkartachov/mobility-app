@@ -103,6 +103,8 @@ export type FigureClip = {
   zoom?: number;
   /** The point to center the camera on, to zoom in on a limb. Parts that never move can fall outside the frame. */
   focus?: Point;
+  /** Outlines the near arm, so it still shows where it crosses in front of the body, which is the same color. */
+  outlineNearArm?: boolean;
   /** A band held in this hand and looped around this foot. */
   band?: readonly [hand: 'nearHand' | 'farHand', foot: 'nearFoot' | 'farFoot'];
   scenery?: readonly Scenery[];
