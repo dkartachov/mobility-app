@@ -1,0 +1,39 @@
+name: Privacy policy site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/lib/privacy-policy.ts
+      - site/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # Node 24 imports the .ts policy source without a build step.
+          node-version: 24
+      - run: node site/build.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
