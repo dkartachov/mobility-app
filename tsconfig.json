@@ -19,5 +19,9 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  // Edge Functions run on Deno with their own imports, so they're checked by the Supabase CLI, not here.
+  "exclude": [
+    "supabase/functions"
   ]
 }

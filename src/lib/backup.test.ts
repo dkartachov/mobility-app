@@ -16,6 +16,7 @@ const mockSession = { value: SIGNED_IN as object | null, error: null as { messag
 const mockApp = { id: 'com.hogos.plie.dev' };
 const mockBucketsUsed = new Set<string>();
 const mockSignOut = jest.fn();
+const mockInvoke = jest.fn();
 const mockDownloads: { bytes: Uint8Array; deleted: boolean } = { bytes: new Uint8Array(), deleted: false };
 
 jest.mock('@/lib/supabase', () => ({
@@ -23,6 +24,9 @@ jest.mock('@/lib/supabase', () => ({
     auth: {
       getSession: async () => ({ data: { session: mockSession.value }, error: mockSession.error }),
       signOut: (...args: unknown[]) => mockSignOut(...args),
+    },
+    functions: {
+      invoke: (...args: unknown[]) => mockInvoke(...args),
     },
     storage: {
       from: (bucket: string) => ({
@@ -142,6 +146,7 @@ describe('backups', () => {
     mockBackupDatabaseAsync.mockClear();
     mockDeserialize.mockReset();
     mockSignOut.mockReset().mockResolvedValue({ error: null });
+    mockInvoke.mockReset().mockResolvedValue({ data: { deleted: true }, error: null });
     Storage.clearSync();
   });
 
@@ -326,6 +331,40 @@ describe('backups', () => {
     const { hasUnsavedChanges, markBackupDirty } = loadBackup();
     markBackupDirty();
     expect(hasUnsavedChanges()).toBe(false);
+  });
+
+  describe('deleting the account', () => {
+    it('deletes the account, then erases the phone without uploading a backup again', async () => {
+      const { backUp, deleteAccount, eraseIfPending, linkDevice } = loadBackup();
+      await linkDevice(db);
+      await updateProfile(db, { ...(await getProfile(db)), firstName: 'Ada' });
+      mockObjects.clear();
+
+      await deleteAccount();
+
+      expect(mockInvoke).toHaveBeenCalledWith('delete-account');
+      expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+      await backUp(db);
+      expect(snapshotPaths()).toHaveLength(0);
+
+      await eraseIfPending(db);
+      expect((await getProfile(db)).firstName).toBe('');
+    });
+
+    it("keeps the phone's data and backups working when deleting fails", async () => {
+      const { backUp, deleteAccount, linkDevice } = loadBackup();
+      await linkDevice(db);
+      await updateProfile(db, { ...(await getProfile(db)), firstName: 'Ada' });
+      mockObjects.clear();
+      mockInvoke.mockResolvedValueOnce({ data: null, error: { message: 'Failed to send a request' } });
+
+      await expect(deleteAccount()).rejects.toThrow('Failed to send a request');
+
+      expect(mockSignOut).not.toHaveBeenCalled();
+      expect(Storage.getItemSync('backup.erasePending')).toBeNull();
+      await backUp(db);
+      expect(snapshotPaths()).toHaveLength(1);
+    });
   });
 
   describe('signing out', () => {

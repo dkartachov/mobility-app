@@ -255,10 +255,12 @@ async function uploadSnapshot(db: SQLiteDatabase) {
 }
 
 let inFlight: Promise<void> | null = null;
+/** Set once account deletion starts, so no upload can put the account's folder back. */
+let deleting = false;
 
 /** Uploads a snapshot now. Failures end up in `lastError` rather than rejecting. */
 export function backUp(db: SQLiteDatabase): Promise<void> {
-  if (!isBackupConfigured || !state.linked) return Promise.resolve();
+  if (!isBackupConfigured || !state.linked || deleting) return Promise.resolve();
   inFlight ??= uploadSnapshot(db).finally(() => {
     inFlight = null;
   });
@@ -308,6 +310,29 @@ export async function signOutAndErase(db: SQLiteDatabase) {
   assertOk(error);
   // Saved only once signed out: erasing a phone that's still signed in would look like lost data.
   Storage.setItemSync(ERASE_PENDING_KEY, 'true');
+}
+
+/**
+ * Deletes the account and all its cloud backups (the `delete-account` Edge Function), then signs
+ * out and erases this phone the same way `signOutAndErase` does. Unlike signing out, no final
+ * backup is made: it would recreate the folder just deleted. The caller reloads the app.
+ */
+export async function deleteAccount() {
+  if (!supabase) throw new Error('Backups are not set up in this build');
+  // An upload in progress must finish before the function removes what it wrote.
+  if (inFlight) await inFlight;
+  deleting = true;
+  try {
+    const { error } = await supabase.functions.invoke('delete-account');
+    if (error) throw new Error(error.message);
+  } catch (error) {
+    deleting = false;
+    throw error;
+  }
+  // The account is already gone, so a failed sign-out is only logged; the erase still runs.
+  Storage.setItemSync(ERASE_PENDING_KEY, 'true');
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (error) console.warn(error.message);
 }
 
 /** Finishes `signOutAndErase` on the next launch, before anything reads the database. */

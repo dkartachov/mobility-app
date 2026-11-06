@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -137,6 +137,15 @@ export default function SettingsScreen() {
             <AccountCard />
           </View>
         )}
+
+        <View style={styles.section}>
+          <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
+            About
+          </ThemedText>
+          <Card style={styles.card}>
+            <Button title="Privacy policy" variant="secondary" onPress={() => router.push('/privacy-policy')} />
+          </Card>
+        </View>
 
         {__DEV__ && <DevTools />}
       </ScrollView>
