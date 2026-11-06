@@ -3,10 +3,15 @@ import { act, render, screen } from '@testing-library/react-native';
 import RootLayout from '@/app/_layout';
 import { clearGreeting, setGreeting } from '@/lib/greeting';
 
-const mockBackup = { linked: true, listeners: new Set<() => void>() };
+const mockBackup = { linked: true, offline: false, listeners: new Set<() => void>() };
 
 function setLinked(linked: boolean) {
   mockBackup.linked = linked;
+  mockBackup.listeners.forEach((listener) => listener());
+}
+
+function setOffline(offline: boolean) {
+  mockBackup.offline = offline;
   mockBackup.listeners.forEach((listener) => listener());
 }
 
@@ -53,15 +58,16 @@ jest.mock('@/lib/backup', () => {
   return {
     eraseIfPending: jest.fn(),
     isBackupConfigured: true,
-    useBackupState: () => ({
-      linked: useSyncExternalStore(
-        (listener: () => void) => {
-          mockBackup.listeners.add(listener);
-          return () => mockBackup.listeners.delete(listener);
-        },
-        () => mockBackup.linked
-      ),
-    }),
+    useBackupState: () => {
+      const subscribe = (listener: () => void) => {
+        mockBackup.listeners.add(listener);
+        return () => mockBackup.listeners.delete(listener);
+      };
+      return {
+        linked: useSyncExternalStore(subscribe, () => mockBackup.linked),
+        offline: useSyncExternalStore(subscribe, () => mockBackup.offline),
+      };
+    },
   };
 });
 jest.mock('@/lib/theme-preference', () => ({
@@ -72,7 +78,19 @@ jest.mock('@/lib/theme-preference', () => ({
 describe('root layout', () => {
   beforeEach(() => {
     mockBackup.linked = true;
+    mockBackup.offline = false;
     clearGreeting();
+  });
+
+  it('opens the app for an offline phone that is not linked, without a restart', async () => {
+    mockBackup.linked = false;
+    await render(<RootLayout />);
+    expect(screen.getByText('Route: login')).toBeTruthy();
+
+    await act(async () => setOffline(true));
+    expect(screen.queryByText('Route: login')).toBeNull();
+    expect(screen.getByText('Route: (tabs)')).toBeTruthy();
+    expect(screen.getByText('Route: sign-in')).toBeTruthy();
   });
 
   it('removes the greeting when it clears, without a restart', async () => {

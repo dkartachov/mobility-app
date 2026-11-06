@@ -12,11 +12,15 @@ import { ThemedView } from './themed-view';
 type LoginLayoutProps = {
   title: string;
   subtitle?: string;
+  /** Below a stack header, which already covers the top inset. */
+  underHeader?: boolean;
+  /** A second card below the first, for a way around it. */
+  footer?: ReactNode;
   children: ReactNode;
 };
 
 /** A full screen with a title and one card, for every step of signing in that asks for something. */
-export function LoginLayout({ title, subtitle, children }: LoginLayoutProps) {
+export function LoginLayout({ title, subtitle, underHeader = false, footer, children }: LoginLayoutProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -26,10 +30,11 @@ export function LoginLayout({ title, subtitle, children }: LoginLayoutProps) {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + Spacing.four, paddingBottom: insets.bottom + Spacing.four },
+          { paddingTop: underHeader ? Spacing.three : insets.top + Spacing.four, paddingBottom: insets.bottom + Spacing.four },
         ]}>
         <PageHeader title={title} subtitle={subtitle} />
         <Card style={styles.card}>{children}</Card>
+        {footer && <Card style={styles.card}>{footer}</Card>}
       </ScrollView>
     </ThemedView>
   );

@@ -8,6 +8,9 @@
  * A device only backs up once it's linked, which the login screen does right after sign-in by
  * restoring the latest backup or, if there's none or the user keeps the phone's data, linking it
  * as is. Without that, a fresh install could replace a good snapshot with an empty database.
+ *
+ * Offline mode is the opt-out: the phone is used without an account and never uploads. Its changes
+ * still count as unsaved, so signing in later asks before a backup could replace them.
  */
 import * as Application from 'expo-application';
 import { File, Paths } from 'expo-file-system';
@@ -33,6 +36,7 @@ const PHOTO_DIR = 'photos';
 const SNAPSHOT_NAME = /^(\d{4}-\d{2}-\d{2})\.db$/;
 
 const LINKED_KEY = 'backup.linked';
+const OFFLINE_KEY = 'backup.offline';
 const DIRTY_KEY = 'backup.dirty';
 const LAST_BACKUP_KEY = 'backup.lastBackupAt';
 const UPLOADED_PHOTO_KEY = 'backup.uploadedPhoto';
@@ -51,6 +55,8 @@ export const isBackupConfigured = supabase !== null && bucketName !== undefined;
 export type BackupState = {
   /** This device may upload, see the top of this file. */
   linked: boolean;
+  /** This phone is used without an account, so nothing is backed up. */
+  offline: boolean;
   lastBackupAt: string | null;
   /** Why the most recent backup failed, `null` once one succeeds. Not persisted. */
   lastError: string | null;
@@ -59,6 +65,7 @@ export type BackupState = {
 
 let state: BackupState = {
   linked: Storage.getItemSync(LINKED_KEY) === 'true',
+  offline: Storage.getItemSync(OFFLINE_KEY) === 'true',
   lastBackupAt: Storage.getItemSync(LAST_BACKUP_KEY),
   lastError: null,
   running: false,
@@ -89,11 +96,12 @@ function setDirty(dirty: boolean) {
 
 /**
  * Records that the database has changes the bucket doesn't, surviving an app restart. Only a linked
- * phone's changes count: before that, writes like erasing after sign-out or saving a new profile
- * have no backup to fall behind, and counting them could offer to keep an empty phone over a backup.
+ * or offline phone's changes count: before that, writes like erasing after sign-out or saving a new
+ * profile have no backup to fall behind, and counting them could offer to keep an empty phone over a
+ * backup. An offline phone's data is real, so signing in later must ask before restoring over it.
  */
 export function markBackupDirty() {
-  if (state.linked) setDirty(true);
+  if (state.linked || state.offline) setDirty(true);
 }
 
 /**
@@ -283,8 +291,19 @@ export async function retryBackupIfDirty(db: SQLiteDatabase): Promise<void> {
 /** Allows this device to upload, keeping what's on it, and uploads it right away. */
 export function linkDevice(db: SQLiteDatabase) {
   Storage.setItemSync(LINKED_KEY, 'true');
-  setState({ linked: true });
+  Storage.removeItemSync(OFFLINE_KEY);
+  setState({ linked: true, offline: false });
   return backUp(db);
+}
+
+/**
+ * Opens the app without an account. The profile just saved counts as unsaved changes, so signing
+ * in later to an account with a backup asks which to keep instead of restoring over it.
+ */
+export function startOffline() {
+  Storage.setItemSync(OFFLINE_KEY, 'true');
+  setDirty(true);
+  setState({ offline: true });
 }
 
 /** Forgets this device's link, so signing in again asks what to do with existing backups. */
@@ -394,6 +413,7 @@ export async function restoreSnapshot(db: SQLiteDatabase, date: DateKey) {
     }
     setDirty(false);
     Storage.setItemSync(LINKED_KEY, 'true');
+    Storage.removeItemSync(OFFLINE_KEY);
     setState({ lastError: null });
   } finally {
     if (download.exists) download.delete();

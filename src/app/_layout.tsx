@@ -63,11 +63,12 @@ function RootNavigator() {
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const baseTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const { signedIn } = useAuthState();
-  const { linked } = useBackupState();
+  const { linked, offline } = useBackupState();
   const greeting = useGreeting();
 
   // Linked means restored or backing up, so nothing recorded from here on can be lost to a restore.
-  const unlocked = !isBackupConfigured || (signedIn === true && linked);
+  // Offline phones record without that, so signing in later has to ask before restoring over them.
+  const unlocked = !isBackupConfigured || offline || (signedIn === true && linked);
 
   const navigationTheme = {
     ...baseTheme,
@@ -108,6 +109,7 @@ function RootNavigator() {
             <Stack.Screen name="mobility-time" />
             <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
             <Stack.Screen name="settings" />
+            <Stack.Screen name="sign-in" />
             <Stack.Screen name="training-days" />
             {/* Draws its own back button, so its summary can drop it without the header jumping away. */}
             <Stack.Screen name="workout" options={{ headerShown: false }} />

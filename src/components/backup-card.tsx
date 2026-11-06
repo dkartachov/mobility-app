@@ -1,4 +1,5 @@
 import { reloadAppAsync } from 'expo';
+import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { StyleSheet, View } from 'react-native';
 
@@ -17,16 +18,26 @@ function errorMessage(error: unknown) {
 
 /**
  * The Settings card for cloud backups, which are always on once signed in (see the login screen):
- * the last backup, backing up now, and restoring the latest backup.
+ * the last backup, backing up now, and restoring the latest backup. Offline, a way to sign in.
  */
 export function BackupCard() {
+  const { offline } = useBackupState();
+
   return (
     <Card style={styles.card}>
       <View style={styles.rowTitle}>
         <IconBadge name={{ ios: 'icloud.fill', android: 'cloud' }} size={32} />
         <ThemedText type="smallBold">Cloud backup</ThemedText>
       </View>
-      {isBackupConfigured ? (
+      {offline ? (
+        <>
+          <ThemedText themeColor="textSecondary">
+            You&apos;re using the app without an account, so your data isn&apos;t backed up. It&apos;s lost if you
+            uninstall the app or lose this phone.
+          </ThemedText>
+          <Button title="Sign in to back up" onPress={() => router.push('/sign-in')} />
+        </>
+      ) : isBackupConfigured ? (
         <BackupStatus />
       ) : (
         <ThemedText themeColor="textSecondary">Backups aren&apos;t set up in this build.</ThemedText>

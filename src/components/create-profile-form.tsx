@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import type { Sex } from '@/data/mobility-tests';
 import { getProfile, updateProfile } from '@/db/profile';
 import { syncDisplayName } from '@/lib/auth';
-import { linkDevice } from '@/lib/backup';
+import { linkDevice, startOffline } from '@/lib/backup';
 import type { DateKey } from '@/lib/dates';
 import { setGreeting } from '@/lib/greeting';
 import { supabase } from '@/lib/supabase';
@@ -17,8 +17,11 @@ import { supabase } from '@/lib/supabase';
 /**
  * A new user's first screen. Linking comes last, because that's what opens the app: quitting before
  * then leaves nothing in the cloud, so this screen just comes back.
+ *
+ * `offline` is for someone going without an account: there's no one to sync the name to or link,
+ * and `onBack` returns to signing in.
  */
-export function CreateProfileForm() {
+export function CreateProfileForm({ offline = false, onBack }: { offline?: boolean; onBack?: () => void }) {
   const db = useSQLiteContext();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -32,9 +35,13 @@ export function CreateProfileForm() {
     setError(undefined);
     try {
       await updateProfile(db, { ...(await getProfile(db)), firstName, lastName, dateOfBirth, sex });
-      syncDisplayName({ firstName, lastName });
       setGreeting('new');
-      linkDevice(db);
+      if (offline) {
+        startOffline();
+      } else {
+        syncDisplayName({ firstName, lastName });
+        linkDevice(db);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setSaving(false);
@@ -76,9 +83,9 @@ export function CreateProfileForm() {
         disabled={!firstName.trim() || !dateOfBirth || !sex}
       />
       <Button
-        title="Use a different email"
+        title={offline ? 'Back' : 'Use a different email'}
         variant="secondary"
-        onPress={() => supabase!.auth.signOut({ scope: 'local' })}
+        onPress={offline ? onBack! : () => supabase!.auth.signOut({ scope: 'local' })}
         disabled={saving}
       />
     </LoginLayout>

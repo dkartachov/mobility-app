@@ -17,7 +17,7 @@ import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { isBackupConfigured } from '@/lib/backup';
+import { isBackupConfigured, useBackupState } from '@/lib/backup';
 import { resetInstructions } from '@/lib/instructions';
 import {
   THEME_PREFERENCES,
@@ -36,6 +36,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const themePreference = useThemePreference();
   const timeoutSeconds = useTimeoutSeconds();
+  const { offline } = useBackupState();
   const { section } = useLocalSearchParams<{ section?: 'reminders' }>();
   const scrollView = useRef<ScrollViewInstance>(null);
   const scrolledToSection = useRef(false);
@@ -129,7 +130,7 @@ export default function SettingsScreen() {
           <BackupCard />
         </View>
 
-        {isBackupConfigured && (
+        {isBackupConfigured && !offline && (
           <View style={styles.section}>
             <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
               Account

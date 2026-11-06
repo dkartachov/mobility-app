@@ -333,6 +333,27 @@ describe('backups', () => {
     expect(hasUnsavedChanges()).toBe(false);
   });
 
+  describe('offline mode', () => {
+    it('never uploads, but counts its changes so signing in later asks before restoring', async () => {
+      const { backUp, hasUnsavedChanges, markBackupDirty, startOffline } = loadBackup();
+      startOffline();
+      markBackupDirty();
+      await backUp(db);
+      expect(snapshotPaths()).toEqual([]);
+      expect(hasUnsavedChanges()).toBe(true);
+      expect(Storage.getItemSync('backup.offline')).toBe('true');
+    });
+
+    it('stops being offline once linked, and uploads what it recorded', async () => {
+      const { getBackupState, linkDevice, startOffline } = loadBackup();
+      startOffline();
+      await linkDevice(db);
+      expect(getBackupState().offline).toBe(false);
+      expect(Storage.getItemSync('backup.offline')).toBeNull();
+      expect(snapshotPaths()).toHaveLength(1);
+    });
+  });
+
   describe('deleting the account', () => {
     it('deletes the account, then erases the phone without uploading a backup again', async () => {
       const { backUp, deleteAccount, eraseIfPending, linkDevice } = loadBackup();
