@@ -31,6 +31,11 @@
         "track": "internal"
       }
     },
+    "closed": {
+      "android": {
+        "track": "alpha"
+      }
+    },
     "production": {
       "android": {
         "track": "production"
