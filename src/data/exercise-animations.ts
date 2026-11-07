@@ -812,10 +812,11 @@ const ROTATIONS_BASE = {
   farFoot: [590, 470, 0],
 } satisfies Partial<Pose>;
 
+/** The back knee, turned in, rests low on the floor beside the hips, so it stands clear of the body. */
 const ROTATIONS_RIGHT: Pose = {
   ...ROTATIONS_BASE,
   knees: [
-    [500, 400],
+    [490, 452],
     [620, 430],
   ],
 };
@@ -830,7 +831,7 @@ const ROTATIONS_LEFT: Pose = {
   ...ROTATIONS_BASE,
   knees: [
     [340, 430],
-    [460, 400],
+    [470, 452],
   ],
 };
 
@@ -2775,4 +2776,173 @@ export const LYING_EXTERNAL_ROTATION_STRETCH: FigureClip = {
   // Running across the body, parallel to the shoulders.
   dumbbells: { hands: ['nearHand'], angle: 90 },
   ...intoHold(LYING_ER_UP, [{ ms: 1800, pose: LYING_ER_DOWN }]),
+};
+
+// ===== Active hip internal rotation drills =====
+
+// --- Seated hip internal rotation: the hip rotation test's swing out to the side, repeated against a band around the feet ---
+
+const SEATED_ROTATED_IN: Pose = { ...SEATED, nearFoot: shinAt(-40) };
+
+export const SEATED_HIP_INTERNAL_ROTATION: FigureClip = {
+  view: 'side',
+  widths: STANDING_FRONT_WIDTHS,
+  armBends: [-1, 1],
+  miniBand: 'ankles',
+  scenery: TABLE,
+  zoom: 1.3,
+  focus: [480, 300],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SEATED },
+    { ms: 300, pose: SEATED },
+    { ms: 1200, pose: SEATED_ROTATED_IN },
+    { ms: 400, pose: SEATED_ROTATED_IN },
+    { ms: 1200, pose: SEATED },
+  ],
+};
+
+// --- 90 to 90 side foot lifts: in the 90 to 90, turned toward the front leg, the back foot lifts off the floor ---
+
+/** The 90 to 90, with the back foot, the far one, drawn in a little so it has room to lift. */
+const SIDE_FOOT_SEATED: Pose = { ...ROTATIONS_LEFT, farFoot: [565, 468, 0] };
+/**
+ * Turned toward the front shin on the figure's right, as in the 90 to 90, but sitting tall rather
+ * than folding down, with the hands resting on the floor beside it.
+ */
+const SIDE_FOOT_TURNED: Pose = {
+  ...SIDE_FOOT_SEATED,
+  torso: 120,
+  torsoLength: 120,
+  neck: 125,
+  nearHand: [360, 440, -90],
+  farHand: [405, 420, -90],
+};
+/** The back foot lifts, the knee staying down. */
+const SIDE_FOOT_LIFTED: Pose = { ...SIDE_FOOT_TURNED, farFoot: [560, 420, 20] };
+
+export const NINETY_TO_NINETY_SIDE_FOOT_LIFTS: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 28, hip: 16 },
+  armBends: [-1, 1],
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: SIDE_FOOT_SEATED },
+    { ms: 400, pose: SIDE_FOOT_SEATED },
+    { ms: 1200, pose: SIDE_FOOT_TURNED },
+    { ms: 1000, pose: SIDE_FOOT_LIFTED },
+    { ms: 500, pose: SIDE_FOOT_LIFTED },
+    { ms: 1000, pose: SIDE_FOOT_TURNED },
+    { ms: 500, pose: SIDE_FOOT_TURNED },
+    { ms: 1000, pose: SIDE_FOOT_LIFTED },
+    { ms: 500, pose: SIDE_FOOT_LIFTED },
+    { ms: 1000, pose: SIDE_FOOT_TURNED },
+    { ms: 1200, pose: SIDE_FOOT_SEATED },
+  ],
+};
+
+// --- Windshield wipers with knee lift: feet hip-width, the knees tip side to side without touching down, the top knee lifting against the band ---
+
+/** Leaning back on the hands, with the feet about hip-width apart and the knees up. */
+const WIPERS_UP: Pose = {
+  ...ROTATIONS_BASE,
+  nearHand: [390, 405, -90],
+  farHand: [570, 405, -90],
+  nearFoot: [440, 470, 180],
+  farFoot: [520, 470, 0],
+  knees: [
+    [445, 330],
+    [515, 330],
+  ],
+};
+/** Tipped to the figure's right, both knees hovering well off the floor. */
+const WIPERS_LEFT: Pose = {
+  ...WIPERS_UP,
+  knees: [
+    [370, 382],
+    [438, 362],
+  ],
+};
+/** The top knee lifts away from the bottom one, stretching the band, and brings its foot up off the floor. */
+const WIPERS_LEFT_LIFTED: Pose = {
+  ...WIPERS_UP,
+  farFoot: [545, 405, 10],
+  knees: [
+    [370, 382],
+    [472, 328],
+  ],
+};
+const WIPERS_RIGHT: Pose = {
+  ...WIPERS_UP,
+  knees: [
+    [522, 362],
+    [590, 382],
+  ],
+};
+const WIPERS_RIGHT_LIFTED: Pose = {
+  ...WIPERS_UP,
+  nearFoot: [415, 405, 170],
+  knees: [
+    [488, 328],
+    [590, 382],
+  ],
+};
+
+export const WINDSHIELD_WIPERS_WITH_KNEE_LIFT: FigureClip = {
+  ...NINETY_TO_NINETY_ROTATIONS,
+  miniBand: 'knees',
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: WIPERS_RIGHT },
+    { ms: 900, pose: WIPERS_UP, ease: 'in' },
+    { ms: 900, pose: WIPERS_LEFT, ease: 'out' },
+    { ms: 800, pose: WIPERS_LEFT_LIFTED },
+    { ms: 300, pose: WIPERS_LEFT_LIFTED },
+    { ms: 800, pose: WIPERS_LEFT },
+    { ms: 900, pose: WIPERS_UP, ease: 'in' },
+    { ms: 900, pose: WIPERS_RIGHT, ease: 'out' },
+    { ms: 800, pose: WIPERS_RIGHT_LIFTED },
+    { ms: 300, pose: WIPERS_RIGHT_LIFTED },
+    { ms: 800, pose: WIPERS_RIGHT },
+  ],
+};
+
+// --- Reverse clamshells: lying on the side, facing the camera, the top knee opens up, then the top foot lifts ---
+
+/** Hips and knees bent, the thighs reaching partly toward the camera, so the legs look short. */
+const CLAM_CLOSED: Pose = {
+  ...SIDE_LYING_IN,
+  nearFoot: [235, 432, 180],
+  farFoot: [235, 456, 180],
+  knees: [
+    [305, 426],
+    [305, 454],
+  ],
+};
+const CLAM_OPEN: Pose = {
+  ...CLAM_CLOSED,
+  nearFoot: [262, 430, 180],
+  knees: [
+    [330, 360],
+    [305, 454],
+  ],
+};
+/** The knee stays put as the shin swings up around it. */
+const CLAM_FOOT_UP: Pose = { ...CLAM_OPEN, nearFoot: [245, 350, 160] };
+
+export const REVERSE_CLAMSHELLS: FigureClip = {
+  view: 'side',
+  widths: { shoulder: 18, hip: 14 },
+  zoom: 1.3,
+  focus: [420, 380],
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: CLAM_CLOSED },
+    { ms: 300, pose: CLAM_CLOSED },
+    { ms: 1200, pose: CLAM_OPEN },
+    { ms: 1000, pose: CLAM_FOOT_UP },
+    { ms: 300, pose: CLAM_FOOT_UP },
+    { ms: 1000, pose: CLAM_OPEN },
+    { ms: 1200, pose: CLAM_CLOSED },
+  ],
 };

@@ -107,6 +107,8 @@ export type FigureClip = {
   outlineNearArm?: boolean;
   /** A band held in this hand and looped around this foot. */
   band?: readonly [hand: 'nearHand' | 'farHand', foot: 'nearFoot' | 'farFoot'];
+  /** A mini loop band around both ankles or both knees. */
+  miniBand?: 'ankles' | 'knees';
   /** Light dumbbells held in these hands, with the handle kept at this angle on screen however the hand turns. */
   dumbbells?: { hands: readonly ('nearHand' | 'farHand')[]; angle: number };
   scenery?: readonly Scenery[];
@@ -132,7 +134,7 @@ export type FigurePaths = {
   neck: string;
   headX: number;
   headY: number;
-  /** Empty when the clip has no band. */
+  /** Empty when the clip has no band or mini band. */
   band: string;
   /** The handles and the plates on their ends, drawn thicker. Empty when the clip has no dumbbells. */
   dumbbellHandles: string;
@@ -394,6 +396,28 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
     band =
       `M${hand[0]} ${hand[1]}L${endX - uy * BAND_WRAP} ${endY + ux * BAND_WRAP}` +
       `M${hand[0]} ${hand[1]}L${endX + uy * BAND_WRAP} ${endY - ux * BAND_WRAP}`;
+  }
+  // A mini loop band is two strands running between either side of the ankles or knees, and a
+  // little past each, so it looks wrapped around both legs.
+  if (clip.miniBand) {
+    const kneeOf = (root: Point, foot: Extremity, bend: Bend, knee?: Point): Point => {
+      if (knee) return knee;
+      const end = withinReach(root, foot, BONES.thigh + BONES.shin);
+      return solveJoint(root, [end[0], end[1]], BONES.thigh, BONES.shin, bend);
+    };
+    const [a, b]: Point[] =
+      clip.miniBand === 'ankles'
+        ? [
+            [nearFoot[0], nearFoot[1]],
+            [farFoot[0], farFoot[1]],
+          ]
+        : [kneeOf(nearHip, nearFoot, legBends[0], knees?.[0]), kneeOf(farHip, farFoot, legBends[1], knees?.[1])];
+    const length = Math.max(0.001, Math.hypot(b[0] - a[0], b[1] - a[1]));
+    const ux = ((b[0] - a[0]) / length) * BAND_WRAP;
+    const uy = ((b[1] - a[1]) / length) * BAND_WRAP;
+    band =
+      `M${a[0] - ux - uy} ${a[1] - uy + ux}L${b[0] + ux - uy} ${b[1] + uy + ux}` +
+      `M${a[0] - ux + uy} ${a[1] - uy - ux}L${b[0] + ux + uy} ${b[1] + uy - ux}`;
   }
 
   // The handle runs through the fist, halfway along the hand, with a plate on each end.

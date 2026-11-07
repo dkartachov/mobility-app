@@ -106,7 +106,7 @@ export function ExerciseFigure({ clip, playing = true }: { clip: FigureClip; pla
             <AnimatedPath animatedProps={nearArm} stroke={COLORS.background} strokeWidth={32} {...LIMB} />
           )}
           <AnimatedPath animatedProps={nearArm} stroke={COLORS.near} strokeWidth={22} {...LIMB} />
-          {clip.band && <AnimatedPath animatedProps={band} stroke={COLORS.band} strokeWidth={10} {...LIMB} />}
+          {(clip.band || clip.miniBand) && <AnimatedPath animatedProps={band} stroke={COLORS.band} strokeWidth={10} {...LIMB} />}
           {clip.dumbbells && (
             <>
               <AnimatedPath animatedProps={dumbbellHandles} stroke={COLORS.weight} strokeWidth={8} {...LIMB} />
