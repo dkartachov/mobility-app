@@ -17,6 +17,8 @@ const INSET = { top: 22, right: 10, bottom: 8, left: 10 };
 const GRID_SCORES = [0, 25, 50, 75, 100];
 const MARKER_RADIUS = 4;
 const SELECTED_RADIUS = 6;
+/** Beyond this many tests, only the selected one is marked, so the line doesn't turn into a row of beads. */
+const MAX_MARKERS = 16;
 
 export type ChartPoint = { id: number; date: DateKey; score: number };
 
@@ -110,6 +112,7 @@ export function ScoreHistoryChart({ points, selectedId, onSelect, label }: Score
             )}
             {placed.map((point) => {
               const isSelected = point.id === selectedId;
+              if (!isSelected && placed.length > MAX_MARKERS) return null;
               return (
                 <Circle
                   key={point.id}

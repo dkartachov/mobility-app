@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { formatScoreChange, SCORE_AREAS, type ScoreArea, type ScoreChange } from '@/data/mobility-score';
 import type { PastTest } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDateKey, formatShortDate } from '@/lib/dates';
+import { addDays, formatDateKey, formatShortDate, todayKey } from '@/lib/dates';
+import { haptic } from '@/lib/haptics';
 
 import { Card } from './card';
 import { Chip } from './chip';
@@ -20,29 +21,48 @@ type Series = 'overall' | ScoreArea;
 
 const SERIES: { id: Series; label: string }[] = [{ id: 'overall', label: 'Overall' }, ...SCORE_AREAS];
 
+type Range = '6m' | '1y' | 'all';
+
+/** How far back the chart reaches, in days before today. `null` for every test. */
+const RANGES: { id: Range; label: string; spoken: string; days: number | null }[] = [
+  { id: '6m', label: '6M', spoken: 'Last 6 months', days: 182 },
+  { id: '1y', label: '1Y', spoken: 'Last year', days: 365 },
+  { id: 'all', label: 'All', spoken: 'All tests', days: null },
+];
+
+/** Tests listed under the chart. The rest are a tap away, on the test history screen. */
+export const RECENT_TEST_COUNT = 5;
+
 const scoreIn = (test: PastTest, series: Series) => (series === 'overall' ? test.overall : test.areas[series]);
 const changeIn = (test: PastTest, series: Series) =>
   series === 'overall' ? test.changes?.overall : test.changes?.areas[series];
 
+/** The first day a range covers, or `null` for all of them. */
+function rangeStart(range: Range, today = todayKey()) {
+  const days = RANGES.find(({ id }) => id === range)!.days;
+  return days === null ? null : addDays(today, -days);
+}
+
 /**
- * Every past test: a chart of the overall or one area's score over time, and a list of the tests
- * to open one and see its breakdown.
+ * Past tests: a chart of the overall or one area's score over the last year (or 6 months, or all
+ * of them, once there's more than 6 months to choose from), and the latest few tests to open one
+ * and see its breakdown.
  */
 export function ScoreHistory({ tests }: { tests: PastTest[] }) {
   const [series, setSeries] = useState<Series>('overall');
-  // The latest test until one is tapped.
+  const [range, setRange] = useState<Range>('1y');
+  // The latest test in the chart until one is tapped.
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const points = tests
-    .flatMap((test) => {
-      const score = scoreIn(test, series);
-      return score === null ? [] : [{ id: test.id, date: test.date, score }];
-    })
-    .reverse();
-  const selected =
-    tests.find((test) => test.id === selectedId && scoreIn(test, series) !== null) ??
-    tests.find((test) => scoreIn(test, series) !== null);
+  // Newest first, like `tests`. Choosing a range only matters once some tests fall outside the shortest.
+  const oldest = tests.at(-1)?.date;
+  const canChooseRange = oldest !== undefined && oldest < rangeStart('6m')!;
+  const start = canChooseRange ? rangeStart(range) : null;
+  const charted = tests.filter((test) => scoreIn(test, series) !== null && (start === null || test.date >= start));
+  const points = charted.map((test) => ({ id: test.id, date: test.date, score: scoreIn(test, series)! })).reverse();
+  const selected = charted.find((test) => test.id === selectedId) ?? charted[0];
   const seriesLabel = SERIES.find(({ id }) => id === series)!.label;
+  const hasAnyScore = tests.some((test) => scoreIn(test, series) !== null);
 
   return (
     <View style={styles.history}>
@@ -70,19 +90,79 @@ export function ScoreHistory({ tests }: { tests: PastTest[] }) {
           </>
         ) : (
           <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-            No {seriesLabel.toLowerCase()} results yet.
+            {hasAnyScore
+              ? `No ${seriesLabel.toLowerCase()} results in this time.`
+              : `No ${seriesLabel.toLowerCase()} results yet.`}
           </ThemedText>
         )}
+        {canChooseRange && <RangePicker range={range} onChange={setRange} />}
       </Card>
 
-      <Card style={styles.list}>
-        {tests.map((test, i) => (
-          <View key={test.id}>
-            {i > 0 && <Divider />}
-            <TestRow test={test} series="overall" />
-          </View>
-        ))}
-      </Card>
+      <TestList tests={tests.slice(0, RECENT_TEST_COUNT)}>
+        {tests.length > RECENT_TEST_COUNT && (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={`See all ${tests.length} tests`}
+            onPress={() => router.push('/test-history')}
+            style={styles.row}>
+            <ThemedText type="smallBold" themeColor="tint" style={styles.rowDate}>
+              See all {tests.length} tests
+            </ThemedText>
+            <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="tint" size={14} />
+          </PressableScale>
+        )}
+      </TestList>
+    </View>
+  );
+}
+
+/** A card of tests, newest first, each with its overall score, then anything in `children` as the last row. */
+export function TestList({ tests, children }: { tests: PastTest[]; children?: ReactNode }) {
+  return (
+    <Card style={styles.list}>
+      {tests.map((test, i) => (
+        <View key={test.id}>
+          {i > 0 && <Divider />}
+          <TestRow test={test} series="overall" />
+        </View>
+      ))}
+      {children && (
+        <>
+          <Divider />
+          {children}
+        </>
+      )}
+    </Card>
+  );
+}
+
+/** A small segmented control for how far back the chart reaches. */
+function RangePicker({ range, onChange }: { range: Range; onChange: (range: Range) => void }) {
+  const theme = useTheme();
+  return (
+    <View
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Time to chart"
+      style={[styles.ranges, { backgroundColor: theme.backgroundSelected }]}>
+      {RANGES.map(({ id, label, spoken }) => {
+        const selected = id === range;
+        return (
+          <PressableScale
+            key={id}
+            accessibilityRole="radio"
+            accessibilityLabel={spoken}
+            accessibilityState={{ selected }}
+            onPress={() => {
+              haptic.select();
+              onChange(id);
+            }}
+            style={[styles.range, selected && { backgroundColor: theme.backgroundElement }]}>
+            <ThemedText type="smallBold" themeColor={selected ? 'text' : 'textSecondary'}>
+              {label}
+            </ThemedText>
+          </PressableScale>
+        );
+      })}
     </View>
   );
 }
@@ -145,6 +225,19 @@ const styles = StyleSheet.create({
   empty: {
     textAlign: 'center',
     paddingVertical: Spacing.five,
+  },
+  ranges: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    padding: Spacing.half,
+    borderRadius: Radius.full,
+  },
+  range: {
+    minWidth: 56,
+    alignItems: 'center',
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radius.full,
   },
   list: {
     gap: 0,

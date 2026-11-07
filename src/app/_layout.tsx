@@ -113,6 +113,7 @@ function RootNavigator() {
             <Stack.Screen name="score-area/[area]" />
             <Stack.Screen name="score-info" options={{ presentation: 'modal' }} />
             <Stack.Screen name="settings" />
+            <Stack.Screen name="test-history" />
             <Stack.Screen name="sign-in" />
             <Stack.Screen name="training-days" />
             {/* Draws its own back button, so its summary can drop it without the header jumping away. */}
