@@ -44,6 +44,16 @@ export default function MobilityScoreScreen() {
         <PageHeader
           eyebrow={schedule?.lastTestDate ? `Last tested ${formatDateKey(schedule.lastTestDate)}` : undefined}
           title="Mobility score"
+          action={
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="How your score works"
+              hitSlop={Spacing.two}
+              onPress={() => router.push('/score-info')}
+              style={[styles.infoButton, { backgroundColor: theme.backgroundElement }]}>
+              <Icon name={{ ios: 'info.circle', android: 'info' }} size={22} color="textSecondary" />
+            </PressableScale>
+          }
         />
 
         <Card style={styles.hero}>
@@ -136,6 +146,13 @@ const styles = StyleSheet.create({
   },
   testLabel: {
     flex: 1,
+  },
+  infoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   retake: {
     flexDirection: 'row',

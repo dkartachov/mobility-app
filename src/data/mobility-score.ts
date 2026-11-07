@@ -215,6 +215,47 @@ export function explainNoRealChange({ points, noise }: ScoreChange) {
   };
 }
 
+/** How the score is worked out, for the score info screen. Keep in step with the scoring above. */
+export const SCORE_EXPLANATION: { heading: string; paragraphs: string[] }[] = [
+  {
+    heading: 'Each test',
+    paragraphs: [
+      'Every result is compared with healthy adults of your sex and age, and scored by the share of them you match or beat. 50 is average, and 84 means you reach further than about 84% of people.',
+      "Your sex and age come from your profile. Without them, you're compared with men and women together, and with the youngest adults.",
+      'Tests done on both sides score each side on its own, then take the average.',
+    ],
+  },
+  {
+    heading: 'Each area',
+    paragraphs: [
+      'Shoulders, hips, hamstrings and ankles each score the average of the tests that stretch them.',
+    ],
+  },
+  {
+    heading: 'Overall',
+    paragraphs: [
+      'Your overall score is the average of the areas you have a score for, so each area counts the same however many tests it has.',
+      'It averages percentiles rather than being one, so it gets harder to raise the closer you get to 100: scoring 84 in every area is rarer than 84% of people.',
+    ],
+  },
+  {
+    heading: 'What the numbers mean',
+    paragraphs: [
+      SCORE_BANDS.map(([from, band], i) => `${SCORE_BAND_LABELS[band]}: ${from}–${i === 0 ? 100 : SCORE_BANDS[i - 1][0]}`).join(
+        '\n'
+      ),
+      'The middle half of adults are average, and the top and bottom 10% are well above and well below.',
+    ],
+  },
+  {
+    heading: 'Changes between tests',
+    paragraphs: [
+      'No measurement is exact. How warm you are, the time of day or where the phone sits all move a result a little, even when your flexibility is the same.',
+      'So a change only shows in points when it is bigger than measuring alone would explain. Smaller ones show as no real change. Testing the same way, at the same time of day, keeps that margin small.',
+    ],
+  },
+];
+
 /** Changes in the overall and area scores from `previous` to `current`. */
 export function compareScores(current: MobilityScore, previous: MobilityScore): ScoreChanges {
   return {

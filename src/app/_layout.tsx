@@ -108,6 +108,7 @@ function RootNavigator() {
             <Stack.Screen name="mobility-test" />
             <Stack.Screen name="mobility-time" />
             <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="score-info" options={{ presentation: 'modal' }} />
             <Stack.Screen name="settings" />
             <Stack.Screen name="sign-in" />
             <Stack.Screen name="training-days" />
