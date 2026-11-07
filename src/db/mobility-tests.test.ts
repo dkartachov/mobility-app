@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { createTestDb } from '@/test-utils/sqlite';
 
-import { getMobilityScore, getTestSchedule, logMobilityTest, RETEST_INTERVAL_DAYS } from './mobility-tests';
+import { getMobilityScore, getTestHistory, getTestSchedule, logMobilityTest, RETEST_INTERVAL_DAYS } from './mobility-tests';
 
 describe('mobility tests', () => {
   let db: SQLiteDatabase;
@@ -81,6 +81,25 @@ describe('mobility tests', () => {
   it('has no previous score after only one test with results', async () => {
     await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.55, unit: 'cm' }]);
     expect(await getMobilityScore(db)).toMatchObject({ overall: expect.closeTo(84.13, 2), previous: null });
+  });
+
+  it('lists every test with results, newest first, each compared with the one before', async () => {
+    expect(await getTestHistory(db)).toEqual([]);
+
+    await logMobilityTest(db, new Date(2026, 7, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 1.75, unit: 'cm' }]);
+    await logMobilityTest(db, new Date(2026, 8, 1, 9));
+    await logMobilityTest(db, new Date(2026, 9, 1, 9), [{ exerciseId: 'sit-and-reach', side: null, value: 11.55, unit: 'cm' }]);
+
+    const history = await getTestHistory(db);
+    expect(history).toMatchObject([
+      { id: 3, date: '2026-10-01', overall: expect.closeTo(84.13, 2), previous: { overall: expect.closeTo(50, 5) } },
+      { id: 1, date: '2026-08-01', overall: expect.closeTo(50, 5), previous: null, changes: null },
+    ]);
+    expect(history[0].changes?.overall).toMatchObject({ points: 34, real: true });
+    // The latest entry is the same score the score screen shows.
+    expect(await getMobilityScore(db)).toEqual(
+      expect.objectContaining({ overall: history[0].overall, changes: history[0].changes })
+    );
   });
 
   it("compares with the profile's sex and the age on the day of each test", async () => {

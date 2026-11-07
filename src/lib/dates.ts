@@ -51,6 +51,15 @@ export function formatDateKey(key: DateKey): string {
   });
 }
 
+/** "Oct 12", or "Oct 12, 2025" outside the current year. */
+export function formatShortDate(key: DateKey, today: DateKey = todayKey()): string {
+  return fromDateKey(key).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(key.slice(0, 4) !== today.slice(0, 4) && { year: 'numeric' }),
+  });
+}
+
 /** A time of day as a `Date`, for time pickers and formatting. The day itself is arbitrary. */
 export function timeOfDayDate(hour: number, minute: number): Date {
   return new Date(2024, 0, 1, hour, minute);

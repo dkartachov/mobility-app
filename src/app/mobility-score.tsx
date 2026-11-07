@@ -10,6 +10,7 @@ import { ScoreChangePill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
 import { ScoreBars } from '@/components/score-bars';
 import { ScoreBreakdown } from '@/components/score-breakdown';
+import { ScoreHistory } from '@/components/score-history';
 import { ScoreRing } from '@/components/score-ring';
 import { ScrollView } from '@/components/scroll-view';
 import { SectionHeader } from '@/components/section-header';
@@ -17,7 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
 import { NO_AREA_SCORES } from '@/data/mobility-score';
-import { useMobilityScore, useTestSchedule, type TestSchedule } from '@/db/mobility-tests';
+import { useMobilityScore, useTestHistory, useTestSchedule, type TestSchedule } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateKey } from '@/lib/dates';
 
@@ -36,6 +37,7 @@ export default function MobilityScoreScreen() {
   const insets = useSafeAreaInsets();
   const schedule = useTestSchedule();
   const score = useMobilityScore();
+  const history = useTestHistory();
   const overallChange = score?.changes?.overall ?? null;
 
   return (
@@ -109,6 +111,14 @@ export default function MobilityScoreScreen() {
           <View style={styles.breakdown}>
             <SectionHeader title="Breakdown" />
             <ScoreBreakdown score={score} />
+          </View>
+        )}
+
+        {/* Only once there's a test to look back on besides the one above. */}
+        {history && history.length > 1 && (
+          <View style={styles.breakdown}>
+            <SectionHeader title="History" />
+            <ScoreHistory tests={history} />
           </View>
         )}
       </ScrollView>
