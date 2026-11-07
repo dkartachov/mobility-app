@@ -1,6 +1,7 @@
 import {
   compareScores,
   explainNoRealChange,
+  focusAreas,
   formatScoreChange,
   maxReadingGap,
   mobilityScore,
@@ -28,6 +29,20 @@ const NORM: TestNorm = {
   evidence: 'strong',
 };
 const ANYONE: Demographics = { sex: null, age: null };
+
+describe('focusAreas', () => {
+  it('picks the two lowest scoring areas, lowest first', () => {
+    expect(focusAreas({ shoulders: 40, hips: 20, hamstrings: 70, ankles: 30 })).toEqual(['hips', 'ankles']);
+  });
+
+  it('leaves out areas without a score', () => {
+    expect(focusAreas({ shoulders: null, hips: 60, hamstrings: null, ankles: null })).toEqual(['hips']);
+  });
+
+  it('breaks ties in area order', () => {
+    expect(focusAreas({ shoulders: 50, hips: 50, hamstrings: 50, ankles: 50 })).toEqual(['shoulders', 'hips']);
+  });
+});
 
 describe('normalCdf', () => {
   it('matches the standard normal distribution', () => {

@@ -1,4 +1,5 @@
 import { EXERCISES, type Exercise } from '@/data/exercises';
+import type { ScoreArea } from '@/data/mobility-score';
 
 import type { WorkoutFilters } from './workout-filters';
 
@@ -74,6 +75,60 @@ export function buildWorkout(minutes: number, library: readonly Exercise[] = EXE
   }
 
   return steps;
+}
+
+/** Share of a focus workout's minutes given to exercises for other areas, for variety. */
+export const FOCUS_VARIETY_SHARE = 0.2;
+
+/**
+ * A workout mostly made of exercises for `areas`: each area gets an even share of the time (the
+ * first, lowest scoring, any minute left over), avoiding exercises another area already picked.
+ * About `FOCUS_VARIETY_SHARE` of it goes to exercises for none of them. Then it's all shuffled together.
+ */
+export function buildFocusWorkout(
+  minutes: number,
+  areas: readonly ScoreArea[],
+  library: readonly Exercise[] = EXERCISES
+): WorkoutStep[] {
+  if (areas.length === 0) return buildWorkout(minutes, library);
+  const varietyMinutes = Math.round(minutes * FOCUS_VARIETY_SHARE);
+  let focusMinutes = minutes - varietyMinutes;
+  const used = new Set<Exercise>();
+  const parts: WorkoutStep[][] = [];
+  areas.forEach((area, i) => {
+    const share = Math.ceil(focusMinutes / (areas.length - i));
+    focusMinutes -= share;
+    const forArea = library.filter((e) => e.areas.includes(area));
+    const unused = forArea.filter((e) => !used.has(e));
+    const steps = buildWorkout(share, unused.length ? unused : forArea.length ? forArea : library);
+    steps.forEach((step) => used.add(step.exercise));
+    parts.push(steps);
+  });
+  const others = library.filter((e) => !e.areas.some((area) => areas.includes(area)));
+  parts.push(buildWorkout(varietyMinutes, others.length ? others : library));
+  return shuffleExercises(parts.flat());
+}
+
+/**
+ * Shuffles the exercises in `steps`, keeping both sides of a two-sided exercise together and, where
+ * a few tries find a way, the same exercise from appearing twice in a row.
+ */
+function shuffleExercises(steps: WorkoutStep[]) {
+  const groups = steps.reduce<WorkoutStep[][]>((all, step) => {
+    if (step.side === 2) all.at(-1)!.push(step);
+    else all.push([step]);
+    return all;
+  }, []);
+  let shuffled = groups;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    shuffled = [...groups];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    if (shuffled.every((group, i) => i === 0 || group[0].exercise !== shuffled[i - 1][0].exercise)) break;
+  }
+  return shuffled.flat();
 }
 
 /** Formats seconds as `m:ss`. */

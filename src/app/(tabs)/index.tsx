@@ -32,6 +32,14 @@ export default function StartScreen() {
         style={styles.tile}
       />
       <StartTile
+        title="Focus"
+        subtitle="Target your weak areas"
+        tag={`${DAILY_MINUTES[0]}–${DAILY_MINUTES[DAILY_MINUTES.length - 1]} min`}
+        image={require('@/assets/images/focus.jpg')}
+        onPress={() => router.push('/focus')}
+        style={styles.tile}
+      />
+      <StartTile
         title="Library"
         subtitle="Browse every exercise"
         tag={`${EXERCISES.length} exercises`}
@@ -44,7 +52,7 @@ export default function StartScreen() {
 }
 
 const styles = StyleSheet.create({
-  // The two tiles split the height below the header, so the screen fits without scrolling.
+  // The tiles split the height below the header, so the screen fits without scrolling.
   // Only on very small screens does the minimum push it into scrolling.
   tile: {
     flex: 1,

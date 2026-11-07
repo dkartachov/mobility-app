@@ -100,6 +100,7 @@ function RootNavigator() {
             <Stack.Screen name="daily" />
             <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
             <Stack.Screen name="exercise/[id]" />
+            <Stack.Screen name="focus" />
             <Stack.Screen name="library" />
             <Stack.Screen name="milestone-badge" />
             <Stack.Screen name="privacy-policy" />

@@ -2,6 +2,8 @@ import type { ImageSource } from 'expo-image';
 
 import type { ExerciseAnimation } from '@/lib/figure-rig';
 
+import type { ScoreArea } from './mobility-score';
+
 import {
   ACTIVE_PANCAKE,
   ACTIVE_STRAIGHT_LEG_RAISE,
@@ -105,6 +107,8 @@ export type Exercise = {
   name: string;
   /** Quick summary of the muscles and areas of the body the exercise works. */
   stimulus: string;
+  /** The score areas it stretches, for focus workouts. Empty for ones that work none of them, like wrists. */
+  areas: ScoreArea[];
   /**
    * Whether you need to bring out a mat. `seated` means sitting, lying or on all fours on the floor.
    * `standing` also covers squats and upright kneeling. `either` can be done sitting or standing.
@@ -129,6 +133,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: '90-to-90',
     name: '90 to 90',
     stimulus: 'Hip rotation, glutes and deep hip rotators',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Sit with both legs bent at 90°, one in front and one to the side',
@@ -142,6 +147,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'butterfly',
     name: 'Butterfly',
     stimulus: 'Inner thighs, groin and hips',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Sit with the soles of your feet together, heels pulled in',
@@ -155,6 +161,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'bottom-squat',
     name: 'Bottom squat',
     stimulus: 'Ankles, hips, inner thighs and lower back',
+    areas: ['hips', 'ankles'],
     position: 'standing',
     instructions: [
       'Stand with feet shoulder-width apart, toes slightly out',
@@ -168,6 +175,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'downward-facing-dog',
     name: 'Downward facing dog',
     stimulus: 'Hamstrings, calves, back and shoulders',
+    areas: ['hamstrings', 'ankles', 'shoulders'],
     position: 'standing',
     instructions: [
       'Start on your hands and knees',
@@ -182,6 +190,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'the-sagittarius',
     name: 'The Sagittarius',
     stimulus: 'Butt, back, thorax and pectorals',
+    areas: ['hips', 'shoulders'],
     position: 'seated',
     instructions: [
       'Bend hip and knee to 90 degrees',
@@ -196,6 +205,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'half-kneeling-frog-stretch',
     name: 'Half kneeling frog stretch',
     stimulus: 'Inner thigh, groin and hip',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'On hands and knees, straighten one leg out to the side',
@@ -210,6 +220,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'pec-stretch-on-the-ground',
     name: 'Pec stretch on the ground',
     stimulus: 'Chest and front of the shoulder',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Lie face down with one arm out to the side, palm down',
@@ -224,6 +235,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'resting-cossack-squat',
     name: 'Resting Cossack squat',
     stimulus: 'Inner thighs, groin, hips and ankles',
+    areas: ['hips', 'ankles'],
     position: 'standing',
     instructions: [
       'Stand with your feet wide apart',
@@ -238,6 +250,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'pancake',
     name: 'Pancake',
     stimulus: 'Inner thighs, hamstrings and lower back',
+    areas: ['hips', 'hamstrings'],
     position: 'seated',
     instructions: [
       'Sit with your legs straight and spread as wide as is comfortable',
@@ -251,6 +264,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'active-pancake',
     name: 'Active pancake',
     stimulus: 'Inner thighs, hamstrings, lower back and hip flexors',
+    areas: ['hips', 'hamstrings'],
     position: 'seated',
     instructions: [
       'Sit with your legs straight and spread as wide as is comfortable',
@@ -266,6 +280,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'half-spinal-twist',
     name: 'Half spinal twist',
     stimulus: 'Spine, obliques, glutes and outer hip',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Sit with one leg straight, cross the other foot over it and plant it beside the knee',
@@ -280,6 +295,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'the-breakdancer',
     name: 'The Breakdancer',
     stimulus: 'Hamstrings, calves, inner thigh and lower back',
+    areas: ['hamstrings', 'hips'],
     position: 'seated',
     instructions: [
       'Sit with one leg extended flat on the floor',
@@ -294,6 +310,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'thread-the-needle',
     name: 'Thread the needle',
     stimulus: 'Upper back, thoracic rotation and shoulders',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Start on your hands and knees',
@@ -309,6 +326,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'reverse-scorpion',
     name: 'Reverse scorpion',
     stimulus: 'Hip flexors, lower back, chest and obliques',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Lie face down with your arms out to the sides',
@@ -324,6 +342,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'blackburn',
     name: 'Blackburn',
     stimulus: 'Upper back, shoulder blades and rotator cuff',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Lie face down with your forehead just off the floor',
@@ -339,6 +358,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'manual-extensor-forearm-stretch',
     name: 'Manual extensor forearm stretch',
     stimulus: 'Forearm extensors and wrist',
+    areas: [],
     position: 'either',
     instructions: [
       'Hold one arm out straight in front of you, palm down',
@@ -353,6 +373,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'downward-facing-dog-to-cobra',
     name: 'Downward facing dog to cobra',
     stimulus: 'Hamstrings, calves, spine, abs and shoulders',
+    areas: ['hamstrings', 'shoulders'],
     position: 'seated',
     instructions: [
       'Start in downward facing dog',
@@ -368,6 +389,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'squat-to-stand',
     name: 'Squat to stand',
     stimulus: 'Hamstrings, hips, ankles and lower back',
+    areas: ['hamstrings', 'hips', 'ankles'],
     position: 'standing',
     instructions: [
       'Stand with feet shoulder-width apart and fold forward to grab your toes',
@@ -383,6 +405,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'bottom-squat-rotation',
     name: 'Bottom squat rotation',
     stimulus: 'Thoracic rotation, hips, ankles and shoulders',
+    areas: ['hips', 'ankles'],
     position: 'standing',
     instructions: [
       'Sit in a deep bottom squat, heels down',
@@ -398,6 +421,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'half-twisted-lizard',
     name: 'Half-twisted lizard',
     stimulus: 'Hip flexors, groin, thoracic rotation and quads',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'From a low lunge, put both hands inside your front foot and drop your back knee',
@@ -412,6 +436,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'pigeon-stretch',
     name: 'Pigeon stretch',
     stimulus: 'Glutes, deep hip rotators and hip flexors',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'From hands and knees, bring one knee forward behind your wrist with the shin angled across',
@@ -426,6 +451,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'prayer-pose',
     name: 'Prayer pose',
     stimulus: 'Lats, shoulders, lower back and hips',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Kneel and sit back onto your heels, knees apart',
@@ -439,6 +465,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'knight-stretch',
     name: 'Knight stretch',
     stimulus: 'Hip flexors and quads',
+    areas: ['hips'],
     position: 'standing',
     instructions: [
       'Kneel on one knee with the other foot planted in front, both knees at 90°',
@@ -453,6 +480,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'knight-to-hamstring',
     name: 'Knight to hamstring',
     stimulus: 'Hip flexors, quads and hamstrings',
+    areas: ['hips', 'hamstrings'],
     position: 'standing',
     instructions: [
       'Start in the knight stretch, one knee down and the other foot in front',
@@ -468,6 +496,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'three-legged-downward-facing-dog',
     name: 'Three legged downward facing dog',
     stimulus: 'Hamstrings, calves, hip flexors and shoulders',
+    areas: ['hamstrings', 'hips', 'shoulders'],
     position: 'standing',
     instructions: [
       'Start in downward facing dog',
@@ -483,6 +512,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'cobra-to-prayer',
     name: 'Cobra to prayer',
     stimulus: 'Spine, abs, hip flexors, lats and shoulders',
+    areas: ['shoulders', 'hips'],
     position: 'seated',
     instructions: [
       'Lie face down and push up into cobra, chest up and arms straight',
@@ -498,6 +528,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'scap-mobilization',
     name: 'Scap mobilization',
     stimulus: 'Shoulder blades, upper back and chest',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Start on your hands and knees, arms straight',
@@ -513,6 +544,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'ankle-mobilization',
     name: 'Ankle mobilization',
     stimulus: 'Ankles and calves',
+    areas: ['ankles'],
     position: 'standing',
     instructions: [
       'Kneel on one knee with the other foot planted in front',
@@ -528,6 +560,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'manual-flexor-forearm-stretch',
     name: 'Manual flexor forearm stretch',
     stimulus: 'Forearm flexors, wrist and fingers',
+    areas: [],
     position: 'either',
     instructions: [
       'Hold one arm out straight in front of you, palm up',
@@ -542,6 +575,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'kneeling-wrist-stretch',
     name: 'Kneeling wrist stretch',
     stimulus: 'Forearm flexors, wrists and palms',
+    areas: [],
     position: 'standing',
     instructions: [
       'Kneel and place your palms flat on the floor, fingers pointing back toward your knees',
@@ -555,6 +589,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'reverse-prayer',
     name: 'Reverse prayer',
     stimulus: 'Forearm extensors, wrists and front of the shoulders',
+    areas: ['shoulders'],
     position: 'standing',
     instructions: [
       'Kneel and place the backs of your hands on the floor, fingers pointing toward your knees',
@@ -568,6 +603,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'wrist-rocks',
     name: 'Wrist rocks',
     stimulus: 'Wrists, forearms and fingers',
+    areas: [],
     position: 'seated',
     instructions: [
       'Start on your hands and knees, hands under your shoulders',
@@ -583,6 +619,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'finger-tendon-glides',
     name: 'Finger tendon glides',
     stimulus: 'Finger tendons, finger joints and forearms',
+    areas: [],
     position: 'either',
     instructions: [
       'Hold both hands up with fingers straight',
@@ -598,6 +635,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'sleeper-stretch',
     name: 'Sleeper stretch',
     stimulus: 'Back of the shoulder and rotator cuff',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Lie on your side with your bottom arm out in front at shoulder height, elbow bent to 90°',
@@ -612,6 +650,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'puppy-pose',
     name: 'Puppy pose',
     stimulus: 'Upper back, lats, chest and shoulders',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Start on your hands and knees, hips over your knees',
@@ -625,6 +664,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'floor-angels',
     name: 'Floor angels',
     stimulus: 'Upper back, shoulder blades, chest and shoulders',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Lie on your back with knees bent and arms in a goalpost shape on the floor',
@@ -640,6 +680,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'open-book',
     name: 'Open book',
     stimulus: 'Thoracic rotation, chest and shoulders',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Lie on your side with knees bent to 90° and arms straight out in front, palms together',
@@ -655,6 +696,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'cat-cow',
     name: 'Cat cow',
     stimulus: 'Spine, upper back and abs',
+    areas: [],
     position: 'seated',
     instructions: [
       'Start on your hands and knees',
@@ -670,6 +712,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'frog-stretch',
     name: 'Frog stretch',
     stimulus: 'Inner thighs, groin and hip rotation',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'On hands and knees, slide your knees out wide with your shins parallel and feet turned out',
@@ -683,6 +726,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'lizard-pose',
     name: 'Lizard pose',
     stimulus: 'Hip flexors, groin, inner thigh and hamstrings',
+    areas: ['hips', 'hamstrings'],
     position: 'seated',
     instructions: [
       'From a low lunge, step your front foot out to the side of your hands and drop your back knee',
@@ -697,6 +741,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: '90-to-90-rotations',
     name: '90 to 90 rotations',
     stimulus: 'Hip rotation, glutes and lower back',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Sit with your knees bent, feet wider than your hips, and lean back on your hands',
@@ -712,6 +757,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'seated-straddle-side-bend',
     name: 'Seated straddle side bend',
     stimulus: 'Lats, obliques, inner thighs and hamstrings',
+    areas: ['hips', 'hamstrings'],
     position: 'seated',
     instructions: [
       'Sit with your legs straight and spread as wide as is comfortable',
@@ -726,6 +772,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'neck-side-stretch',
     name: 'Neck side stretch',
     stimulus: 'Side of the neck and upper traps',
+    areas: [],
     position: 'either',
     instructions: [
       'Sit or stand tall with your shoulders relaxed',
@@ -740,6 +787,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'shoulder-circles',
     name: 'Shoulder circles',
     stimulus: 'Shoulder joint, rotator cuff and shoulder blades',
+    areas: ['shoulders'],
     position: 'standing',
     instructions: [
       'Stand tall with one arm by your side and make a tight fist',
@@ -755,6 +803,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'shoulder-pass-throughs',
     name: 'Shoulder pass-throughs',
     stimulus: 'Shoulders, chest, lats and rotator cuff',
+    areas: ['shoulders'],
     position: 'standing',
     equipment: ['band'],
     instructions: [
@@ -771,6 +820,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'cross-body-shoulder-stretch',
     name: 'Cross-body shoulder stretch',
     stimulus: 'Back of the shoulder and upper back',
+    areas: ['shoulders'],
     position: 'standing',
     instructions: [
       'Stand tall and bring one straight arm across your chest',
@@ -785,6 +835,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'overhead-triceps-stretch',
     name: 'Overhead triceps stretch',
     stimulus: 'Triceps, lats and side of the torso',
+    areas: ['shoulders'],
     position: 'either',
     instructions: [
       'Reach one arm overhead and bend the elbow so your hand drops behind your head',
@@ -799,6 +850,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'cow-face-arms',
     name: 'Cow face arms',
     stimulus: 'Shoulder rotation, triceps and chest',
+    areas: ['shoulders'],
     position: 'standing',
     instructions: [
       'Reach one hand down behind your head, elbow pointing up',
@@ -813,6 +865,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'reverse-tabletop',
     name: 'Reverse tabletop',
     stimulus: 'Front of the shoulders, chest, hip flexors and glutes',
+    areas: ['shoulders', 'hips'],
     position: 'seated',
     instructions: [
       'Sit with your knees bent and feet flat, hands on the floor behind you with fingers pointing forward',
@@ -827,6 +880,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'behind-the-back-chest-opener',
     name: 'Behind the back chest opener',
     stimulus: 'Chest, front of the shoulders and biceps',
+    areas: ['shoulders'],
     position: 'standing',
     instructions: [
       'Stand tall and link your hands behind your back, or hold a towel between them',
@@ -840,6 +894,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'hip-circles',
     name: 'Hip circles',
     stimulus: 'Hip joint, hip rotators and glutes',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Start on your hands and knees and lift one knee off the floor',
@@ -855,6 +910,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'figure-four-stretch',
     name: 'Figure four stretch',
     stimulus: 'Glutes, deep hip rotators and outer hip',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Lie on your back with your knees bent and cross one ankle over the opposite knee',
@@ -869,6 +925,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'happy-baby',
     name: 'Happy baby',
     stimulus: 'Inner thighs, groin, hamstrings and lower back',
+    areas: ['hips', 'hamstrings'],
     position: 'seated',
     instructions: [
       'Lie on your back and pull your knees toward your armpits',
@@ -882,6 +939,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'cossack-squat',
     name: 'Cossack squat',
     stimulus: 'Inner thighs, hips, hamstrings and ankles',
+    areas: ['hips', 'hamstrings', 'ankles'],
     position: 'standing',
     instructions: [
       'Stand with your feet wide apart',
@@ -897,6 +955,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'worlds-greatest-stretch',
     name: "World's greatest stretch",
     stimulus: 'Hip flexors, groin, hamstrings and thoracic rotation',
+    areas: ['hips', 'hamstrings'],
     position: 'standing',
     instructions: [
       'Step into a long lunge, back leg straight, with both hands on the floor inside your front foot',
@@ -912,6 +971,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'frog-rocks',
     name: 'Frog rocks',
     stimulus: 'Inner thighs, groin and hip rotation',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Set up in the frog stretch, knees wide with your shins parallel and feet turned out',
@@ -927,6 +987,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'couch-stretch',
     name: 'Couch stretch',
     stimulus: 'Quads and hip flexors',
+    areas: ['hips'],
     position: 'standing',
     equipment: ['wall'],
     instructions: [
@@ -942,6 +1003,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'standing-forward-fold',
     name: 'Standing forward fold',
     stimulus: 'Hamstrings, calves and lower back',
+    areas: ['hamstrings'],
     position: 'standing',
     instructions: [
       'Stand with your feet hip-width apart and your knees soft',
@@ -955,6 +1017,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'pyramid-stretch',
     name: 'Pyramid stretch',
     stimulus: 'Hamstrings, calves and hips',
+    areas: ['hamstrings'],
     position: 'standing',
     instructions: [
       'Stand with one foot a long step in front of the other, hips facing forward',
@@ -969,6 +1032,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'lying-hamstring-stretch',
     name: 'Lying hamstring stretch',
     stimulus: 'Hamstrings and calves',
+    areas: ['hamstrings'],
     position: 'seated',
     equipment: ['band'],
     instructions: [
@@ -984,6 +1048,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'active-straight-leg-raise',
     name: 'Active straight leg raise',
     stimulus: 'Hamstrings, hip flexors and abs',
+    areas: ['hamstrings'],
     position: 'seated',
     instructions: [
       'Lie on your back with both legs straight and your arms by your sides',
@@ -999,6 +1064,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'inchworm',
     name: 'Inchworm',
     stimulus: 'Hamstrings, calves, shoulders and abs',
+    areas: ['hamstrings'],
     position: 'standing',
     instructions: [
       'Stand tall, then fold forward and put your hands on the floor',
@@ -1014,6 +1080,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'elephant-walk',
     name: 'Elephant walk',
     stimulus: 'Hamstrings and calves',
+    areas: ['hamstrings', 'ankles'],
     position: 'standing',
     instructions: [
       'Fold forward from standing and put your hands on the floor or your shins',
@@ -1029,6 +1096,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'seated-pike-stretch',
     name: 'Seated pike stretch',
     stimulus: 'Hamstrings, calves and lower back',
+    areas: ['hamstrings'],
     position: 'seated',
     instructions: [
       'Sit with your legs straight and together, toes pointing up',
@@ -1042,6 +1110,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'seated-shoulder-extension',
     name: 'Seated shoulder extension',
     stimulus: 'Front of the shoulders, chest and biceps',
+    areas: ['shoulders'],
     position: 'seated',
     instructions: [
       'Sit with your legs straight and your hands on the floor behind you, fingers pointing back',
@@ -1056,6 +1125,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'leg-swings',
     name: 'Leg swings',
     stimulus: 'Hip flexors, hamstrings and glutes',
+    areas: ['hips', 'hamstrings'],
     position: 'standing',
     equipment: ['wall'],
     instructions: [
@@ -1072,6 +1142,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'lying-knee-hug',
     name: 'Lying knee hug',
     stimulus: 'Glutes, lower back and hip flexors',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Lie on your back with both legs straight',
@@ -1086,6 +1157,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'horse-stance',
     name: 'Horse stance',
     stimulus: 'Inner thighs, groin, hips and quads',
+    areas: ['hips'],
     position: 'standing',
     instructions: [
       'Stand with your feet about twice shoulder-width apart, toes turned slightly out',
@@ -1099,6 +1171,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'belly-down-foot-splay',
     name: 'Belly down foot splay',
     stimulus: 'Hip internal rotation and deep hip rotators',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Lie face down and bend your knees to 90° so your feet point up, with a block or pillow between your knees if you have one',
@@ -1112,6 +1185,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'lying-windshield-wiper-hold',
     name: 'Lying windshield wiper hold',
     stimulus: 'Hip internal and external rotation and glutes',
+    areas: ['hips'],
     position: 'seated',
     instructions: [
       'Lie on your back with knees bent and feet flat, a bit wider than your hips',
@@ -1126,6 +1200,7 @@ const ALL_EXERCISES: Exercise[] = [
     id: 'back-lying-reverse-pigeon',
     name: 'Back lying reverse pigeon',
     stimulus: 'Hip internal rotation and outer hip',
+    areas: ['hips'],
     position: 'seated',
     equipment: ['band'],
     instructions: [

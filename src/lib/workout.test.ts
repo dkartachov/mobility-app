@@ -8,7 +8,14 @@ import {
   type Position,
 } from '@/data/exercises';
 
-import { buildWorkout, DAILY_MINUTES, filterExercises, formatClock, type WorkoutStep } from './workout';
+import {
+  buildFocusWorkout,
+  buildWorkout,
+  DAILY_MINUTES,
+  filterExercises,
+  formatClock,
+  type WorkoutStep,
+} from './workout';
 
 function totalMinutes(steps: WorkoutStep[]) {
   return steps.reduce((sum, step) => sum + step.durationSeconds, 0) / 60;
@@ -154,6 +161,55 @@ describe('filterExercises', () => {
         expect(totalMinutes(buildWorkout(minutes, library))).toBe(minutes);
       }
     }
+  });
+});
+
+describe('buildFocusWorkout', () => {
+  const RUNS = 200;
+  const AREAS = ['hips', 'shoulders'] as const;
+  const targets = (step: WorkoutStep) => step.exercise.areas.some((area) => (AREAS as readonly string[]).includes(area));
+
+  it.each(DAILY_MINUTES)('fills exactly %i minutes', (minutes) => {
+    for (let i = 0; i < RUNS; i++) expect(totalMinutes(buildFocusWorkout(minutes, AREAS))).toBe(minutes);
+  });
+
+  it.each(DAILY_MINUTES)('spends most of %i minutes on the focus areas, and some on others', (minutes) => {
+    for (let i = 0; i < RUNS; i++) {
+      const steps = buildFocusWorkout(minutes, AREAS);
+      const focusMinutes = totalMinutes(steps.filter(targets));
+      expect(focusMinutes).toBeGreaterThanOrEqual(minutes * 0.75);
+      expect(focusMinutes).toBeLessThan(minutes);
+    }
+  });
+
+  it('gives both areas time', () => {
+    for (let i = 0; i < RUNS; i++) {
+      const steps = buildFocusWorkout(15, ['ankles', 'shoulders']);
+      for (const area of ['ankles', 'shoulders'] as const) {
+        expect(steps.some((step) => step.exercise.areas.includes(area))).toBe(true);
+      }
+    }
+  });
+
+  it('keeps both sides of two-sided exercises together', () => {
+    for (let i = 0; i < RUNS; i++) {
+      const steps = buildFocusWorkout(22, AREAS);
+      steps.forEach((step, index) => {
+        if (step.side === 1) expect(steps[index + 1]).toEqual({ ...step, side: 2 });
+        if (step.side === 2) expect(steps[index - 1]).toEqual({ ...step, side: 1 });
+      });
+    }
+  });
+
+  it('never repeats an exercise back to back', () => {
+    for (let i = 0; i < RUNS; i++) {
+      const exercises = exercisesInOrder(buildFocusWorkout(22, AREAS));
+      exercises.slice(1).forEach((exercise, index) => expect(exercise).not.toBe(exercises[index]));
+    }
+  });
+
+  it('is a plain workout without focus areas', () => {
+    expect(totalMinutes(buildFocusWorkout(8, []))).toBe(8);
   });
 });
 

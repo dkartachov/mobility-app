@@ -27,6 +27,7 @@ export const MARCHING_EXERCISE: Exercise = {
   id: 'warmup-marching',
   name: 'Marching',
   stimulus: 'Light cardio to warm up the whole body',
+  areas: [],
   position: 'standing',
   instructions: [
     'March on the spot, lifting each knee towards hip height',

@@ -50,6 +50,24 @@ export type MobilityScore = {
   errors: { areas: AreaScores; overall: number | null };
 };
 
+/** How many areas focus workouts target. */
+export const FOCUS_AREA_COUNT = 2;
+
+/**
+ * The lowest scoring areas, lowest first, which focus workouts target. Areas without a score are
+ * left out, and ties go to the area listed first in `SCORE_AREAS`.
+ */
+export function focusAreas(areas: AreaScores, count = FOCUS_AREA_COUNT): ScoreArea[] {
+  return SCORE_AREAS.filter(({ id }) => areas[id] !== null)
+    .sort((a, b) => areas[a.id]! - areas[b.id]!)
+    .slice(0, count)
+    .map(({ id }) => id);
+}
+
+export function scoreAreaLabel(area: ScoreArea) {
+  return SCORE_AREAS.find(({ id }) => id === area)!.label;
+}
+
 /** One saved test result, as stored with a flexibility test. */
 export type ScoredResult = { exerciseId: string; side: Side | null; value: number; unit: Unit };
 

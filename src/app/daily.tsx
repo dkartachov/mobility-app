@@ -1,27 +1,19 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { css } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Chip } from '@/components/chip';
-import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/page-header';
-import { PressableScale } from '@/components/pressable-scale';
 import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Elevation, Radius, Spacing } from '@/constants/theme';
+import { TimePicker } from '@/components/time-picker';
+import { Spacing } from '@/constants/theme';
 import { EQUIPMENT, EQUIPMENT_LABELS, EXERCISE_TYPE_LABELS, EXERCISE_TYPES, POSITION_LABELS, POSITIONS } from '@/data/exercises';
-import { useTheme } from '@/hooks/use-theme';
-import { haptic } from '@/lib/haptics';
-import { useColorScheme } from '@/lib/theme-preference';
 import { DAILY_MINUTES } from '@/lib/workout';
 import { setWorkoutFilters, useWorkoutFilters } from '@/lib/workout-filters';
-
-/** Shown under each option, shortest first. */
-const OPTION_LABELS = ['Quick', 'Standard', 'Deep'];
 
 function toggled<T>(items: readonly T[], item: T) {
   return items.includes(item) ? items.filter((other) => other !== item) : [...items, item];
@@ -45,20 +37,7 @@ export default function DailyScreen() {
     <ThemedView style={styles.screen}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <PageHeader eyebrow="Daily routine" title="How much time do you have?" />
-        <View style={styles.options} accessibilityRole="radiogroup">
-          {DAILY_MINUTES.map((value, i) => (
-            <TimeOption
-              key={value}
-              minutes={value}
-              label={OPTION_LABELS[i]}
-              selected={minutes === value}
-              onPress={() => {
-                haptic.select();
-                setMinutes(value);
-              }}
-            />
-          ))}
-        </View>
+        <TimePicker minutes={minutes} onChange={setMinutes} />
         <View style={styles.filter}>
           <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
             Position
@@ -124,50 +103,6 @@ export default function DailyScreen() {
   );
 }
 
-type TimeOptionProps = {
-  minutes: number;
-  label?: string;
-  selected: boolean;
-  onPress: () => void;
-};
-
-function TimeOption({ minutes, label, selected, onPress }: TimeOptionProps) {
-  const theme = useTheme();
-  const scheme = useColorScheme();
-
-  return (
-    <PressableScale
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${minutes} minutes`}
-      onPress={onPress}
-      style={[
-        styles.option,
-        cssStyles.fade,
-        selected
-          ? { backgroundColor: theme.tint, boxShadow: `0 8px 20px ${theme.tint}55` }
-          : [{ backgroundColor: theme.backgroundElement }, Elevation[scheme]],
-      ]}>
-      {selected && (
-        <View style={styles.check}>
-          <Icon name={{ ios: 'checkmark.circle.fill', android: 'check_circle' }} size={20} color="onTint" />
-        </View>
-      )}
-      <ThemedText type="stat" themeColor={selected ? 'onTint' : 'text'} style={styles.minutes}>
-        {minutes}
-      </ThemedText>
-      <ThemedText type="smallBold" themeColor={selected ? 'onTint' : 'textSecondary'}>
-        min
-      </ThemedText>
-      {label && (
-        <ThemedText type="eyebrow" themeColor={selected ? 'onTint' : 'tint'} style={styles.label}>
-          {label}
-        </ThemedText>
-      )}
-    </PressableScale>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -183,30 +118,6 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: Spacing.screen,
   },
-  options: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  option: {
-    flex: 1,
-    aspectRatio: 0.8,
-    borderRadius: Radius.xl,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  check: {
-    position: 'absolute',
-    top: Spacing.twoAndHalf,
-    right: Spacing.twoAndHalf,
-  },
-  minutes: {
-    fontSize: 40,
-    lineHeight: 46,
-  },
-  label: {
-    marginTop: Spacing.two,
-  },
   filter: {
     gap: Spacing.two,
   },
@@ -217,11 +128,3 @@ const styles = StyleSheet.create({
   },
 });
 
-/** Reanimated CSS transitions, which React Native's `StyleSheet.create` doesn't type. */
-const cssStyles = css.create({
-  // Fades between selected and not, instead of snapping.
-  fade: {
-    transitionProperty: 'backgroundColor',
-    transitionDuration: 150,
-  },
-});

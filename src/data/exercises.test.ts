@@ -1,4 +1,5 @@
 import { EXERCISES, getExercise, getExercises, searchExercises } from './exercises';
+import { SCORE_AREAS } from './mobility-score';
 
 describe('EXERCISES', () => {
   it('has unique ids', () => {
@@ -17,6 +18,13 @@ describe('EXERCISES', () => {
 
   it('has a photo for every exercise', () => {
     for (const exercise of EXERCISES) expect(exercise.photo).toBeDefined();
+  });
+
+  it('has exercises for every score area, enough to fill focus workouts', () => {
+    for (const { id } of SCORE_AREAS) {
+      expect(EXERCISES.filter((e) => e.areas.includes(id)).length).toBeGreaterThanOrEqual(5);
+    }
+    expect(EXERCISES.some((e) => e.areas.length === 0)).toBe(true);
   });
 
   it('has enough one-sided exercises for workouts to fill odd minutes', () => {

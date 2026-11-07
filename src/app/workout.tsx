@@ -16,6 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WorkoutPlayer } from '@/components/workout-player';
 import { Spacing } from '@/constants/theme';
+import { SCORE_AREAS, type ScoreArea } from '@/data/mobility-score';
 import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDuration } from '@/lib/dates';
@@ -27,6 +28,7 @@ import {
   DAILY_MINUTES,
   FAST_BUFFER_SECONDS,
   FAST_STEP_SECONDS,
+  buildFocusWorkout,
   buildWorkout,
   filterExercises,
 } from '@/lib/workout';
@@ -46,14 +48,23 @@ function parseMinutes(value: string | undefined) {
   return (DAILY_MINUTES as readonly number[]).includes(minutes) ? minutes : DAILY_MINUTES[0];
 }
 
+/** The areas a focus workout targets, in the order given, skipping any that don't exist. */
+function parseAreas(value: string | undefined): ScoreArea[] {
+  const ids = value?.split(',') ?? [];
+  return ids.filter((id): id is ScoreArea => SCORE_AREAS.some((area) => area.id === id));
+}
+
 export default function WorkoutScreen() {
   const db = useSQLiteContext();
-  const { minutes } = useLocalSearchParams<{ minutes: string }>();
-  const totalMinutes = parseMinutes(minutes);
+  const params = useLocalSearchParams<{ minutes: string; routine?: 'focus'; areas?: string }>();
+  const totalMinutes = parseMinutes(params.minutes);
+  const focus = params.routine === 'focus';
   // Read once: toggling fast mode mid-workout shouldn't change the running workout.
   const [fast] = useState(getFastWorkouts);
   const [steps] = useState(() => {
-    const built = buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
+    const built = focus
+      ? buildFocusWorkout(totalMinutes, parseAreas(params.areas))
+      : buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
     return fast ? built.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : built;
   });
   const [startedAt] = useState(() => new Date());
@@ -80,14 +91,14 @@ export default function WorkoutScreen() {
   const complete = async () => {
     const plannedSeconds = totalMinutes * 60;
     const fromSeconds = await getTotalSeconds(db);
-    await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: 'daily' });
+    await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: focus ? 'focus' : 'daily' });
     countWorkoutForReminderPrompt();
     setResult({ fromSeconds, toSeconds: fromSeconds + plannedSeconds });
   };
 
   return (
     <>
-      <Stack.Screen options={{ title: `Daily · ${totalMinutes} min` }} />
+      <Stack.Screen options={{ title: `${focus ? 'Focus' : 'Daily'} · ${totalMinutes} min` }} />
       {result ? (
         <WorkoutSummary {...result} onLeave={() => setLeaving(true)} />
       ) : (
