@@ -36,6 +36,8 @@ import {
 import { logMobilityTest, useMobilityScore } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 import { getFastWorkouts, useSkipTestMeasurements } from '@/lib/dev-settings';
+import { requestNotificationPermission } from '@/lib/reminders';
+import { getTestRemindersEnabled } from '@/lib/test-reminder-preference';
 import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
 
 /** The calculating screen shows at least this long, even when saving is quicker. */
@@ -428,7 +430,14 @@ function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => vo
         )}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
-        <Button title="Done" onPress={onDone} />
+        <Button
+          title="Done"
+          onPress={() => {
+            onDone();
+            // Test reminders are on unless turned off, but can't show without permission. Asks only if it still can.
+            if (getTestRemindersEnabled()) requestNotificationPermission().catch(console.warn);
+          }}
+        />
       </View>
     </ThemedView>
   );

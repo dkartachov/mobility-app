@@ -7,7 +7,7 @@ import { Text } from 'react-native';
 
 import { ReminderScheduler } from './reminder-scheduler';
 
-const mockTapListeners = new Set<() => void>();
+const mockTapListeners = new Set<(response: object) => void>();
 const mockHandler: { current?: NotificationHandler | null } = {};
 
 jest.mock('expo-sqlite', () => ({
@@ -16,7 +16,7 @@ jest.mock('expo-sqlite', () => ({
 }));
 
 jest.mock('expo-notifications', () => ({
-  addNotificationResponseReceivedListener: (listener: () => void) => {
+  addNotificationResponseReceivedListener: (listener: (response: object) => void) => {
     mockTapListeners.add(listener);
     return { remove: () => mockTapListeners.delete(listener) };
   },
@@ -25,7 +25,7 @@ jest.mock('expo-notifications', () => ({
   },
 }));
 
-jest.mock('@/lib/reminders', () => ({ syncReminderNotifications: jest.fn() }));
+jest.mock('@/lib/reminders', () => ({ syncReminderNotifications: jest.fn(), TEST_REMINDER_KIND: 'test' }));
 
 const Screen = () => <Text>screen</Text>;
 
@@ -50,10 +50,13 @@ const routes = {
   settings: Screen,
   workout: Screen,
   'mobility-test': Screen,
+  'mobility-score': Screen,
 };
 
-async function tapReminder() {
-  await act(async () => mockTapListeners.forEach((listener) => listener()));
+/** Taps a reminder, with `data` as its content's data. */
+async function tapReminder(data: object = {}) {
+  const response = { notification: { request: { content: { data } } } };
+  await act(async () => mockTapListeners.forEach((listener) => listener(response)));
 }
 
 async function behavior() {
@@ -92,6 +95,14 @@ describe('ReminderScheduler', () => {
 
     expect(screen.getPathname()).toBe(pathname);
     expect(await behavior()).toMatchObject({ shouldShowBanner: false, shouldPlaySound: false });
+  });
+
+  it('opens the mobility score from a test reminder', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/dashboard' });
+
+    await tapReminder({ kind: 'test' });
+
+    expect(screen.getPathname()).toBe('/mobility-score');
   });
 
   it('shows a reminder that fires while the app is open', async () => {

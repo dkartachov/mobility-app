@@ -1,7 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { logMobilityTest } from '@/db/mobility-tests';
 import { createReminder, deleteReminder, updateReminder } from '@/db/reminders';
+import { addDays, fromDateKey, todayKey } from '@/lib/dates';
+import { setTestRemindersEnabled } from '@/lib/test-reminder-preference';
 import { createTestDb } from '@/test-utils/sqlite';
 
 import { isNotificationPermissionGranted, requestNotificationPermission, syncReminderNotifications } from './reminders';
@@ -11,7 +14,7 @@ const mockScheduled = new Set<string>();
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 5 },
   IosAuthorizationStatus: { PROVISIONAL: 3 },
-  SchedulableTriggerInputTypes: { WEEKLY: 'weekly' },
+  SchedulableTriggerInputTypes: { WEEKLY: 'weekly', DATE: 'date' },
   cancelScheduledNotificationAsync: jest.fn(async (identifier: string) => void mockScheduled.delete(identifier)),
   getAllScheduledNotificationsAsync: jest.fn(async () => [...mockScheduled].map((identifier) => ({ identifier }))),  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
   scheduleNotificationAsync: jest.fn(async ({ identifier }: { identifier: string }) => {
@@ -100,6 +103,63 @@ describe('syncReminderNotifications', () => {
 
     await syncReminderNotifications(db);
     expect(schedule).toHaveBeenCalledTimes(7);
+  });
+});
+
+describe('test reminders', () => {
+  let db: SQLiteDatabase;
+
+  /** A test taken `daysAgo` days before today. */
+  const testFrom = (daysAgo: number) => logMobilityTest(db, fromDateKey(addDays(todayKey(), -daysAgo)));
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockScheduled.clear();
+    setTestRemindersEnabled(true);
+    db = await createTestDb();
+  });
+
+  it('waits for the first test', async () => {
+    await syncReminderNotifications(db);
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('reminds at 10:00 on the day the next test is due', async () => {
+    await testFrom(0);
+    await syncReminderNotifications(db);
+
+    const due = addDays(todayKey(), 30);
+    const [[request]] = schedule.mock.calls;
+    expect(request.identifier).toBe(`test-reminder-${due}-10`);
+    expect(request.content.data).toEqual({ kind: 'test' });
+    const date = fromDateKey(due);
+    date.setHours(10);
+    expect(request.trigger).toEqual({ type: 'date', channelId: 'test-reminders', date });
+  });
+
+  it('moves to the new date after a retest', async () => {
+    await testFrom(10);
+    await syncReminderNotifications(db);
+    await testFrom(0);
+    await syncReminderNotifications(db);
+
+    expect([...mockScheduled]).toEqual([`test-reminder-${addDays(todayKey(), 30)}-10`]);
+  });
+
+  it('has nothing to schedule once a test is already due', async () => {
+    await testFrom(40);
+    await syncReminderNotifications(db);
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('cancels it when turned off', async () => {
+    await testFrom(0);
+    await syncReminderNotifications(db);
+
+    setTestRemindersEnabled(false);
+    await syncReminderNotifications(db);
+
+    expect(mockScheduled.size).toBe(0);
   });
 });
 

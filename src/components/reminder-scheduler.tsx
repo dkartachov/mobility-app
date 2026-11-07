@@ -4,10 +4,14 @@ import { addDatabaseChangeListener, useSQLiteContext } from 'expo-sqlite';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
-import { syncReminderNotifications } from '@/lib/reminders';
+import { syncReminderNotifications, TEST_REMINDER_KIND } from '@/lib/reminders';
+import { useTestRemindersEnabled } from '@/lib/test-reminder-preference';
 
 /** Screens a reminder shouldn't interrupt, each with progress to lose. */
 const SESSION_PATHS = ['/workout', '/mobility-test'];
+
+/** Exercise reminders come from `reminders`, and test reminders from the latest test. */
+const SYNCED_TABLES = ['reminders', 'mobility_tests'];
 
 /**
  * `dismissTo` does nothing when a tab is already showing, as there's no screen to dismiss, and
@@ -22,12 +26,14 @@ function goToStartTab() {
  * Keeps scheduled notifications matching the `reminders` table, when it changes and whenever the
  * app opens, which also picks up permission granted in the system settings. A reminder that fires
  * while the app is open shows as usual, unless you're in a session. Tapping one goes to the Start
- * tab; a cold start lands there anyway, so only a running app needs moving. Renders nothing; it's
+ * tab, or the mobility score for a test reminder; a cold start lands on the Start tab anyway, so
+ * only a running app needs moving. Renders nothing; it's
  * a component because it has to sit inside `SQLiteProvider`.
  */
 export function ReminderScheduler() {
   const db = useSQLiteContext();
   const inSession = SESSION_PATHS.includes(usePathname());
+  const testRemindersEnabled = useTestRemindersEnabled();
 
   useEffect(() => {
     setNotificationHandler({
@@ -39,14 +45,20 @@ export function ReminderScheduler() {
       }),
     });
     if (inSession) return;
-    const taps = addNotificationResponseReceivedListener(goToStartTab);
+    const taps = addNotificationResponseReceivedListener((response) => {
+      if (response.notification.request.content.data?.kind === TEST_REMINDER_KIND) router.navigate('/mobility-score');
+      else goToStartTab();
+    });
     return () => taps.remove();
   }, [inSession]);
 
   useEffect(() => {
     syncReminderNotifications(db);
+  }, [db, testRemindersEnabled]);
+
+  useEffect(() => {
     const changes = addDatabaseChangeListener((event) => {
-      if (event.tableName === 'reminders') syncReminderNotifications(db);
+      if (SYNCED_TABLES.includes(event.tableName)) syncReminderNotifications(db);
     });
     const appState = AppState.addEventListener('change', (next) => {
       if (next === 'active') syncReminderNotifications(db);

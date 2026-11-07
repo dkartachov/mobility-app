@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
+import { StyleSheet, Switch, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccountCard } from '@/components/account-card';
@@ -17,8 +17,12 @@ import { ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { RETEST_INTERVAL_DAYS } from '@/db/mobility-tests';
+import { useTheme } from '@/hooks/use-theme';
 import { isBackupConfigured, useBackupState } from '@/lib/backup';
 import { resetInstructions } from '@/lib/instructions';
+import { requestNotificationPermission } from '@/lib/reminders';
+import { setTestRemindersEnabled, useTestRemindersEnabled } from '@/lib/test-reminder-preference';
 import {
   THEME_PREFERENCES,
   THEME_PREFERENCE_LABELS,
@@ -36,6 +40,8 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const themePreference = useThemePreference();
   const timeoutSeconds = useTimeoutSeconds();
+  const testRemindersEnabled = useTestRemindersEnabled();
+  const theme = useTheme();
   const { offline } = useBackupState();
   const { section } = useLocalSearchParams<{ section?: 'reminders' }>();
   const scrollView = useRef<ScrollViewInstance>(null);
@@ -109,6 +115,26 @@ export default function SettingsScreen() {
             Reminders
           </ThemedText>
           <RemindersCard />
+          <Card style={styles.card}>
+            <View style={styles.rowTitle}>
+              <IconBadge name={{ ios: 'calendar', android: 'calendar_month' }} size={32} />
+              <View style={styles.rowText}>
+                <ThemedText type="smallBold">Test reminders</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {RETEST_INTERVAL_DAYS} days after each flexibility test
+                </ThemedText>
+              </View>
+              <Switch
+                value={testRemindersEnabled}
+                onValueChange={(next) => {
+                  setTestRemindersEnabled(next);
+                  if (next) requestNotificationPermission().catch(console.warn);
+                }}
+                trackColor={{ true: theme.tint, false: theme.backgroundSelected }}
+                accessibilityLabel="Test reminders"
+              />
+            </View>
+          </Card>
         </View>
 
         <View style={styles.section}>
@@ -173,6 +199,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.twoAndHalf,
+  },
+  rowText: {
+    flex: 1,
   },
   row: {
     flexDirection: 'row',
