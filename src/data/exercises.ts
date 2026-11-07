@@ -21,6 +21,7 @@ import {
   COUCH_STRETCH,
   COW_FACE_ARMS,
   CROSS_BODY_SHOULDER_STRETCH,
+  CUBAN_ROTATION,
   DOWNWARD_FACING_DOG,
   DOWNWARD_FACING_DOG_TO_COBRA,
   ELEPHANT_WALK,
@@ -41,6 +42,7 @@ import {
   KNIGHT_TO_HAMSTRING,
   LEG_SWINGS,
   LIZARD_POSE,
+  LYING_EXTERNAL_ROTATION_STRETCH,
   LYING_HAMSTRING_STRETCH,
   LYING_KNEE_HUG,
   LYING_WINDSHIELD_WIPER_HOLD,
@@ -58,15 +60,14 @@ import {
   PUPPY_POSE,
   PYRAMID_STRETCH,
   RESTING_COSSACK_SQUAT,
-  REVERSE_PRAYER,
   REVERSE_SCORPION,
   REVERSE_TABLETOP,
   SCAP_MOBILIZATION,
   SEATED_PIKE_STRETCH,
   SEATED_SHOULDER_EXTENSION,
   SEATED_STRADDLE_SIDE_BEND,
-  SHOULDER_CIRCLES,
   SHOULDER_PASS_THROUGHS,
+  SIDE_LYING_EXTERNAL_ROTATION,
   SLEEPER_STRETCH,
   SQUAT_TO_STAND,
   STANDING_FORWARD_FOLD,
@@ -86,12 +87,13 @@ export const POSITION_LABELS: Record<Position, string> = {
   seated: 'Seated & lying',
 };
 
-export const EQUIPMENT = ['band', 'wall'] as const;
+export const EQUIPMENT = ['band', 'wall', 'dumbbell'] as const;
 export type Equipment = (typeof EQUIPMENT)[number];
 
 export const EQUIPMENT_LABELS: Record<Equipment, string> = {
   band: 'Band or towel',
   wall: 'Wall',
+  dumbbell: 'Light dumbbells',
 };
 
 export const EXERCISE_TYPES = ['active', 'passive'] as const;
@@ -586,20 +588,6 @@ const ALL_EXERCISES: Exercise[] = [
     animation: KNEELING_WRIST_STRETCH,
   },
   {
-    id: 'reverse-prayer',
-    name: 'Reverse prayer',
-    stimulus: 'Forearm extensors, wrists and front of the shoulders',
-    areas: ['shoulders'],
-    position: 'standing',
-    instructions: [
-      'Kneel and place the backs of your hands on the floor, fingers pointing toward your knees',
-      'Keep your arms straight and gently lean back',
-      'Hold, keeping your shoulders relaxed',
-    ],
-    photo: require('@/assets/images/exercises/reverse-prayer.png'),
-    animation: REVERSE_PRAYER,
-  },
-  {
     id: 'wrist-rocks',
     name: 'Wrist rocks',
     stimulus: 'Wrists, forearms and fingers',
@@ -782,22 +770,6 @@ const ALL_EXERCISES: Exercise[] = [
     photo: require('@/assets/images/exercises/neck-side-stretch.png'),
     animation: NECK_SIDE_STRETCH,
     twoSided: true,
-  },
-  {
-    id: 'shoulder-circles',
-    name: 'Shoulder circles',
-    stimulus: 'Shoulder joint, rotator cuff and shoulder blades',
-    areas: ['shoulders'],
-    position: 'standing',
-    instructions: [
-      'Stand tall with one arm by your side and make a tight fist',
-      'Slowly draw the biggest circle you can with your straight arm, without letting your torso move',
-      'Reverse direction every few circles, then switch sides',
-    ],
-    photo: require('@/assets/images/exercises/shoulder-circles.png'),
-    animation: SHOULDER_CIRCLES,
-    twoSided: true,
-    active: true,
   },
   {
     id: 'shoulder-pass-throughs',
@@ -1210,6 +1182,56 @@ const ALL_EXERCISES: Exercise[] = [
     ],
     photo: require('@/assets/images/exercises/back-lying-reverse-pigeon.png'),
     animation: BACK_LYING_REVERSE_PIGEON,
+    twoSided: true,
+  },
+  {
+    id: 'side-lying-external-rotation',
+    name: 'Side-lying external rotation',
+    stimulus: 'Rotator cuff and back of the shoulder',
+    areas: ['shoulders'],
+    position: 'seated',
+    equipment: ['dumbbell'],
+    instructions: [
+      'Lie on your side holding a light dumbbell in your top hand, elbow tucked against your side and bent to 90°',
+      'Keeping the elbow pinned, slowly turn the forearm up toward the ceiling as far as you can',
+      'Lower it back to your belly with control and keep repeating, then switch sides',
+    ],
+    photo: require('@/assets/images/exercises/side-lying-external-rotation.png'),
+    animation: SIDE_LYING_EXTERNAL_ROTATION,
+    twoSided: true,
+    active: true,
+  },
+  {
+    id: 'cuban-rotation',
+    name: 'Cuban rotation',
+    stimulus: 'Rotator cuff, upper back and shoulder blades',
+    areas: ['shoulders'],
+    position: 'standing',
+    equipment: ['dumbbell'],
+    instructions: [
+      'Stand holding a light dumbbell in each hand, and lift your elbows out to shoulder height with the forearms hanging down',
+      'Keeping your elbows where they are, rotate the forearms up until the weights are above your elbows',
+      'Rotate back down, lower your arms, and keep repeating slowly',
+    ],
+    photo: require('@/assets/images/exercises/cuban-rotation.png'),
+    animation: CUBAN_ROTATION,
+    active: true,
+    oneMinuteOnly: true,
+  },
+  {
+    id: 'lying-external-rotation-stretch',
+    name: 'Lying external rotation stretch',
+    stimulus: 'Front of the shoulder, rotator cuff and chest',
+    areas: ['shoulders'],
+    position: 'seated',
+    equipment: ['dumbbell'],
+    instructions: [
+      'Lie on your back with one arm out to the side at shoulder height, elbow bent to 90° and a light dumbbell pointing at the ceiling',
+      'Let the weight slowly lower the forearm back toward the floor beside your head',
+      'Relax and let it hang without forcing it, then switch sides',
+    ],
+    photo: require('@/assets/images/exercises/lying-external-rotation-stretch.png'),
+    animation: LYING_EXTERNAL_ROTATION_STRETCH,
     twoSided: true,
   },
 ];

@@ -5,6 +5,7 @@ import { MARCHING_EXERCISE } from '@/data/test-warmup';
 import {
   BONES,
   clipDuration,
+  DUMBBELL,
   figureViewBox,
   FINGER,
   keyframeTime,
@@ -85,6 +86,23 @@ describe('poseAt', () => {
     expect(poseAt({ ...clip, keyframes }, 500).nearFoot[1]).toBeCloseTo(400);
     const stepped = keyframes.map((k) => ({ ...k, step: true }));
     expect(poseAt({ ...clip, keyframes: stepped }, 500).nearFoot[1]).toBeLessThan(400);
+  });
+});
+
+describe('dumbbells', () => {
+  const stand = animated[0].animation.keyframes[0].pose;
+  const clip: FigureClip = { view: 'side', stillFrame: 0, keyframes: [{ ms: 0, pose: stand }] };
+
+  it('draws nothing for a clip without them', () => {
+    expect(solveFigure(stand, clip).dumbbellHandles).toBe('');
+  });
+
+  it('keeps the handle at the clip angle, centered on the grip', () => {
+    const paths = solveFigure(stand, { ...clip, dumbbells: { hands: ['nearHand'], angle: 0 } });
+    const [start, end] = pathPoints(paths.dumbbellHandles);
+    expect(end[1]).toBeCloseTo(start[1]);
+    expect(end[0] - start[0]).toBeCloseTo(DUMBBELL.handle);
+    expect(pathPoints(paths.dumbbellPlates)).toHaveLength(4);
   });
 });
 

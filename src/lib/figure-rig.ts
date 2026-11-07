@@ -107,6 +107,8 @@ export type FigureClip = {
   outlineNearArm?: boolean;
   /** A band held in this hand and looped around this foot. */
   band?: readonly [hand: 'nearHand' | 'farHand', foot: 'nearFoot' | 'farFoot'];
+  /** Light dumbbells held in these hands, with the handle kept at this angle on screen however the hand turns. */
+  dumbbells?: { hands: readonly ('nearHand' | 'farHand')[]; angle: number };
   scenery?: readonly Scenery[];
 };
 
@@ -132,6 +134,9 @@ export type FigurePaths = {
   headY: number;
   /** Empty when the clip has no band. */
   band: string;
+  /** The handles and the plates on their ends, drawn thicker. Empty when the clip has no dumbbells. */
+  dumbbellHandles: string;
+  dumbbellPlates: string;
 };
 
 type Timed = { keyframes: readonly { ms: number }[] };
@@ -179,6 +184,9 @@ export function limbRoots(pose: Pose, clip: FigureClip) {
 
 /** How far each side of a band's loop sits from the ankle, and runs on past it. */
 const BAND_WRAP = 10;
+
+/** A dumbbell's handle length, and how long each plate is along it. */
+export const DUMBBELL = { handle: 44, plate: 8 };
 
 /** How high a step lifts, as a fraction of how far it travels. */
 const STEP_HEIGHT = 0.2;
@@ -388,6 +396,25 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
       `M${hand[0]} ${hand[1]}L${endX + uy * BAND_WRAP} ${endY - ux * BAND_WRAP}`;
   }
 
+  // The handle runs through the fist, halfway along the hand, with a plate on each end.
+  let dumbbellHandles = '';
+  let dumbbellPlates = '';
+  if (clip.dumbbells) {
+    const { angle } = clip.dumbbells;
+    for (const side of clip.dumbbells.hands) {
+      const hand = pose[side];
+      const grip = along([hand[0], hand[1]], hand[2], BONES.hand / 2);
+      const start = along(grip, angle + 180, DUMBBELL.handle / 2);
+      const end = along(grip, angle, DUMBBELL.handle / 2);
+      dumbbellHandles += `M${start[0]} ${start[1]}L${end[0]} ${end[1]}`;
+      for (const plate of [start, end]) {
+        const from = along(plate, angle + 180, DUMBBELL.plate / 2);
+        const to = along(plate, angle, DUMBBELL.plate / 2);
+        dumbbellPlates += `M${from[0]} ${from[1]}L${to[0]} ${to[1]}`;
+      }
+    }
+  }
+
   const girdles = clip.widths
     ? `M${nearShoulder[0]} ${nearShoulder[1]}L${farShoulder[0]} ${farShoulder[1]}M${nearHip[0]} ${nearHip[1]}L${farHip[0]} ${farHip[1]}`
     : '';
@@ -402,6 +429,8 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
     headX: head[0],
     headY: head[1],
     band,
+    dumbbellHandles,
+    dumbbellPlates,
   };
 }
 

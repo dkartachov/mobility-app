@@ -850,31 +850,6 @@ export const NINETY_TO_NINETY_ROTATIONS: FigureClip = {
   ],
 };
 
-// --- Shoulder circles: a straight arm drawing a full circle, each way, with the body still ---
-
-const circleAt = (degrees: number): Pose => ({ ...STANDING_TALL, nearHand: armAt(STANDING_SHOULDER, degrees) });
-const CIRCLE_DOWN = circleAt(90);
-
-export const SHOULDER_CIRCLES: FigureClip = {
-  view: 'side',
-  straightArms: true,
-  zoom: 0.8,
-  stillFrame: 3,
-  keyframes: [
-    { ms: 0, pose: CIRCLE_DOWN },
-    { ms: 1800, pose: circleAt(0), swing: true, ease: 'in' },
-    { ms: 900, pose: circleAt(-90), swing: true, ease: 'none' },
-    { ms: 900, pose: circleAt(180), swing: true, ease: 'none' },
-    { ms: 1800, pose: CIRCLE_DOWN, swing: true, ease: 'out' },
-    { ms: 300, pose: CIRCLE_DOWN },
-    { ms: 1800, pose: circleAt(180), swing: true, ease: 'in' },
-    { ms: 900, pose: circleAt(-90), swing: true, ease: 'none' },
-    { ms: 900, pose: circleAt(0), swing: true, ease: 'none' },
-    { ms: 1800, pose: CIRCLE_DOWN, swing: true, ease: 'out' },
-    { ms: 300, pose: CIRCLE_DOWN },
-  ],
-};
-
 // --- Shoulder pass-throughs: from the side, where both straight arms' whole arc over the head shows ---
 
 const passAt = (degrees: number): Pose => ({
@@ -2672,12 +2647,6 @@ export const KNEELING_WRIST_STRETCH: FigureClip = {
   ...intoHold(FINGERS_BACK, [{ ms: 1800, pose: { ...FINGERS_BACK, hip: [358, 363], torso: 24, neck: 25 } }]),
 };
 
-/** The same, on the backs of the hands, so it leans back less. */
-export const REVERSE_PRAYER: FigureClip = {
-  view: 'side',
-  ...intoHold(FINGERS_BACK, [{ ms: 1800, pose: { ...FINGERS_BACK, hip: [372, 362], torso: 24, neck: 22 } }]),
-};
-
 // --- Manual forearm stretches: one arm held out straight, the other hand bending its wrist down ---
 
 const FOREARM_CAMERA = { view: 'side', zoom: 1.5, focus: [560, 180] } satisfies Partial<FigureClip>;
@@ -2700,4 +2669,110 @@ export const MANUAL_FLEXOR_FOREARM_STRETCH: FigureClip = {
     { ms: 1200, pose: FOREARM_REACH, swing: true },
     { ms: 1200, pose: { ...FOREARM_REACH, nearHand: [628, 138, -110], farHand: [622, 165, 160] } },
   ]),
+};
+
+// ===== Shoulder rotation, some of it with light dumbbells =====
+
+// --- Cuban rotation: from the front, the elbows lift out to shoulder height, then the forearms turn from down to up ---
+
+const CUBAN_ELBOWS: readonly [Point, Point] = [
+  [377, 134],
+  [583, 134],
+];
+/** Arms hanging a little away from the sides, so the dumbbells don't overlap in front of the hips. */
+const CUBAN_HANGING: Pose = {
+  ...ARMS_HANGING,
+  nearHand: [438, 284, -90],
+  farHand: [524, 284, -90],
+  elbows: [
+    [445, 209],
+    [515, 209],
+  ],
+};
+const CUBAN_ROW: Pose ={ ...STANDING_FRONT, nearHand: [377, 209, -90], farHand: [583, 209, -90], elbows: CUBAN_ELBOWS };
+/** Halfway round, the forearms point at the camera, so they look short. Each hand turns out the way it's going. */
+const CUBAN_TURNING: Pose = { ...CUBAN_ROW, nearHand: [377, 146, -180], farHand: [583, 146, 0] };
+const CUBAN_UP: Pose = { ...CUBAN_ROW, nearHand: [377, 59, -270], farHand: [583, 59, 90] };
+
+export const CUBAN_ROTATION: FigureClip = {
+  ...STANDING_FRONT_CLIP,
+  zoom: 1.2,
+  focus: [480, 170],
+  dumbbells: { hands: ['nearHand', 'farHand'], angle: 0 },
+  stillFrame: 4,
+  keyframes: [
+    { ms: 0, pose: CUBAN_HANGING },
+    { ms: 400, pose: CUBAN_HANGING },
+    { ms: 1200, pose: CUBAN_ROW },
+    { ms: 700, pose: CUBAN_TURNING, ease: 'in' },
+    { ms: 700, pose: CUBAN_UP, ease: 'out' },
+    { ms: 600, pose: CUBAN_UP },
+    { ms: 700, pose: CUBAN_TURNING, ease: 'in' },
+    { ms: 700, pose: CUBAN_ROW, ease: 'out' },
+    { ms: 1200, pose: CUBAN_HANGING },
+  ],
+};
+
+// --- Side-lying external rotation: lying on the side, facing the camera, the top forearm turns up from the floor ---
+
+/** Head to the right, resting on the bottom arm stretched out along the floor. The legs lie straight and stacked. */
+const SIDE_LYING_BASE = {
+  hip: [380, 440],
+  torso: 0,
+  arch: 0,
+  neck: 0,
+  farHand: [655, 458, 0],
+  nearFoot: [180.1, 426, 180],
+  farFoot: [180.1, 454, 180],
+} satisfies Partial<Pose>;
+
+/** The top elbow stays tucked against the side. Pointing at the camera across the belly, the forearm looks short. */
+const SIDE_LYING_IN: Pose = {
+  ...SIDE_LYING_BASE,
+  nearHand: [430, 440, -90],
+  elbows: [
+    [430, 422],
+    [580, 458],
+  ],
+};
+const SIDE_LYING_UP: Pose = { ...SIDE_LYING_IN, nearHand: [430, 347, 90] };
+
+export const SIDE_LYING_EXTERNAL_ROTATION: FigureClip = {
+  view: 'side',
+  widths: { shoulder: 18, hip: 14 },
+  zoom: 1.3,
+  focus: [420, 380],
+  // Running along the body, from the hips toward the head.
+  dumbbells: { hands: ['nearHand'], angle: 0 },
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SIDE_LYING_IN },
+    { ms: 400, pose: SIDE_LYING_IN },
+    { ms: 1600, pose: SIDE_LYING_UP },
+    { ms: 600, pose: SIDE_LYING_UP },
+    { ms: 1800, pose: SIDE_LYING_IN },
+  ],
+};
+
+// --- Lying external rotation stretch: from above, on the back, the bent arm lowers from pointing up to the floor by the head ---
+
+/** The near elbow out on the floor at shoulder height, the far arm resting by the side. */
+const LYING_ER_UP: Pose = {
+  ...ANGEL_BASE,
+  // Pointing at the ceiling, the forearm looks short from above.
+  nearHand: [525, 172, 0],
+  farHand: [445, 300, 180],
+  elbows: [
+    [515, 175],
+    [480, 296],
+  ],
+};
+const LYING_ER_DOWN: Pose = { ...LYING_ER_UP, nearHand: [590, 175, 0] };
+
+export const LYING_EXTERNAL_ROTATION_STRETCH: FigureClip = {
+  view: 'above',
+  widths: { shoulder: 20, hip: 14 },
+  // Running across the body, parallel to the shoulders.
+  dumbbells: { hands: ['nearHand'], angle: 90 },
+  ...intoHold(LYING_ER_UP, [{ ms: 1800, pose: LYING_ER_DOWN }]),
 };

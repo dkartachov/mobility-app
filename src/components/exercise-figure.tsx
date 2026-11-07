@@ -31,7 +31,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // The same fixed palette as the exercise photos, which don't change with the theme either.
-const COLORS = { background: '#E3EEEC', ground: '#D8E6E3', mat: '#D0E6E2', near: '#0F8F82', far: '#7DC4BA', band: '#D9443B', scenery: '#BCD3CF' };
+const COLORS = { background: '#E3EEEC', ground: '#D8E6E3', mat: '#D0E6E2', near: '#0F8F82', far: '#7DC4BA', band: '#D9443B', scenery: '#BCD3CF', weight: '#3E4F4C' };
 
 const VIEW_BOX = `0 0 ${SCENE.width} ${SCENE.height}`;
 const HEAD_RADIUS = 30;
@@ -74,6 +74,8 @@ export function ExerciseFigure({ clip, playing = true }: { clip: FigureClip; pla
   const neck = useAnimatedProps(() => ({ d: figure.get().neck }));
   const head = useAnimatedProps(() => ({ cx: figure.get().headX, cy: figure.get().headY }));
   const band = useAnimatedProps(() => ({ d: figure.get().band }));
+  const dumbbellHandles = useAnimatedProps(() => ({ d: figure.get().dumbbellHandles }));
+  const dumbbellPlates = useAnimatedProps(() => ({ d: figure.get().dumbbellPlates }));
 
   return (
     <View accessible accessibilityRole="image" accessibilityLabel="Animated demonstration" style={styles.scene}>
@@ -105,6 +107,12 @@ export function ExerciseFigure({ clip, playing = true }: { clip: FigureClip; pla
           )}
           <AnimatedPath animatedProps={nearArm} stroke={COLORS.near} strokeWidth={22} {...LIMB} />
           {clip.band && <AnimatedPath animatedProps={band} stroke={COLORS.band} strokeWidth={10} {...LIMB} />}
+          {clip.dumbbells && (
+            <>
+              <AnimatedPath animatedProps={dumbbellHandles} stroke={COLORS.weight} strokeWidth={8} {...LIMB} />
+              <AnimatedPath animatedProps={dumbbellPlates} stroke={COLORS.weight} strokeWidth={28} {...LIMB} />
+            </>
+          )}
         </Svg>
       </Animated.View>
     </View>
