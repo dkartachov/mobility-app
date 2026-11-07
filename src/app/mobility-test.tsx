@@ -9,6 +9,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { showDialog } from '@/components/dialog';
 import { ExerciseVideo } from '@/components/exercise-video';
+import { FocusAreas } from '@/components/focus-areas';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
 import { PageHeader } from '@/components/page-header';
@@ -24,7 +25,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WorkoutPlayer } from '@/components/workout-player';
 import { Spacing } from '@/constants/theme';
-import { SCORE_AREAS, SCORE_BAND_LABELS, scoreBand } from '@/data/mobility-score';
+import { focusAreas, SCORE_AREAS, SCORE_BAND_LABELS, scoreBand } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS, METHOD_UNITS, SIDE_LABELS, TEST_STEPS } from '@/data/mobility-tests';
 import {
   TEST_WARMUP,
@@ -381,6 +382,7 @@ function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => vo
   const score = saveFailed ? null : loaded;
   const overall = score?.overall ?? null;
   const overallChange = score?.changes?.overall ?? null;
+  const focus = score ? focusAreas(score.areas) : [];
 
   return (
     <ThemedView style={[styles.screen, { paddingTop: insets.top }]}>
@@ -412,6 +414,15 @@ function Results({ saveFailed, onDone }: { saveFailed: boolean; onDone: () => vo
               />
               <ScoreBars scores={score.areas} changes={score.changes?.areas} delayMs={ANIMATION_DELAY_MS} />
             </Card>
+            {focus.length > 0 && (
+              <Card style={styles.introCard}>
+                <CardTitle icon={{ ios: 'scope', android: 'track_changes' }} title="Focus areas" />
+                <FocusAreas areas={focus} scores={score.areas} />
+                <ThemedText type="small" themeColor="textSecondary">
+                  Your lowest scoring areas. The Focus routine now targets these.
+                </ThemedText>
+              </Card>
+            )}
             <ScoreBreakdown score={score} />
           </>
         )}
