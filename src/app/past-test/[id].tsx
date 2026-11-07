@@ -61,7 +61,7 @@ export default function PastTestScreen() {
 
         <View style={styles.breakdown}>
           <SectionHeader title="Breakdown" />
-          <ScoreBreakdown score={test} />
+          <ScoreBreakdown score={test} testId={test.id} />
         </View>
       </ScrollView>
     </ThemedView>

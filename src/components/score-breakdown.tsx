@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { interpolateColor } from 'react-native-reanimated';
 
@@ -7,36 +8,52 @@ import { FLEXIBILITY_TESTS, type FlexibilityTest } from '@/data/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 
 import { Card } from './card';
+import { Icon } from './icon';
+import { PressableScale } from './pressable-scale';
 import { ThemedText } from './themed-text';
 
 const BAR_HEIGHT = 6;
 const COLORS = [...SCORE_COLORS];
 
-/** A card per score area, listing the score of each movement in it and of each side. */
-export function ScoreBreakdown({ score }: { score: MobilityScore }) {
+/**
+ * A card per score area, listing the score of each movement in it and of each side. Tapping a card
+ * opens the area's measurements and how they compare. `testId` picks a past test, else the latest.
+ */
+export function ScoreBreakdown({ score, testId }: { score: MobilityScore; testId?: number }) {
   return (
     <View style={styles.list}>
       {SCORE_AREAS.map(({ id, label }) => {
         const areaScore = score.areas[id];
         return (
-          <Card key={id}>
-            <View style={styles.row}>
-              <ThemedText type="smallBold" style={styles.label}>
-                {label}
-              </ThemedText>
-              <ThemedText
-                type="smallBold"
-                themeColor={areaScore === null ? 'textSecondary' : 'text'}
-                style={styles.score}>
-                {areaScore === null ? '—' : Math.round(areaScore)}
-              </ThemedText>
-            </View>
-            {FLEXIBILITY_TESTS.filter((test) => test.area === id).map((test) => (
-              <MovementRow key={test.id} test={test} score={score.tests[test.id]} />
-            ))}
-          </Card>
+          <PressableScale
+            key={id}
+            accessibilityRole="button"
+            accessibilityLabel={`${label}: ${areaScore === null ? 'no score' : Math.round(areaScore)}. See measurements`}
+            onPress={() => router.push({ pathname: '/score-area/[area]', params: { area: id, testId } })}
+            pressedScale={0.98}>
+            <Card>
+              <AreaHeader label={label} score={areaScore} />
+              {FLEXIBILITY_TESTS.filter((test) => test.area === id).map((test) => (
+                <MovementRow key={test.id} test={test} score={score.tests[test.id]} />
+              ))}
+            </Card>
+          </PressableScale>
         );
       })}
+    </View>
+  );
+}
+
+function AreaHeader({ label, score }: { label: string; score: number | null }) {
+  return (
+    <View style={styles.row}>
+      <ThemedText type="smallBold" style={styles.label}>
+        {label}
+      </ThemedText>
+      <ThemedText type="smallBold" themeColor={score === null ? 'textSecondary' : 'text'} style={styles.score}>
+        {score === null ? '—' : Math.round(score)}
+      </ThemedText>
+      <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={14} />
     </View>
   );
 }

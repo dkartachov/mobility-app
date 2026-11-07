@@ -109,6 +109,7 @@ function RootNavigator() {
             <Stack.Screen name="mobility-time" />
             <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
             <Stack.Screen name="past-test/[id]" />
+            <Stack.Screen name="score-area/[area]" />
             <Stack.Screen name="score-info" options={{ presentation: 'modal' }} />
             <Stack.Screen name="settings" />
             <Stack.Screen name="sign-in" />

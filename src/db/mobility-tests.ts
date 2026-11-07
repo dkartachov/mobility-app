@@ -99,6 +99,8 @@ export type PastTest = ScoreWithBaseline & {
   id: number;
   /** The day it was taken. */
   date: DateKey;
+  /** Who the test was compared with: the profile's sex and the age on that day. */
+  demographics: Demographics;
 };
 
 /**
@@ -107,9 +109,9 @@ export type PastTest = ScoreWithBaseline & {
  */
 export async function getTestHistory(db: SQLiteDatabase): Promise<PastTest[]> {
   const tests = await scoredTests(db);
-  return tests.map(({ id, date, score }, i) => {
+  return tests.map(({ id, date, demographics, score }, i) => {
     const before = tests[i + 1]?.score ?? null;
-    return { ...score, id, date, previous: before, changes: before ? compareScores(score, before) : null };
+    return { ...score, id, date, demographics, previous: before, changes: before ? compareScores(score, before) : null };
   });
 }
 
@@ -144,6 +146,6 @@ async function scoredTests(db: SQLiteDatabase, limit = -1) {
       results.filter((r) => r.testId === test.id),
       demographics
     );
-    return { id: test.id, date: test.local_date, score };
+    return { id: test.id, date: test.local_date, demographics, score };
   });
 }

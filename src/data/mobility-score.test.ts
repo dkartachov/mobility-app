@@ -152,8 +152,17 @@ describe('mobilityScore', () => {
       score: expect.closeTo(50),
       error: expect.any(Number),
       sides: { left: expect.closeTo(15.87, 2), right: expect.closeTo(84.13, 2) },
+      results: [
+        { side: 'left', value: 7.4, unit: 'cm' },
+        { side: 'right', value: 14.6, unit: 'cm' },
+      ],
     });
-    expect(score.tests['sit-and-reach']).toEqual({ score: expect.closeTo(50), error: expect.any(Number), sides: {} });
+    expect(score.tests['sit-and-reach']).toEqual({
+      score: expect.closeTo(50),
+      error: expect.any(Number),
+      sides: {},
+      results: [{ side: null, value: -1.5, unit: 'cm' }],
+    });
     expect(score.tests['knee-to-chest']).toBeUndefined();
   });
 

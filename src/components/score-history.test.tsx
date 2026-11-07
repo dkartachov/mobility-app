@@ -21,13 +21,21 @@ const TESTS: PastTest[] = [
     ...score(72, null),
     id: 3,
     date: '2026-10-01',
+    demographics: { sex: null, age: null },
     previous: score(60, 40),
     changes: {
       overall: { points: 12, real: true, noise: 4 },
       areas: { shoulders: null, hips: null, hamstrings: null, ankles: null },
     },
   },
-  { ...score(60, 40), id: 1, date: '2026-09-01', previous: null, changes: null },
+  {
+    ...score(60, 40),
+    id: 1,
+    date: '2026-09-01',
+    demographics: { sex: null, age: null },
+    previous: null,
+    changes: null,
+  },
 ];
 
 describe('ScoreHistory', () => {

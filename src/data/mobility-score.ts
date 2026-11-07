@@ -29,7 +29,13 @@ export const NO_AREA_SCORES = Object.fromEntries(SCORE_AREAS.map(({ id }) => [id
  * 0–100 for one flexibility test, and for each side of a two-sided one. `error` is how far
  * measurement error alone typically moves the score, in score points (its standard error).
  */
-export type TestScore = { score: number; error: number; sides: Partial<Record<Side, number>> };
+export type TestScore = {
+  score: number;
+  error: number;
+  sides: Partial<Record<Side, number>>;
+  /** The measurements behind the score, as taken, in the test's unit. */
+  results: { side: Side | null; value: number; unit: Unit }[];
+};
 
 export type MobilityScore = {
   areas: AreaScores;
@@ -127,6 +133,34 @@ export function scoreBand(score: number): ScoreBand {
   return SCORE_BANDS.find(([from]) => score >= from)![1];
 }
 
+/** The result a percentile of a standard normal distribution falls at, by bisection on `normalCdf`. */
+export function normalQuantile(p: number) {
+  let low = -10;
+  let high = 10;
+  for (let i = 0; i < 60; i++) {
+    const mid = (low + high) / 2;
+    if (normalCdf(mid) < p) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
+}
+
+/**
+ * The results each band covers for someone of `demographics`, in the test's units, lowest band
+ * first. Every test scores higher results better, so each band runs from its lower edge up to the
+ * next band's. The bottom and top bands are open-ended.
+ */
+export function bandRanges(test: FlexibilityTest, demographics: Demographics): { band: ScoreBand; min: number; max: number }[] {
+  const { mean, sd } = normAt(test.norm, demographics);
+  const valueAt = (score: number) => mean + sd * normalQuantile(score / 100);
+  const ascending = [...SCORE_BANDS].reverse();
+  return ascending.map(([from, band], i) => ({
+    band,
+    min: i === 0 ? -Infinity : valueAt(from),
+    max: i === ascending.length - 1 ? Infinity : valueAt(ascending[i + 1][0]),
+  }));
+}
+
 /**
  * Scores one flexibility test's results against people of `demographics`. Each side is scored on
  * its own, each test scores the average of its sides, and each area the average of its tests.
@@ -137,13 +171,12 @@ export function mobilityScore(results: ScoredResult[], demographics: Demographic
   const tests: Partial<Record<string, TestScore>> = {};
   const byArea = new Map<ScoreArea, TestScore[]>();
   for (const test of FLEXIBILITY_TESTS) {
-    const scored = results
-      .filter((r) => r.exerciseId === test.id && r.unit === METHOD_UNITS[test.method.kind])
-      .map((r) => ({
-        side: r.side,
-        score: scoreResult(r.value, test.norm, demographics),
-        error: scoreError(r.value, test, demographics),
-      }));
+    const measured = results.filter((r) => r.exerciseId === test.id && r.unit === METHOD_UNITS[test.method.kind]);
+    const scored = measured.map((r) => ({
+      side: r.side,
+      score: scoreResult(r.value, test.norm, demographics),
+      error: scoreError(r.value, test, demographics),
+    }));
     const score = average(scored.map((r) => r.score));
     if (score === null) continue;
     const sides: TestScore['sides'] = {};
@@ -151,7 +184,12 @@ export function mobilityScore(results: ScoredResult[], demographics: Demographic
       const sideScore = average(scored.filter((r) => r.side === side).map((r) => r.score));
       if (sideScore !== null) sides[side] = sideScore;
     }
-    const testScore = { score, error: averageError(scored.map((r) => r.error))!, sides };
+    const testScore: TestScore = {
+      score,
+      error: averageError(scored.map((r) => r.error))!,
+      sides,
+      results: measured.map(({ side, value, unit }) => ({ side, value, unit })),
+    };
     tests[test.id] = testScore;
     byArea.set(test.area, [...(byArea.get(test.area) ?? []), testScore]);
   }
