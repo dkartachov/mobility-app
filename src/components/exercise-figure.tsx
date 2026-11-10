@@ -9,8 +9,10 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnUI } from 'react-native-worklets';
 import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
 
 import {
@@ -39,28 +41,36 @@ const HEAD_RADIUS = 30;
 /**
  * Loops a clip's time for as long as it's on screen, or holds its key pose if reduced motion is on.
  * While not `playing` it waits on its first frame, and starts from the beginning once it is.
+ * While `paused` it freezes where it is, and carries on from that frame once it isn't.
  */
-function useClipTime(clip: FigureClip | HandClip, playing: boolean) {
+function useClipTime(clip: FigureClip | HandClip, playing: boolean, paused: boolean) {
   const reducedMotion = useReducedMotion();
   const time = useSharedValue(keyframeTime(clip, clip.stillFrame));
 
   useEffect(() => {
-    if (reducedMotion) {
-      time.set(keyframeTime(clip, clip.stillFrame));
-      return;
-    }
-    time.set(0);
-    if (!playing) return;
-    const duration = clipDuration(clip);
-    time.set(withRepeat(withTiming(duration, { duration, easing: Easing.linear }), -1, false));
-    return () => cancelAnimation(time);
+    time.set(reducedMotion ? keyframeTime(clip, clip.stillFrame) : 0);
   }, [clip, playing, reducedMotion, time]);
+
+  useEffect(() => {
+    if (reducedMotion || !playing || paused) return;
+    const duration = clipDuration(clip);
+    const easing = Easing.linear;
+    // Runs on the UI thread, after the reset above, so it reads the frame a pause stopped on.
+    scheduleOnUI(() => {
+      const from = time.get() % duration;
+      const loop = withRepeat(withSequence(withTiming(0, { duration: 0 }), withTiming(duration, { duration, easing })), -1, false);
+      time.set(from === 0 ? loop : withSequence(withTiming(duration, { duration: duration - from, easing }), loop));
+    });
+    return () => cancelAnimation(time);
+  }, [clip, playing, paused, reducedMotion, time]);
 
   return time;
 }
 
-export function ExerciseFigure({ clip, playing = true }: { clip: FigureClip; playing?: boolean }) {
-  const time = useClipTime(clip, playing);
+type PlaybackProps = { playing?: boolean; paused?: boolean };
+
+export function ExerciseFigure({ clip, playing = true, paused = false }: { clip: FigureClip } & PlaybackProps) {
+  const time = useClipTime(clip, playing, paused);
   const viewBox = figureViewBox(clip);
 
   const figure = useDerivedValue(() => solveFigure(poseAt(clip, time.get()), clip));
@@ -120,8 +130,8 @@ export function ExerciseFigure({ clip, playing = true }: { clip: FigureClip; pla
 }
 
 /** A single finger up close, as this exercise is all in the hand. */
-export function ExerciseHand({ clip, playing = true }: { clip: HandClip; playing?: boolean }) {
-  const time = useClipTime(clip, playing);
+export function ExerciseHand({ clip, playing = true, paused = false }: { clip: HandClip } & PlaybackProps) {
+  const time = useClipTime(clip, playing, paused);
   const finger = useAnimatedProps(() => ({ d: solveFinger(clip, time.get()) }));
   const [wristX, wristY] = FINGER.wrist;
   const [knuckleX, knuckleY] = FINGER.knuckle;

@@ -11,23 +11,26 @@ import { ThemedText } from './themed-text';
  * The exercise's looping figure animation if it has one, then its photo, otherwise a "coming soon"
  * panel. Once videos exist, swap this for an autoplaying, looping `VideoView` from `expo-video`.
  * While not `playing`, the animation waits on its first frame, and plays from the start once it is.
+ * While `paused`, it freezes on its current frame and carries on from there once it isn't.
  */
 export function ExerciseVideo({
   photo,
   animation,
   playing = true,
+  paused = false,
 }: {
   photo?: ImageSource;
   animation?: ExerciseAnimation;
   playing?: boolean;
+  paused?: boolean;
 }) {
   if (animation) {
     return (
       <View style={styles.video}>
         {animation.view === 'hand' ? (
-          <ExerciseHand clip={animation} playing={playing} />
+          <ExerciseHand clip={animation} playing={playing} paused={paused} />
         ) : (
-          <ExerciseFigure clip={animation} playing={playing} />
+          <ExerciseFigure clip={animation} playing={playing} paused={paused} />
         )}
       </View>
     );

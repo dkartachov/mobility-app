@@ -134,7 +134,7 @@ export function WorkoutPlayer({
       <View>
         {/* Fades in each new exercise, rather than snapping to it; the second side is the same exercise, so it stays. */}
         <Animated.View key={step.exercise.id} entering={FadeIn.duration(CHANGE_MS)}>
-          <ExerciseVideo photo={step.exercise.photo} animation={step.exercise.animation} />
+          <ExerciseVideo photo={step.exercise.photo} animation={step.exercise.animation} paused={state.paused || onTimeout} />
         </Animated.View>
         {/* Dims slightly while getting ready, so it's clear the hold hasn't started. */}
         <Animated.View pointerEvents="none" style={[cssStyles.dim, { opacity: gettingReady ? 1 : 0 }]} />
