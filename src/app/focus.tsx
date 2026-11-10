@@ -12,7 +12,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimePicker } from '@/components/time-picker';
 import { Spacing } from '@/constants/theme';
-import { focusAreas } from '@/data/mobility-score';
+import { focusAreas, focusTests } from '@/data/mobility-score';
+import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { useMobilityScore } from '@/db/mobility-tests';
 import { DAILY_MINUTES } from '@/lib/workout';
 
@@ -21,6 +22,11 @@ export default function FocusScreen() {
   const [minutes, setMinutes] = useState<number | null>(null);
   const score = useMobilityScore();
   const areas = score ? focusAreas(score.areas) : [];
+  // The weakest movement in each focus area, which the routine always includes exercises for.
+  const tests = score ? focusTests(score.tests, areas) : [];
+  const movements = Object.fromEntries(
+    FLEXIBILITY_TESTS.filter((test) => tests.includes(test.id)).map((test) => [test.area, test.movement])
+  );
 
   return (
     <ThemedView style={styles.screen}>
@@ -41,14 +47,15 @@ export default function FocusScreen() {
           ) : (
             score && (
               <Card>
-                <FocusAreas areas={areas} scores={score.areas} />
+                <FocusAreas areas={areas} scores={score.areas} movements={movements} />
               </Card>
             )
           )}
         </View>
         {areas.length > 0 && (
           <ThemedText type="small" themeColor="textSecondary">
-            Your lowest scoring areas from your last test. Most exercises work on them, with a few others for variety.
+            Your lowest scoring areas from your last test, with the weakest movement in each. Most exercises work on them,
+            with a few others for variety.
           </ThemedText>
         )}
       </ScrollView>
@@ -61,7 +68,7 @@ export default function FocusScreen() {
           onPress={() =>
             router.push({
               pathname: '/workout',
-              params: { minutes: minutes ?? DAILY_MINUTES[0], routine: 'focus', areas: areas.join(',') },
+              params: { minutes: minutes ?? DAILY_MINUTES[0], routine: 'focus', areas: areas.join(','), tests: tests.join(',') },
             })
           }
         />

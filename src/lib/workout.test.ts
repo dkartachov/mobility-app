@@ -7,6 +7,7 @@ import {
   type ExerciseType,
   type Position,
 } from '@/data/exercises';
+import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 
 import {
   buildFocusWorkout,
@@ -206,6 +207,53 @@ describe('buildFocusWorkout', () => {
       const exercises = exercisesInOrder(buildFocusWorkout(22, AREAS));
       exercises.slice(1).forEach((exercise, index) => expect(exercise).not.toBe(exercises[index]));
     }
+  });
+
+  describe('with the weakest test in each area', () => {
+    const TESTS = ['hip-internal-rotation', 'shoulder-external-rotation'];
+    const trains = (test: string) => (step: WorkoutStep) => !!step.exercise.trains?.includes(test);
+
+    it.each(DAILY_MINUTES)('always has exercises for each of them in %i minutes', (minutes) => {
+      for (let i = 0; i < RUNS; i++) {
+        const steps = buildFocusWorkout(minutes, AREAS, TESTS);
+        for (const test of TESTS) expect(steps.some(trains(test))).toBe(true);
+      }
+    });
+
+    it.each(DAILY_MINUTES)('still fills exactly %i minutes, mostly on the focus areas', (minutes) => {
+      for (let i = 0; i < RUNS; i++) {
+        const steps = buildFocusWorkout(minutes, AREAS, TESTS);
+        expect(totalMinutes(steps)).toBe(minutes);
+        expect(totalMinutes(steps.filter(targets))).toBeGreaterThanOrEqual(minutes * 0.75);
+      }
+    });
+
+    it('leaves time for the rest of each area', () => {
+      for (let i = 0; i < RUNS; i++) {
+        const steps = buildFocusWorkout(22, AREAS, TESTS);
+        expect(steps.some((step) => targets(step) && !TESTS.some((test) => trains(test)(step)))).toBe(true);
+      }
+    });
+
+    it.each(FLEXIBILITY_TESTS.map((test) => [test.id, test.area] as const))(
+      'fills the time exactly when %s is the weakest',
+      (test, area) => {
+        for (const minutes of DAILY_MINUTES) {
+          for (let i = 0; i < 50; i++) {
+            const steps = buildFocusWorkout(minutes, [area], [test]);
+            expect(totalMinutes(steps)).toBe(minutes);
+            expect(steps.some(trains(test))).toBe(true);
+          }
+        }
+      }
+    );
+
+    it('falls back to the area when nothing trains the test', () => {
+      const library = EXERCISES.map((exercise) => ({ ...exercise, trains: undefined }));
+      const steps = buildFocusWorkout(15, AREAS, TESTS, library);
+      expect(totalMinutes(steps)).toBe(15);
+      expect(totalMinutes(steps.filter(targets))).toBeGreaterThanOrEqual(15 * 0.75);
+    });
   });
 
   it('is a plain workout without focus areas', () => {

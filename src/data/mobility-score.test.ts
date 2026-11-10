@@ -2,6 +2,7 @@ import {
   compareScores,
   explainNoRealChange,
   focusAreas,
+  focusTests,
   formatScoreChange,
   maxReadingGap,
   mobilityScore,
@@ -29,6 +30,32 @@ const NORM: TestNorm = {
   evidence: 'strong',
 };
 const ANYONE: Demographics = { sex: null, age: null };
+
+describe('focusTests', () => {
+  const scored = (scores: Record<string, number>) =>
+    Object.fromEntries(Object.entries(scores).map(([id, score]) => [id, { score, error: 0, sides: {}, results: [] }]));
+
+  it('picks the lowest scoring test in each area, in the order of the areas', () => {
+    const tests = scored({
+      'hip-internal-rotation': 10,
+      'knee-to-chest': 20,
+      'hip-abduction': 60,
+      'shoulder-external-rotation': 30,
+      'overhead-reach': 50,
+      'knee-to-wall': 5,
+    });
+    expect(focusTests(tests, ['shoulders', 'hips'])).toEqual(['shoulder-external-rotation', 'hip-internal-rotation']);
+  });
+
+  it('leaves out areas without a scored test', () => {
+    expect(focusTests(scored({ 'knee-to-chest': 20 }), ['shoulders', 'hips'])).toEqual(['knee-to-chest']);
+  });
+
+  it('breaks ties in test order', () => {
+    const tests = scored({ 'hip-abduction': 40, 'hip-external-rotation': 40 });
+    expect(focusTests(tests, ['hips'])).toEqual(['hip-external-rotation']);
+  });
+});
 
 describe('focusAreas', () => {
   it('picks the two lowest scoring areas, lowest first', () => {

@@ -17,6 +17,7 @@ import { ThemedView } from '@/components/themed-view';
 import { WorkoutPlayer } from '@/components/workout-player';
 import { Spacing } from '@/constants/theme';
 import { SCORE_AREAS, type ScoreArea } from '@/data/mobility-score';
+import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDuration } from '@/lib/dates';
@@ -54,16 +55,22 @@ function parseAreas(value: string | undefined): ScoreArea[] {
   return ids.filter((id): id is ScoreArea => SCORE_AREAS.some((area) => area.id === id));
 }
 
+/** The tests a focus workout works on most within its areas, skipping any that don't exist. */
+function parseTests(value: string | undefined) {
+  const ids = value?.split(',') ?? [];
+  return ids.filter((id) => FLEXIBILITY_TESTS.some((test) => test.id === id));
+}
+
 export default function WorkoutScreen() {
   const db = useSQLiteContext();
-  const params = useLocalSearchParams<{ minutes: string; routine?: 'focus'; areas?: string }>();
+  const params = useLocalSearchParams<{ minutes: string; routine?: 'focus'; areas?: string; tests?: string }>();
   const totalMinutes = parseMinutes(params.minutes);
   const focus = params.routine === 'focus';
   // Read once: toggling fast mode mid-workout shouldn't change the running workout.
   const [fast] = useState(getFastWorkouts);
   const [steps] = useState(() => {
     const built = focus
-      ? buildFocusWorkout(totalMinutes, parseAreas(params.areas))
+      ? buildFocusWorkout(totalMinutes, parseAreas(params.areas), parseTests(params.tests))
       : buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
     return fast ? built.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : built;
   });

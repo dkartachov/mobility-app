@@ -1,5 +1,6 @@
 import { EXERCISES, getExercise, getExercises, searchExercises } from './exercises';
 import { SCORE_AREAS } from './mobility-score';
+import { FLEXIBILITY_TESTS } from './mobility-tests';
 
 describe('EXERCISES', () => {
   it('has unique ids', () => {
@@ -25,6 +26,22 @@ describe('EXERCISES', () => {
       expect(EXERCISES.filter((e) => e.areas.includes(id)).length).toBeGreaterThanOrEqual(5);
     }
     expect(EXERCISES.some((e) => e.areas.length === 0)).toBe(true);
+  });
+
+  it('only trains flexibility tests that exist, in an area the exercise works', () => {
+    for (const exercise of EXERCISES) {
+      for (const id of exercise.trains ?? []) {
+        const test = FLEXIBILITY_TESTS.find((t) => t.id === id);
+        expect(test).toBeDefined();
+        expect(exercise.areas).toContain(test!.area);
+      }
+    }
+  });
+
+  it('has exercises that train every flexibility test, so focus workouts can target any of them', () => {
+    for (const test of FLEXIBILITY_TESTS) {
+      expect(EXERCISES.filter((e) => e.trains?.includes(test.id)).length).toBeGreaterThanOrEqual(4);
+    }
   });
 
   it('has enough one-sided exercises for workouts to fill odd minutes', () => {

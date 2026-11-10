@@ -64,6 +64,19 @@ export function focusAreas(areas: AreaScores, count = FOCUS_AREA_COUNT): ScoreAr
     .map(({ id }) => id);
 }
 
+/**
+ * The id of the lowest scoring test in each of `areas`, in the same order: the movement focus
+ * workouts work on most within that area. Areas without a scored test are left out, and ties go to
+ * the test listed first in `FLEXIBILITY_TESTS`.
+ */
+export function focusTests(tests: MobilityScore['tests'], areas: readonly ScoreArea[]): string[] {
+  return areas.flatMap((area) => {
+    const scored = FLEXIBILITY_TESTS.filter((test) => test.area === area && tests[test.id]);
+    if (scored.length === 0) return [];
+    return scored.reduce((lowest, test) => (tests[test.id]!.score < tests[lowest.id]!.score ? test : lowest)).id;
+  });
+}
+
 export function scoreAreaLabel(area: ScoreArea) {
   return SCORE_AREAS.find(({ id }) => id === area)!.label;
 }

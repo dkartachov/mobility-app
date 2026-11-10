@@ -1,5 +1,6 @@
 import { EXERCISES, type Exercise } from '@/data/exercises';
 import type { ScoreArea } from '@/data/mobility-score';
+import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 
 import type { WorkoutFilters } from './workout-filters';
 
@@ -80,32 +81,54 @@ export function buildWorkout(minutes: number, library: readonly Exercise[] = EXE
 /** Share of a focus workout's minutes given to exercises for other areas, for variety. */
 export const FOCUS_VARIETY_SHARE = 0.2;
 
+/** Share of each focus area's minutes given to exercises for its weakest movement. */
+export const FOCUS_MOVEMENT_SHARE = 0.5;
+
 /**
  * A workout mostly made of exercises for `areas`: each area gets an even share of the time (the
  * first, lowest scoring, any minute left over), avoiding exercises another area already picked.
- * About `FOCUS_VARIETY_SHARE` of it goes to exercises for none of them. Then it's all shuffled together.
+ * Within an area, about `FOCUS_MOVEMENT_SHARE` of its time, and always at least one exercise, goes
+ * to exercises that train its test in `tests` (its weakest movement), when there are any.
+ * About `FOCUS_VARIETY_SHARE` of the workout goes to exercises for none of the areas. Then it's all
+ * shuffled together.
  */
 export function buildFocusWorkout(
   minutes: number,
   areas: readonly ScoreArea[],
+  tests: readonly string[] = [],
   library: readonly Exercise[] = EXERCISES
 ): WorkoutStep[] {
   if (areas.length === 0) return buildWorkout(minutes, library);
-  const varietyMinutes = Math.round(minutes * FOCUS_VARIETY_SHARE);
-  let focusMinutes = minutes - varietyMinutes;
+  let focusMinutes = minutes - Math.round(minutes * FOCUS_VARIETY_SHARE);
   const used = new Set<Exercise>();
   const parts: WorkoutStep[][] = [];
-  areas.forEach((area, i) => {
-    const share = Math.ceil(focusMinutes / (areas.length - i));
-    focusMinutes -= share;
-    const forArea = library.filter((e) => e.areas.includes(area));
-    const unused = forArea.filter((e) => !used.has(e));
-    const steps = buildWorkout(share, unused.length ? unused : forArea.length ? forArea : library);
+  /** Adds a part of about `partMinutes` and returns how long it came to: a minute over when only two-sided exercises were left for an odd minute. */
+  const build = (partMinutes: number, pool: readonly Exercise[]) => {
+    const steps = buildWorkout(partMinutes, pool);
     steps.forEach((step) => used.add(step.exercise));
     parts.push(steps);
+    return steps.reduce((sum, step) => sum + step.durationSeconds, 0) / 60;
+  };
+  let builtMinutes = 0;
+  areas.forEach((area, i) => {
+    const share = Math.ceil(focusMinutes / (areas.length - i));
+    const forArea = library.filter((e) => e.areas.includes(area));
+    const unused = () => forArea.filter((e) => !used.has(e));
+
+    const areaTests = FLEXIBILITY_TESTS.filter((test) => test.area === area && tests.includes(test.id));
+    const forMovement = unused().filter((e) => areaTests.some((test) => e.trains?.includes(test.id)));
+    let areaMinutes = 0;
+    if (forMovement.length && share > 0) areaMinutes += build(Math.ceil(share * FOCUS_MOVEMENT_SHARE), forMovement);
+    if (share > areaMinutes) {
+      const rest = unused();
+      areaMinutes += build(share - areaMinutes, rest.length ? rest : forArea.length ? forArea : library);
+    }
+    // A part that ran over takes its extra minute from the parts after it, keeping the total exact.
+    focusMinutes -= areaMinutes;
+    builtMinutes += areaMinutes;
   });
   const others = library.filter((e) => !e.areas.some((area) => areas.includes(area)));
-  parts.push(buildWorkout(varietyMinutes, others.length ? others : library));
+  if (minutes > builtMinutes) parts.push(buildWorkout(minutes - builtMinutes, others.length ? others : library));
   return shuffleExercises(parts.flat());
 }
 
