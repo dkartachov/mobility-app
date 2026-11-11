@@ -20,6 +20,8 @@ export const BUFFER_SECONDS = 10;
 /** Dev-only fast mode, so a whole workout can be clicked through in seconds. */
 export const FAST_BUFFER_SECONDS = 1;
 export const FAST_STEP_SECONDS = 5;
+/** How long a timeout lasts with the short timeouts dev switch on, whatever length is set in Settings. */
+export const SHORT_TIMEOUT_SECONDS = 5;
 
 /** 2-minute holds are rarer than 1-minute ones. */
 const TWO_MINUTE_CHANCE = 0.25;

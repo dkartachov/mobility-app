@@ -22,6 +22,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { isBackupConfigured, useBackupState } from '@/lib/backup';
 import { resetInstructions } from '@/lib/instructions';
 import { requestNotificationPermission } from '@/lib/reminders';
+import { setSoundEffectsEnabled, useSoundEffectsEnabled } from '@/lib/sound-preference';
 import { setTestRemindersEnabled, useTestRemindersEnabled } from '@/lib/test-reminder-preference';
 import {
   THEME_PREFERENCES,
@@ -41,6 +42,7 @@ export default function SettingsScreen() {
   const themePreference = useThemePreference();
   const timeoutSeconds = useTimeoutSeconds();
   const testRemindersEnabled = useTestRemindersEnabled();
+  const soundEffectsEnabled = useSoundEffectsEnabled();
   const theme = useTheme();
   const { offline } = useBackupState();
   const { section } = useLocalSearchParams<{ section?: 'reminders' }>();
@@ -106,6 +108,29 @@ export default function SettingsScreen() {
                   onPress={() => setTimeoutSeconds(seconds)}
                 />
               ))}
+            </View>
+          </Card>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="eyebrow" themeColor="textSecondary" accessibilityRole="header">
+            Sound
+          </ThemedText>
+          <Card style={styles.card}>
+            <View style={styles.rowTitle}>
+              <IconBadge name={{ ios: 'speaker.wave.2.fill', android: 'volume_up' }} size={32} />
+              <View style={styles.rowText}>
+                <ThemedText type="smallBold">Sound effects</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Workout and test cues always play
+                </ThemedText>
+              </View>
+              <Switch
+                value={soundEffectsEnabled}
+                onValueChange={setSoundEffectsEnabled}
+                trackColor={{ true: theme.tint, false: theme.backgroundSelected }}
+                accessibilityLabel="Sound effects"
+              />
             </View>
           </Card>
         </View>

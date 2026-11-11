@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { Spacing } from '@/constants/theme';
+import { useSoundEffect } from '@/hooks/use-sound-effect';
 import { badgeLook } from '@/lib/badge-looks';
 
 import { BadgeCoin, useBadgeSpin } from './badge-coin';
@@ -45,12 +46,19 @@ export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
   const scale = useSharedValue(0);
   const burst = useSharedValue(0);
   const reducedMotion = useReducedMotion();
+  // The spin builds up to the landing's chime. They're separate sounds so the chime still lands on
+  // time when the spin is cut short, as it is with reduced motion.
+  const spinSound = useSoundEffect(require('@/assets/sounds/milestone-spin.wav'));
+  const chime = useSoundEffect(require('@/assets/sounds/milestone.wav'));
 
   useEffect(() => {
     const land = () => {
       setLanded(true);
+      spinSound.stop();
+      chime.play();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     };
+    spinSound.play();
     scale.set(withSpring(1, { damping: 14, stiffness: 90 }));
     rotation.set(
       withTiming(SPIN_TURNS * 360, { duration: SPIN_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
@@ -60,7 +68,7 @@ export function MilestoneReveal({ hours, onDone }: MilestoneRevealProps) {
         burst.set(withTiming(1, { duration: BURST_MS, easing: Easing.out(Easing.cubic) }));
       })
     );
-  }, [burst, rotation, scale]);
+  }, [burst, chime, rotation, scale, spinSound]);
 
   // Once landed, it can be dragged round, flung or tapped to spin again.
   const spinner = useBadgeSpin(rotation, scale);

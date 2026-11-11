@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Spacing } from '@/constants/theme';
+import { useSoundEffect } from '@/hooks/use-sound-effect';
 import { useTheme } from '@/hooks/use-theme';
 import { fromDateKey, todayKey, type DateKey } from '@/lib/dates';
 
@@ -89,9 +90,13 @@ function TodayDot({ celebration, delayMs }: { celebration?: Celebration; delayMs
   const glowFade = useSharedValue(start);
   const ripple = useSharedValue(start);
   const burst = useSharedValue(start);
+  const sound = useSoundEffect(require('@/assets/sounds/day-complete.wav'));
 
   useEffect(() => {
     if (!celebrate) return;
+    // Not cancelled on cleanup: the celebration is marked as played the moment it starts, which
+    // re-runs this effect before the sound is due.
+    setTimeout(sound.play, delayMs);
     pop.set(0);
     glowFade.set(0);
     ripple.set(0);
@@ -108,7 +113,7 @@ function TodayDot({ celebration, delayMs }: { celebration?: Celebration; delayMs
     glowFade.set(withDelay(delayMs + 1100, withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) })));
     ripple.set(withDelay(delayMs + 180, withTiming(1, { duration: 1100, easing: Easing.out(Easing.cubic) })));
     burst.set(withDelay(delayMs + 180, withTiming(1, { duration: BURST_MS, easing: Easing.out(Easing.cubic) })));
-  }, [burst, celebrate, delayMs, glowFade, pop, ripple]);
+  }, [burst, celebrate, delayMs, glowFade, pop, ripple, sound]);
 
   // Gone once filled, or its anti-aliased edge shows as a faint rim round the fill.
   const emptyStyle = useAnimatedStyle(() => ({

@@ -130,6 +130,7 @@ export default function WorkoutScreen() {
           steps={steps}
           bufferMs={(fast ? FAST_BUFFER_SECONDS : BUFFER_SECONDS) * 1000}
           completeLabel="Complete workout"
+          celebrate
           onComplete={complete}
           onBack={() => router.back()}
         />

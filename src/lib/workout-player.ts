@@ -51,8 +51,10 @@ export function createPlayerReducer(steps: WorkoutStep[], bufferMs: number, side
         if (state.paused || state.phase === 'finished') return state;
         if (state.timeoutMs !== undefined) {
           const timeoutMs = state.timeoutMs - action.deltaMs;
-          // Only a timeout that runs out dings: you may have walked away, but you know if you ended it yourself.
-          return timeoutMs > 0 ? { ...state, timeoutMs } : { ...state, timeoutMs: undefined, cue: { type: 'done' } };
+          // Only a timeout that runs out makes a sound: you may have walked away, but you know if you ended it yourself.
+          return timeoutMs > 0
+            ? { ...state, timeoutMs }
+            : { ...state, timeoutMs: undefined, cue: { type: 'timeoutOver' } };
         }
         const remainingMs = state.remainingMs - action.deltaMs;
         if (remainingMs > 0) {
@@ -76,7 +78,7 @@ export function createPlayerReducer(steps: WorkoutStep[], bufferMs: number, side
           // Finishing the first side isn't the end of the exercise, so the ding is followed by a voice cue.
           return { ...startStep(state, state.index + 1), cue: { type: next.side === 2 ? 'switchSides' : 'done' } };
         }
-        return { ...state, phase: 'finished', remainingMs: 0, cue: { type: 'done' } };
+        return { ...state, phase: 'finished', remainingMs: 0, cue: { type: 'finished' } };
       }
       case 'pause':
         return { ...state, paused: true };

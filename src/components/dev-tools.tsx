@@ -21,13 +21,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatDuration } from '@/lib/dates';
 import {
   setFastWorkouts,
+  setShortTimeouts,
   setSkipTestMeasurements,
   useFastWorkouts,
+  useShortTimeouts,
   useSkipTestMeasurements,
 } from '@/lib/dev-settings';
 import { milestoneProgress } from '@/lib/milestones';
 import { resetCelebration } from '@/lib/training-celebration';
-import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
+import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS, SHORT_TIMEOUT_SECONDS } from '@/lib/workout';
 
 import { Button } from './button';
 import { Card } from './card';
@@ -40,6 +42,7 @@ export function DevTools() {
   const theme = useTheme();
   const stats = useStats();
   const fastWorkouts = useFastWorkouts();
+  const shortTimeouts = useShortTimeouts();
 
   const addTodaySession = (seconds: number) => {
     resetCelebration();
@@ -75,6 +78,21 @@ export function DevTools() {
             onValueChange={setFastWorkouts}
             trackColor={{ true: theme.tint, false: theme.backgroundSelected }}
             accessibilityLabel="Fast workouts"
+          />
+        </View>
+        <View style={styles.switchRow}>
+          <View style={styles.switchText}>
+            <ThemedText>Short timeouts</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Timeouts last {SHORT_TIMEOUT_SECONDS} s, whatever length is set above. Adding time still adds the usual
+              amount.
+            </ThemedText>
+          </View>
+          <Switch
+            value={shortTimeouts}
+            onValueChange={setShortTimeouts}
+            trackColor={{ true: theme.tint, false: theme.backgroundSelected }}
+            accessibilityLabel="Short timeouts"
           />
         </View>
         <View style={styles.switchRow}>

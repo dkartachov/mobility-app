@@ -31,6 +31,12 @@ export const getFastWorkouts = fastWorkouts.get;
 export const setFastWorkouts = fastWorkouts.set;
 export const useFastWorkouts = fastWorkouts.use;
 
+/** Timeouts in workouts last `SHORT_TIMEOUT_SECONDS`. Adding time to one still adds the usual amount. */
+const shortTimeouts = devSwitch('dev.shortTimeouts');
+export const getShortTimeouts = shortTimeouts.get;
+export const setShortTimeouts = shortTimeouts.set;
+export const useShortTimeouts = shortTimeouts.use;
+
 /** Next works in flexibility tests without a measurement, and the warm-up can be skipped; skipped measurements save as 0. */
 const skipTestMeasurements = devSwitch('dev.skipTestMeasurements');
 export const setSkipTestMeasurements = skipTestMeasurements.set;

@@ -110,12 +110,17 @@ function PhoneMeasurement({
   maxGap: number;
 }) {
   useKeepAwake();
-  const ding = useAudioPlayer(require('@/assets/sounds/ding.wav'));
+  // The phone is strapped on or held out of sight while measuring, so each outcome has its own sound.
+  const sounds = {
+    zeroed: useAudioPlayer(require('@/assets/sounds/measure-zeroed.wav')),
+    captured: useAudioPlayer(require('@/assets/sounds/measure-captured.wav')),
+    retry: useAudioPlayer(require('@/assets/sounds/measure-retry.wav')),
+  };
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'duckOthers' });
   }, []);
-  const cue = (haptic: Haptics.NotificationFeedbackType) => {
-    ding.seekTo(0).then(() => ding.play());
+  const cue = (sound: keyof typeof sounds, haptic: Haptics.NotificationFeedbackType) => {
+    sounds[sound].seekTo(0).then(() => sounds[sound].play());
     Haptics.notificationAsync(haptic);
   };
 
@@ -126,12 +131,13 @@ function PhoneMeasurement({
   const average = (rs: number[]) => rs.reduce((sum, r) => sum + r, 0) / rs.length;
   const gap = (rs: number[]) => Math.max(...rs) - Math.min(...rs);
   const { phase, angle, holdProgress, start, cancel } = usePhoneMeasurement(method, {
-    onZeroed: () => cue(Haptics.NotificationFeedbackType.Warning),
+    onZeroed: () => cue('zeroed', Haptics.NotificationFeedbackType.Warning),
     onResult: (result) => {
       const next = readings.length === PHONE_READINGS ? [result] : [...readings, result];
       const complete = next.length === PHONE_READINGS;
       const agree = !complete || gap(next) <= maxGap;
-      cue(agree ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error);
+      if (agree) cue('captured', Haptics.NotificationFeedbackType.Success);
+      else cue('retry', Haptics.NotificationFeedbackType.Error);
       setReadings(next);
       setKeptAnyway(false);
       if (complete && agree) onChange(average(next));

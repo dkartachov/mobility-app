@@ -28,10 +28,11 @@ import { TimerBar, useCountdownProgress } from '@/components/timer-bar';
 import { Elevation, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkoutCues } from '@/hooks/use-workout-cues';
+import { getShortTimeouts } from '@/lib/dev-settings';
 import { haptic } from '@/lib/haptics';
 import { useColorScheme } from '@/lib/theme-preference';
 import { TIMEOUT_EXTEND_SECONDS, getTimeoutSeconds } from '@/lib/timeout-preference';
-import { formatClock, type WorkoutStep } from '@/lib/workout';
+import { SHORT_TIMEOUT_SECONDS, formatClock, type WorkoutStep } from '@/lib/workout';
 import { createPlayerReducer, stepBufferMs } from '@/lib/workout-player';
 
 const TICK_MS = 250;
@@ -48,6 +49,8 @@ type WorkoutPlayerProps = {
   sideSwitchBufferMs?: number;
   /** Accessibility label of the button on the last exercise that finishes. */
   completeLabel: string;
+  /** Finishing is an achievement worth a flourish, rather than the ding that ends every other hold. */
+  celebrate?: boolean;
   /** Called once, when the finish button is pressed. */
   onComplete: () => void;
   /** The back button. Confirming that leaving loses progress is up to the screen. */
@@ -63,6 +66,7 @@ export function WorkoutPlayer({
   bufferMs,
   sideSwitchBufferMs = bufferMs,
   completeLabel,
+  celebrate,
   onComplete,
   onBack,
 }: WorkoutPlayerProps) {
@@ -76,7 +80,7 @@ export function WorkoutPlayer({
     countdown: 0,
   });
   const [completing, setCompleting] = useState(false);
-  useWorkoutCues(state.cue);
+  useWorkoutCues(state.cue, { celebrate });
   // A locked screen would background the app, pausing the cues mid-workout.
   useKeepAwake();
 
@@ -196,7 +200,12 @@ export function WorkoutPlayer({
             </Animated.View>
             <TimeoutButton
               disabled={!running}
-              onPress={() => dispatch({ type: 'startTimeout', seconds: getTimeoutSeconds() })}
+              onPress={() =>
+                dispatch({
+                  type: 'startTimeout',
+                  seconds: getShortTimeouts() ? SHORT_TIMEOUT_SECONDS : getTimeoutSeconds(),
+                })
+              }
             />
           </View>
           <View style={styles.progress}>

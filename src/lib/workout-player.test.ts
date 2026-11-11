@@ -28,12 +28,12 @@ describe('timeouts', () => {
     expect(state.remainingMs).toBe(BUFFER_MS);
   });
 
-  it('dings when the timeout runs out, then the exercise timer continues', () => {
+  it('calls you back when the timeout runs out, then the exercise timer continues', () => {
     const started = reducer(holding, { type: 'startTimeout', seconds: 30 });
     const ended = reducer(started, { type: 'tick', deltaMs: 30_000 });
 
     expect(ended.timeoutMs).toBeUndefined();
-    expect(ended.cue).toEqual({ type: 'done' });
+    expect(ended.cue).toEqual({ type: 'timeoutOver' });
     expect(ended.remainingMs).toBe(BUFFER_MS);
 
     expect(reducer(ended, { type: 'tick', deltaMs: 1000 }).remainingMs).toBe(BUFFER_MS - 1000);
@@ -60,6 +60,18 @@ describe('timeouts', () => {
     expect(ended.timeoutMs).toBeUndefined();
     expect(ended.cue).toBeUndefined();
     expect(ended).toMatchObject({ index: 1, phase: 'buffer', remainingMs: BUFFER_MS });
+  });
+});
+
+describe('cues', () => {
+  it('dings when a hold ends with more exercises to come', () => {
+    const first: PlayerState = { ...holding, index: 0 };
+    expect(reducer(first, { type: 'tick', deltaMs: 25_000 })).toMatchObject({ index: 1, cue: { type: 'done' } });
+  });
+
+  it('marks the end of the last hold as finishing, not just another ding', () => {
+    const ended = reducer(holding, { type: 'tick', deltaMs: 25_000 });
+    expect(ended).toMatchObject({ phase: 'finished', cue: { type: 'finished' } });
   });
 });
 

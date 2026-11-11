@@ -1,17 +1,22 @@
 import { type AudioPlayer, setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useEffect } from 'react';
 
-export type WorkoutCue = 'tenSeconds' | 'switchSides' | 'done';
+/** `done` ends a hold; `finished` ends the last hold, and so the whole session. */
+export type WorkoutCue = 'tenSeconds' | 'switchSides' | 'done' | 'finished' | 'timeoutOver';
 
 /**
  * Plays `cue` whenever a new cue object arrives. Pass a fresh object for every cue, so the same
  * kind of cue twice in a row still plays twice.
+ *
+ * With `celebrate`, finishing plays a flourish rather than the ding that ends every other hold.
  */
-export function useWorkoutCues(cue: { type: WorkoutCue } | undefined) {
+export function useWorkoutCues(cue: { type: WorkoutCue } | undefined, { celebrate = false } = {}) {
   const players = {
     tenSeconds: useAudioPlayer(require('@/assets/sounds/ten-seconds-1.m4a')),
     switchSides: useAudioPlayer(require('@/assets/sounds/switch-sides-1.m4a')),
     done: useAudioPlayer(require('@/assets/sounds/ding.wav')),
+    complete: useAudioPlayer(require('@/assets/sounds/workout-complete.wav')),
+    timeoutOver: useAudioPlayer(require('@/assets/sounds/timeout-over.wav')),
   };
 
   useEffect(() => {
@@ -21,6 +26,10 @@ export function useWorkoutCues(cue: { type: WorkoutCue } | undefined) {
 
   useEffect(() => {
     if (!cue) return;
+    if (cue.type === 'finished') {
+      replay(celebrate ? players.complete : players.done);
+      return;
+    }
     if (cue.type !== 'switchSides') {
       replay(players[cue.type]);
       return;
