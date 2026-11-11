@@ -154,6 +154,7 @@ const ALL_EXERCISES: Exercise[] = [
     ],
     photo: require('@/assets/images/exercises/90-to-90.png'),
     animation: NINETY_TO_NINETY,
+    twoSided: true,
   },
   {
     id: 'butterfly',
