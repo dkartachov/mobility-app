@@ -1,4 +1,4 @@
-import { Stack, router, useFocusEffect, useLocalSearchParams, usePreventRemove } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -77,6 +77,8 @@ export default function WorkoutScreen() {
   const [startedAt] = useState(() => new Date());
   const [result, setResult] = useState<{ fromSeconds: number; toSeconds: number }>();
   const [leaving, setLeaving] = useState(false);
+  const navigation = useNavigation();
+  const onDashboard = useRef(false);
 
   // Leaving mid-workout loses it, so confirm first and then go all the way back to the start screen.
   // The summary has nothing to confirm: going back does nothing there, and only its Done button leaves.
@@ -90,9 +92,23 @@ export default function WorkoutScreen() {
     });
   });
   // Runs after the re-render that lifts the prevention above, so this navigation isn't blocked.
+  // A finished workout lands on the Dashboard, where the day's first fills in today's dot. Cancelled
+  // ones go back to Start.
   useEffect(() => {
-    if (leaving) router.dismissTo('/');
+    if (!leaving) return;
+    if (onDashboard.current) router.dismissAll();
+    else router.dismissTo('/');
   }, [leaving]);
+
+  // `dismissTo('/dashboard')` uncovers the tabs before they switch, so Start shows for a moment.
+  // Instead the tab switches underneath as soon as the workout is done, and has the whole summary
+  // to get there before Done uncovers it.
+  const showDashboardUnderneath = () => {
+    const tabsKey = navigation.getState()?.routes.find((route) => route.name === '(tabs)')?.state?.key;
+    if (!tabsKey) return;
+    navigation.dispatch({ type: 'JUMP_TO', payload: { name: 'dashboard' }, target: tabsKey });
+    onDashboard.current = true;
+  };
 
   // Logged as the planned length, even if exercises were skipped.
   const complete = async () => {
@@ -100,6 +116,7 @@ export default function WorkoutScreen() {
     const fromSeconds = await getTotalSeconds(db);
     await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: focus ? 'focus' : 'daily' });
     countWorkoutForReminderPrompt();
+    showDashboardUnderneath();
     setResult({ fromSeconds, toSeconds: fromSeconds + plannedSeconds });
   };
 
