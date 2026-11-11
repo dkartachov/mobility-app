@@ -138,6 +138,7 @@ export default function DashboardScreen() {
                 ? `Focus areas, ${focus.map((area) => scoreAreaLabel(area)).join(' and ')}`
                 : 'Focus areas'
             }
+            onPress={focus.length ? () => router.push('/focus-areas') : undefined}
             fill>
             {score === null ? (
               <ThemedText type="small" themeColor="textSecondary">

@@ -1,20 +1,16 @@
-import { router } from 'expo-router';
 import { useDeferredValue, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
-import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
-import { ExercisePhoto } from '@/components/exercise-photo';
+import { ExerciseTile } from '@/components/exercise-tile';
 import { TextField } from '@/components/field';
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/page-header';
-import { Pill } from '@/components/pill';
-import { PressableScale } from '@/components/pressable-scale';
 import { FlatList, ScrollView } from '@/components/scroll-view';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import {
   EQUIPMENT,
   EQUIPMENT_LABELS,
@@ -24,7 +20,6 @@ import {
   POSITION_LABELS,
   POSITIONS,
   searchExercises,
-  type Exercise,
 } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -134,39 +129,6 @@ export default function LibraryScreen() {
   );
 }
 
-/** Opens the exercise, and lets you swipe on through the rest of the list it was picked from. */
-function ExerciseTile({ exercise, list }: { exercise: Exercise; list: readonly Exercise[] }) {
-  const tags = [exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides'].filter(
-    (tag): tag is string => Boolean(tag)
-  );
-
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      onPress={() =>
-        router.push({
-          pathname: '/exercise/[id]',
-          params: { id: exercise.id, list: list.map((item) => item.id).join(',') },
-        })
-      }>
-      <Card style={styles.tile}>
-        <ExercisePhoto source={exercise.photo} style={styles.photo} />
-        <View style={styles.text}>
-          <ThemedText type="subtitle" numberOfLines={2}>
-            {exercise.name}
-          </ThemedText>
-          <View style={styles.tags}>
-            {tags.map((tag) => (
-              <Pill key={tag} label={tag} size="small" />
-            ))}
-          </View>
-        </View>
-        <Icon name={{ ios: 'chevron.right', android: 'chevron_right' }} color="textSecondary" size={16} />
-      </Card>
-    </PressableScale>
-  );
-}
-
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.screen,
@@ -203,26 +165,5 @@ const styles = StyleSheet.create({
   },
   emptyButton: {
     alignSelf: 'center',
-  },
-  tile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    padding: Spacing.two,
-    paddingRight: Spacing.three,
-  },
-  photo: {
-    width: 80,
-    height: 80,
-    borderRadius: Radius.medium + 2,
-  },
-  text: {
-    flex: 1,
-    gap: Spacing.one + Spacing.half,
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.one + Spacing.half,
   },
 });
