@@ -9,3 +9,9 @@ jest.mock('expo-sqlite/kv-store', () => {
   };
   return { __esModule: true, default: Storage, Storage };
 });
+
+// expo-audio needs the native module too. Tests that care what plays mock it themselves.
+jest.mock('expo-audio', () => ({
+  setAudioModeAsync: () => Promise.resolve(),
+  useAudioPlayer: () => ({ play: jest.fn(), pause: jest.fn(), seekTo: () => Promise.resolve() }),
+}));
