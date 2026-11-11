@@ -98,7 +98,7 @@ export const SQUAT_TO_STAND: FigureClip = {
   ],
 };
 
-// --- Inchworm: travels forward, so it fades out where it ends and back in where it started ---
+// --- Inchworm: travels forward, so the camera goes with it and it ends where it started on screen ---
 
 const IW_START_X = 300;
 const IW_END_X = 575;
@@ -263,7 +263,8 @@ const IW_FOLD_END: Pose = {
 export const INCHWORM: FigureClip = {
   view: 'side',
   stillFrame: 8,
-  fadeMs: 350,
+  follow: true,
+  focus: [330, 270],
   keyframes: [
     { ms: 0, pose: standingAt(IW_START_X) },
     { ms: 700, pose: standingAt(IW_START_X) },

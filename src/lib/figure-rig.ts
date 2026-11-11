@@ -52,6 +52,8 @@ export type Pose = {
   knees?: readonly [near: Point, far: Point];
   /** Places the elbows rather than solving them, for forearms pointing partly at the camera. Give it in every pose of a clip or in none. */
   elbows?: readonly [near: Point, far: Point];
+  /** How far through an in-breath, from 0 to 1, which fills out the chest. Set by `livePoseAt`, not by clips. */
+  breath?: number;
 };
 
 /** Something in the scene the figure uses, like a wall, a box or a table, drawn behind it. */
@@ -85,8 +87,12 @@ export type FigureClip = {
    * swinging over the body looks shorter as it points at the camera; it doesn't really bend.
    */
   straightArms?: boolean;
-  /** Fade over this long at both ends of the loop, for clips that travel and don't end where they start. */
-  fadeMs?: number;
+  /**
+   * The camera travels with the hips, for clips that move along the floor and don't end where they
+   * start. They loop when the last pose is the first one further along, and marks on the floor
+   * show the ground going by.
+   */
+  follow?: boolean;
   /**
    * How far each shoulder and hip sits from the spine, for views that face the width of the body.
    * Near limbs attach on the left of the spine, looking from the hips to the head; far on the right.
@@ -126,6 +132,7 @@ export type HandClip = {
 export type ExerciseAnimation = FigureClip | HandClip;
 
 export type FigurePaths = {
+  /** The bones of each limb as a line through its joints. The body drawn over them is in `shapes`. */
   nearArm: string;
   farArm: string;
   nearLeg: string;
@@ -134,6 +141,19 @@ export type FigurePaths = {
   neck: string;
   headX: number;
   headY: number;
+  /** Filled outlines of the body: limbs that taper toward the wrist and ankle, and a torso with a waist. */
+  shapes: {
+    nearArm: string;
+    farArm: string;
+    nearLeg: string;
+    farLeg: string;
+    torso: string;
+    /** Sticks out of the head the way the figure is looking. Empty when it faces the camera or the floor. */
+    nose: string;
+  };
+  /** The middle and half the width of the shadow the figure casts on the floor. */
+  shadowX: number;
+  shadowRadius: number;
   /** Empty when the clip has no band or mini band. */
   band: string;
   /** The handles and the plates on their ends, drawn thicker. Empty when the clip has no dumbbells. */
@@ -193,6 +213,45 @@ export const DUMBBELL = { handle: 44, plate: 8 };
 /** How high a step lifts, as a fraction of how far it travels. */
 const STEP_HEIGHT = 0.2;
 
+export const HEAD_RADIUS = 30;
+
+/**
+ * Half the thickness of each limb at the [start, end] of its bones, from the body outward. The foot
+ * and hand start wider than the shin and forearm end, which leaves a heel and the ball of the hand.
+ */
+const LEG_RADII = [
+  [15, 12.5],
+  [12.5, 9.5],
+  [12.5, 10.5],
+] as const;
+const ARM_RADII = [
+  [12.5, 10.5],
+  [10.5, 8.5],
+  [10.5, 8.5],
+] as const;
+/** An arm drawn as one straight bone, from the shoulder to the fingertips. */
+const STRAIGHT_ARM_RADII = [[12.5, 8.5]] as const;
+
+/**
+ * The torso seen from the side: how far along the spine from the hips, and half its depth there.
+ * It's drawn with an outline `TORSO_SKIN` thick on every side, which rounds off its ends.
+ */
+const TORSO_PROFILE = [
+  [0, 21],
+  [0.2, 19.5],
+  [0.4, 18.5],
+  [0.6, 21],
+  [0.8, 24],
+  [1, 20],
+] as const;
+export const TORSO_SKIN = 8;
+const TORSO_STEPS = 14;
+/** The outline of the torso seen from the front, as thick as the shoulders and hips are deep. */
+export const TORSO_FRONT_SKIN = 19;
+
+/** The narrowest the shadow gets, under a figure standing with its feet together. */
+const SHADOW_MIN_RADIUS = 55;
+
 function lerp(a: number, b: number, t: number): number {
   'worklet';
   return a + (b - a) * t;
@@ -233,8 +292,8 @@ function sameExtremity(a: Extremity, b: Extremity): boolean {
   return a[0] === b[0] && a[1] === b[1];
 }
 
-/** The clip's pose at a time in `[0, clipDuration]`. */
-export function poseAt(clip: FigureClip, timeMs: number): Pose {
+/** The pose a clip's keyframes give at a time in `[0, clipDuration]`, wherever on the floor that is. */
+function keyedPoseAt(clip: FigureClip, timeMs: number): Pose {
   'worklet';
   const frames = clip.keyframes;
   let elapsed = 0;
@@ -300,12 +359,103 @@ export function poseAt(clip: FigureClip, timeMs: number): Pose {
   return frames[frames.length - 1].pose;
 }
 
-/** How opaque the figure is at a time, for clips that fade across the loop point. */
-export function opacityAt(clip: FigureClip, timeMs: number): number {
+/** How far along the floor the figure has gone at a time, in a clip the camera follows. */
+export function travelAt(clip: FigureClip, timeMs: number): number {
   'worklet';
-  if (!clip.fadeMs) return 1;
-  const fromEnd = Math.min(timeMs, clipDuration(clip) - timeMs);
-  return Math.max(0, Math.min(1, fromEnd / clip.fadeMs));
+  if (!clip.follow) return 0;
+  return keyedPoseAt(clip, timeMs).hip[0] - clip.keyframes[0].pose.hip[0];
+}
+
+function slid(point: Point, dx: number): Point {
+  'worklet';
+  return [point[0] + dx, point[1]];
+}
+
+function slidExtremity(extremity: Extremity, dx: number): Extremity {
+  'worklet';
+  return [extremity[0] + dx, extremity[1], extremity[2]];
+}
+
+/** The clip's pose at a time in `[0, clipDuration]`, as the camera sees it. */
+export function poseAt(clip: FigureClip, timeMs: number): Pose {
+  'worklet';
+  const pose = keyedPoseAt(clip, timeMs);
+  if (!clip.follow) return pose;
+  // The hips stay where they started on screen, and everything else moves around them.
+  const dx = clip.keyframes[0].pose.hip[0] - pose.hip[0];
+  return {
+    ...pose,
+    hip: slid(pose.hip, dx),
+    nearHand: slidExtremity(pose.nearHand, dx),
+    farHand: slidExtremity(pose.farHand, dx),
+    nearFoot: slidExtremity(pose.nearFoot, dx),
+    farFoot: slidExtremity(pose.farFoot, dx),
+    knees: pose.knees ? [slid(pose.knees[0], dx), slid(pose.knees[1], dx)] : undefined,
+    elbows: pose.elbows ? [slid(pose.elbows[0], dx), slid(pose.elbows[1], dx)] : undefined,
+  };
+}
+
+/** How far apart the marks on the floor are, and how long each is. */
+const FLOOR_MARK = { spacing: 220, length: 46 };
+
+/** Dashes along the floor that slide back as the figure travels, across more than the widest camera can see. */
+export function floorMarks(travel: number): string {
+  'worklet';
+  const offset = ((travel % FLOOR_MARK.spacing) + FLOOR_MARK.spacing) % FLOOR_MARK.spacing;
+  let path = '';
+  for (let x = -SCENE.width - offset; x < SCENE.width * 2; x += FLOOR_MARK.spacing) {
+    path += `M${Math.round(x * 10) / 10} ${SCENE.floorY + 34}h${FLOOR_MARK.length}`;
+  }
+  return path;
+}
+
+/** Clips shorter than this are all movement, with no time to see a breath. */
+const BREATH_MIN_CLIP_MS = 2500;
+const BREATH_MS = 4000;
+/** How far a full breath lifts the shoulders and fills out the chest. */
+const BREATH_LIFT = 2.5;
+const BREATH_SWELL = 2;
+/** How far behind the body the head follows. */
+const HEAD_LAG_MS = 90;
+
+/** How far through an in-breath the figure is, from 0 to 1. A whole number of breaths fit the clip, so it loops. */
+export function breathAt(clip: FigureClip, timeMs: number): number {
+  'worklet';
+  const duration = clipDuration(clip);
+  if (duration < BREATH_MIN_CLIP_MS) return 0;
+  const breaths = Math.max(1, Math.round(duration / BREATH_MS));
+  return (1 - Math.cos((2 * Math.PI * breaths * timeMs) / duration)) / 2;
+}
+
+/**
+ * The clip's pose with the life that isn't in its keyframes: the figure breathes, and its head
+ * trails a moment behind its body. Hands and feet stay exactly where the clip puts them.
+ */
+export function livePoseAt(clip: FigureClip, timeMs: number): Pose {
+  'worklet';
+  const pose = poseAt(clip, timeMs);
+  const duration = clipDuration(clip);
+  if (duration <= 0) return pose;
+  const neck = poseAt(clip, (((timeMs - HEAD_LAG_MS) % duration) + duration) % duration).neck;
+  const breath = breathAt(clip, timeMs);
+  if (breath === 0) return { ...pose, neck };
+
+  // A breath lifts the shoulders, but never so far that it pulls a hand off what it's holding:
+  // the nearer an arm is to straight, the less they rise.
+  let slack = 2 * BREATH_LIFT;
+  if (!clip.straightArms && !pose.elbows) {
+    const roots = limbRoots(pose, clip);
+    const reach = BONES.upperArm + BONES.forearm;
+    const near = reach * (pose.armLengths?.[0] ?? 1) - Math.hypot(pose.nearHand[0] - roots.nearShoulder[0], pose.nearHand[1] - roots.nearShoulder[1]);
+    const far = reach * (pose.armLengths?.[1] ?? 1) - Math.hypot(pose.farHand[0] - roots.farShoulder[0], pose.farHand[1] - roots.farShoulder[1]);
+    slack = Math.max(0, Math.min(slack, near, far));
+  }
+  return {
+    ...pose,
+    neck,
+    breath,
+    torsoLength: (pose.torsoLength ?? BONES.torso) + (breath * slack) / 2,
+  };
 }
 
 /** The target itself, or as far toward it as a limb of this length can get. */
@@ -336,13 +486,86 @@ export function solveJoint(root: Point, tip: Point, first: number, second: numbe
   return [root[0] + a * ux + bend * h * uy, root[1] + a * uy - bend * h * ux];
 }
 
-/** A two-bone limb with a hand or foot on the end. Bones never stretch to reach a far target. */
-function limbPath(root: Point, target: Extremity, first: number, second: number, bend: Bend, endLength: number): string {
+/** The joints of a two-bone limb with a hand or foot on the end. Bones never stretch to reach a far target. */
+function limbPoints(root: Point, target: Extremity, first: number, second: number, bend: Bend, endLength: number): Point[] {
   'worklet';
   const end = withinReach(root, target, first + second);
   const joint = solveJoint(root, [end[0], end[1]], first, second, bend);
   const tip = along([end[0], end[1]], end[2], endLength);
-  return `M${root[0]} ${root[1]}L${joint[0]} ${joint[1]}L${end[0]} ${end[1]}L${tip[0]} ${tip[1]}`;
+  return [root, joint, [end[0], end[1]], tip];
+}
+
+function polyline(points: readonly Point[]): string {
+  'worklet';
+  let path = `M${points[0][0]} ${points[0][1]}`;
+  for (let i = 1; i < points.length; i++) path += `L${points[i][0]} ${points[i][1]}`;
+  return path;
+}
+
+/** To a tenth of a unit, which is finer than a pixel and keeps the paths sent to the screen every frame short. */
+function fixed(value: number): number {
+  'worklet';
+  return Math.round(value * 10) / 10;
+}
+
+/** The outline of a bone with a round end of its own radius at each joint. */
+function capsule(a: Point, ra: number, b: Point, rb: number): string {
+  'worklet';
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const length = Math.hypot(dx, dy);
+  // A bone pointing straight at the camera is just its thicker end.
+  if (length < 0.5) {
+    const r = Math.max(ra, rb);
+    return `M${fixed(a[0] - r)} ${fixed(a[1])}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+  }
+  const nx = -dy / length;
+  const ny = dx / length;
+  return (
+    `M${fixed(a[0] + nx * ra)} ${fixed(a[1] + ny * ra)}L${fixed(b[0] + nx * rb)} ${fixed(b[1] + ny * rb)}` +
+    `A${rb} ${rb} 0 0 0 ${fixed(b[0] - nx * rb)} ${fixed(b[1] - ny * rb)}L${fixed(a[0] - nx * ra)} ${fixed(a[1] - ny * ra)}` +
+    `A${ra} ${ra} 0 0 0 ${fixed(a[0] + nx * ra)} ${fixed(a[1] + ny * ra)}Z`
+  );
+}
+
+/** The outline of a whole limb, one capsule a bone, all wound the same way so they fill as one shape. */
+function limbShape(points: readonly Point[], radii: readonly (readonly [number, number])[]): string {
+  'worklet';
+  let path = '';
+  for (let i = 1; i < points.length; i++) path += capsule(points[i - 1], radii[i - 1][0], points[i], radii[i - 1][1]);
+  return path;
+}
+
+/** Half the torso's depth at a point along the spine, less the outline drawn around it. */
+function torsoInset(t: number): number {
+  'worklet';
+  for (let i = 1; i < TORSO_PROFILE.length; i++) {
+    const [t0, r0] = TORSO_PROFILE[i - 1];
+    const [t1, r1] = TORSO_PROFILE[i];
+    if (t <= t1) return lerp(r0, r1, (t - t0) / (t1 - t0)) - TORSO_SKIN;
+  }
+  return TORSO_PROFILE[TORSO_PROFILE.length - 1][1] - TORSO_SKIN;
+}
+
+/** The torso from the side, following the curve of the spine from the hips, through `bow`, to the shoulders. */
+function torsoProfile(hip: Point, bow: Point, shoulder: Point, swell: number): string {
+  'worklet';
+  let front = '';
+  let back = '';
+  // Enough points that a deeply rounded back still reads as a curve.
+  for (let i = 0; i <= TORSO_STEPS; i++) {
+    const t = i / TORSO_STEPS;
+    const x = (1 - t) * (1 - t) * hip[0] + 2 * (1 - t) * t * bow[0] + t * t * shoulder[0];
+    const y = (1 - t) * (1 - t) * hip[1] + 2 * (1 - t) * t * bow[1] + t * t * shoulder[1];
+    const dx = (1 - t) * (bow[0] - hip[0]) + t * (shoulder[0] - bow[0]);
+    const dy = (1 - t) * (bow[1] - hip[1]) + t * (shoulder[1] - bow[1]);
+    // A breath fills the chest and leaves the hips alone.
+    const depth = torsoInset(t) + swell * Math.max(0, Math.min(1, (t - 0.2) / 0.4));
+    const scale = depth / Math.max(0.001, Math.hypot(dx, dy));
+    front += `${i === 0 ? 'M' : 'L'}${fixed(x - dy * scale)} ${fixed(y + dx * scale)}`;
+    back = `L${fixed(x + dy * scale)} ${fixed(y - dx * scale)}` + back;
+  }
+  return `${front}${back}Z`;
 }
 
 /** Traces the figure in the given pose. */
@@ -356,25 +579,24 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
   const legBends = clip.legBends ?? [1, 1];
 
   // Knees bend forward and elbows backward, whichever way the limb is pointing.
-  const arm = (root: Point, hand: Extremity, bend: Bend, length: number, elbow?: Point): string => {
-    if (elbow) {
-      const tip = along([hand[0], hand[1]], hand[2], BONES.hand);
-      return `M${root[0]} ${root[1]}L${elbow[0]} ${elbow[1]}L${hand[0]} ${hand[1]}L${tip[0]} ${tip[1]}`;
-    }
+  const arm = (root: Point, hand: Extremity, bend: Bend, length: number, elbow?: Point): Point[] => {
+    if (elbow) return [root, elbow, [hand[0], hand[1]], along([hand[0], hand[1]], hand[2], BONES.hand)];
     if (clip.straightArms) {
       // The hand shortens along with the rest of the arm as it swings toward the camera.
       const scale = 1 + BONES.hand / (BONES.upperArm + BONES.forearm);
-      const tipX = root[0] + (hand[0] - root[0]) * scale;
-      const tipY = root[1] + (hand[1] - root[1]) * scale;
-      return `M${root[0]} ${root[1]}L${tipX} ${tipY}`;
+      return [root, [root[0] + (hand[0] - root[0]) * scale, root[1] + (hand[1] - root[1]) * scale]];
     }
-    return limbPath(root, hand, BONES.upperArm * length, BONES.forearm * length, bend, BONES.hand * length);
+    return limbPoints(root, hand, BONES.upperArm * length, BONES.forearm * length, bend, BONES.hand * length);
   };
-  const leg = (root: Point, foot: Extremity, bend: Bend, knee?: Point): string => {
-    if (!knee) return limbPath(root, foot, BONES.thigh, BONES.shin, bend, BONES.foot);
-    const toe = along([foot[0], foot[1]], foot[2], BONES.foot);
-    return `M${root[0]} ${root[1]}L${knee[0]} ${knee[1]}L${foot[0]} ${foot[1]}L${toe[0]} ${toe[1]}`;
+  const leg = (root: Point, foot: Extremity, bend: Bend, knee?: Point): Point[] => {
+    if (!knee) return limbPoints(root, foot, BONES.thigh, BONES.shin, bend, BONES.foot);
+    return [root, knee, [foot[0], foot[1]], along([foot[0], foot[1]], foot[2], BONES.foot)];
   };
+  const nearArm = arm(nearShoulder, nearHand, armBends[0], pose.armLengths?.[0] ?? 1, elbows?.[0]);
+  const farArm = arm(farShoulder, farHand, armBends[1], pose.armLengths?.[1] ?? 1, elbows?.[1]);
+  const nearLeg = leg(nearHip, nearFoot, legBends[0], knees?.[0]);
+  const farLeg = leg(farHip, farFoot, legBends[1], knees?.[1]);
+  const armRadii = clip.straightArms ? STRAIGHT_ARM_RADII : ARM_RADII;
 
   // The spine bows off the middle of the straight line from hips to shoulders.
   const spine = along(
@@ -443,15 +665,54 @@ export function solveFigure(pose: Pose, clip: FigureClip): FigurePaths {
     ? `M${nearShoulder[0]} ${nearShoulder[1]}L${farShoulder[0]} ${farShoulder[1]}M${nearHip[0]} ${nearHip[1]}L${farHip[0]} ${farHip[1]}`
     : '';
 
+  // Facing the width of the body, the torso runs straight between the shoulders and the hips, its
+  // sides bowing with the spine. From the side it has a profile instead.
+  const swell = (pose.breath ?? 0) * BREATH_SWELL;
+  let torsoShape: string;
+  if (clip.widths) {
+    const bowX = spine[0] - (hip[0] + shoulder[0]) / 2;
+    const bowY = spine[1] - (hip[1] + shoulder[1]) / 2;
+    // A breath pushes the ribs out to the sides.
+    const nearSide = along([(nearShoulder[0] + nearHip[0]) / 2 + bowX, (nearShoulder[1] + nearHip[1]) / 2 + bowY], pose.torso + 90, 2 * swell);
+    const farSide = along([(farShoulder[0] + farHip[0]) / 2 + bowX, (farShoulder[1] + farHip[1]) / 2 + bowY], pose.torso - 90, 2 * swell);
+    torsoShape =
+      `M${fixed(nearShoulder[0])} ${fixed(nearShoulder[1])}L${fixed(farShoulder[0])} ${fixed(farShoulder[1])}` +
+      `Q${fixed(farSide[0])} ${fixed(farSide[1])} ${fixed(farHip[0])} ${fixed(farHip[1])}L${fixed(nearHip[0])} ${fixed(nearHip[1])}` +
+      `Q${fixed(nearSide[0])} ${fixed(nearSide[1])} ${fixed(nearShoulder[0])} ${fixed(nearShoulder[1])}Z`;
+  } else {
+    torsoShape = torsoProfile(hip, spine, shoulder, swell);
+  }
+
+  // The face is on the front of the body, a quarter turn from the neck. Only a side view shows it.
+  let nose = '';
+  if (clip.view === 'side' && !clip.widths) {
+    nose = capsule(along(head, pose.neck - 100, HEAD_RADIUS - 12), 10, along(head, pose.neck - 100, HEAD_RADIUS + 2), 5);
+  }
+
+  // The shadow lies under the bulk of the body, from the feet to the head, so it's narrow under a
+  // figure standing up and stretches out as it lies down.
+  const shadowLeft = Math.min(hip[0], head[0], nearFoot[0], farFoot[0]);
+  const shadowRight = Math.max(hip[0], head[0], nearFoot[0], farFoot[0]);
+
   return {
-    nearArm: arm(nearShoulder, nearHand, armBends[0], pose.armLengths?.[0] ?? 1, elbows?.[0]),
-    farArm: arm(farShoulder, farHand, armBends[1], pose.armLengths?.[1] ?? 1, elbows?.[1]),
-    nearLeg: leg(nearHip, nearFoot, legBends[0], knees?.[0]),
-    farLeg: leg(farHip, farFoot, legBends[1], knees?.[1]),
+    nearArm: polyline(nearArm),
+    farArm: polyline(farArm),
+    nearLeg: polyline(nearLeg),
+    farLeg: polyline(farLeg),
     torso: `M${hip[0]} ${hip[1]}Q${spine[0]} ${spine[1]} ${shoulder[0]} ${shoulder[1]}${girdles}`,
     neck: `M${shoulder[0]} ${shoulder[1]}L${head[0]} ${head[1]}`,
     headX: head[0],
     headY: head[1],
+    shapes: {
+      nearArm: limbShape(nearArm, armRadii),
+      farArm: limbShape(farArm, armRadii),
+      nearLeg: limbShape(nearLeg, LEG_RADII),
+      farLeg: limbShape(farLeg, LEG_RADII),
+      torso: torsoShape,
+      nose,
+    },
+    shadowX: (shadowLeft + shadowRight) / 2,
+    shadowRadius: Math.max(SHADOW_MIN_RADIUS, (shadowRight - shadowLeft) / 2 + 30),
     band,
     dumbbellHandles,
     dumbbellPlates,

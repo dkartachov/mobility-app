@@ -4,7 +4,6 @@ import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedProps,
-  useAnimatedStyle,
   useDerivedValue,
   useReducedMotion,
   useSharedValue,
@@ -19,24 +18,41 @@ import {
   clipDuration,
   figureViewBox,
   FINGER,
+  floorMarks,
+  HEAD_RADIUS,
   keyframeTime,
-  opacityAt,
+  livePoseAt,
   poseAt,
   SCENE,
   solveFigure,
   solveFinger,
+  travelAt,
+  TORSO_SKIN,
   type FigureClip,
   type HandClip,
 } from '@/lib/figure-rig';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
-// The same fixed palette as the exercise photos, which don't change with the theme either.
-const COLORS = { background: '#E3EEEC', ground: '#D8E6E3', mat: '#D0E6E2', near: '#0F8F82', far: '#7DC4BA', band: '#D9443B', scenery: '#BCD3CF', weight: '#3E4F4C' };
+// The same fixed palette as the exercise photos, which don't change with the theme either. The
+// figure gets darker toward the camera: the far limbs, then the body, then the near limbs, so a limb
+// crossing the body still shows.
+const COLORS = {
+  background: '#E3EEEC',
+  ground: '#D8E6E3',
+  mat: '#D0E6E2',
+  near: '#0B776C',
+  body: '#0F8F82',
+  far: '#7DC4BA',
+  shadow: '#0B3B36',
+  band: '#D9443B',
+  scenery: '#BCD3CF',
+  weight: '#3E4F4C',
+};
 
 const VIEW_BOX = `0 0 ${SCENE.width} ${SCENE.height}`;
-const HEAD_RADIUS = 30;
 
 /**
  * Loops a clip's time for as long as it's on screen, or holds its key pose if reduced motion is on.
@@ -73,58 +89,85 @@ export function ExerciseFigure({ clip, playing = true, paused = false }: { clip:
   const time = useClipTime(clip, playing, paused);
   const viewBox = figureViewBox(clip);
 
-  const figure = useDerivedValue(() => solveFigure(poseAt(clip, time.get()), clip));
+  // Only the side profile has its drawn body so far. Seen from the front or from above, the figure
+  // is still the plain one: round lines along its bones, moving exactly as the clip says.
+  const shaped = clip.view === 'side' && !clip.widths;
 
-  const fade = useAnimatedStyle(() => ({ opacity: opacityAt(clip, time.get()) }));
-  const nearArm = useAnimatedProps(() => ({ d: figure.get().nearArm }));
-  const farArm = useAnimatedProps(() => ({ d: figure.get().farArm }));
-  const nearLeg = useAnimatedProps(() => ({ d: figure.get().nearLeg }));
-  const farLeg = useAnimatedProps(() => ({ d: figure.get().farLeg }));
-  const torso = useAnimatedProps(() => ({ d: figure.get().torso }));
+  // Reduced motion holds the clip's key pose exactly as it was drawn, without a breath in it.
+  const reducedMotion = useReducedMotion();
+  const figure = useDerivedValue(() =>
+    solveFigure(shaped && !reducedMotion ? livePoseAt(clip, time.get()) : poseAt(clip, time.get()), clip)
+  );
+
+  const marks = useAnimatedProps(() => ({ d: clip.follow ? floorMarks(travelAt(clip, time.get())) : '' }));
+  const shadow = useAnimatedProps(() => ({ cx: figure.get().shadowX, rx: figure.get().shadowRadius }));
+  const nearArm = useAnimatedProps(() => ({ d: shaped ? figure.get().shapes.nearArm : figure.get().nearArm }));
+  const farArm = useAnimatedProps(() => ({ d: shaped ? figure.get().shapes.farArm : figure.get().farArm }));
+  const nearLeg = useAnimatedProps(() => ({ d: shaped ? figure.get().shapes.nearLeg : figure.get().nearLeg }));
+  const farLeg = useAnimatedProps(() => ({ d: shaped ? figure.get().shapes.farLeg : figure.get().farLeg }));
+  const torso = useAnimatedProps(() => ({ d: shaped ? figure.get().shapes.torso : figure.get().torso }));
   const neck = useAnimatedProps(() => ({ d: figure.get().neck }));
   const head = useAnimatedProps(() => ({ cx: figure.get().headX, cy: figure.get().headY }));
+  const nose = useAnimatedProps(() => ({ d: figure.get().shapes.nose }));
   const band = useAnimatedProps(() => ({ d: figure.get().band }));
   const dumbbellHandles = useAnimatedProps(() => ({ d: figure.get().dumbbellHandles }));
   const dumbbellPlates = useAnimatedProps(() => ({ d: figure.get().dumbbellPlates }));
 
   return (
     <View accessible accessibilityRole="image" accessibilityLabel="Animated demonstration" style={styles.scene}>
-      {/* In the figure's own frame, so the floor and scenery line up with it however the camera moves. */}
-      <Svg width="100%" height="100%" viewBox={viewBox} style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={viewBox}>
         {clip.view === 'above' ? (
           <Ellipse cx={SCENE.width / 2} cy={SCENE.height / 2} rx={300} ry={235} fill={COLORS.mat} />
         ) : (
           <>
             {/* Wider and deeper than the scene, so it still reaches the edges when the camera pulls back. */}
             <Rect x={-SCENE.width} y={SCENE.floorY + 10} width={SCENE.width * 3} height={SCENE.height} fill={COLORS.ground} />
-            <Rect x={120} y={SCENE.floorY} width={720} height={10} rx={5} fill={COLORS.mat} />
+            {/* A mat has ends, so a figure travelling along the floor gets one that never runs out. */}
+            <Rect x={clip.follow ? -SCENE.width : 120} y={SCENE.floorY} width={clip.follow ? SCENE.width * 3 : 720} height={10} rx={5} fill={COLORS.mat} />
+            {clip.follow && <AnimatedPath animatedProps={marks} stroke={COLORS.scenery} strokeWidth={6} {...LIMB} />}
           </>
         )}
         {clip.scenery?.map((item, i) => (
           <Rect key={i} {...item} rx={4} fill={COLORS.scenery} />
         ))}
+        {shaped ? (
+          <>
+            <AnimatedEllipse animatedProps={shadow} cy={SCENE.floorY + 6} ry={7} fill={COLORS.shadow} opacity={0.14} />
+            <AnimatedPath animatedProps={farLeg} fill={COLORS.far} />
+            <AnimatedPath animatedProps={farArm} fill={COLORS.far} />
+            <AnimatedPath animatedProps={neck} stroke={COLORS.body} strokeWidth={22} {...LIMB} />
+            {/* Outlined in its own color, which rounds its corners and fills it out to its full size. */}
+            <AnimatedPath animatedProps={torso} fill={COLORS.body} stroke={COLORS.body} strokeWidth={2 * TORSO_SKIN} strokeLinejoin="round" />
+            <AnimatedCircle animatedProps={head} r={HEAD_RADIUS} fill={COLORS.body} />
+            <AnimatedPath animatedProps={nose} fill={COLORS.body} />
+            <AnimatedPath animatedProps={nearLeg} fill={COLORS.near} />
+            {clip.outlineNearArm && (
+              <AnimatedPath animatedProps={nearArm} fill={COLORS.background} stroke={COLORS.background} strokeWidth={10} />
+            )}
+            <AnimatedPath animatedProps={nearArm} fill={COLORS.near} />
+          </>
+        ) : (
+          <>
+            <AnimatedPath animatedProps={farLeg} stroke={COLORS.far} strokeWidth={24} {...LIMB} />
+            <AnimatedPath animatedProps={farArm} stroke={COLORS.far} strokeWidth={20} {...LIMB} />
+            <AnimatedPath animatedProps={neck} stroke={COLORS.body} strokeWidth={22} {...LIMB} />
+            <AnimatedPath animatedProps={torso} stroke={COLORS.body} strokeWidth={38} {...LIMB} />
+            <AnimatedCircle animatedProps={head} r={HEAD_RADIUS} fill={COLORS.body} />
+            <AnimatedPath animatedProps={nearLeg} stroke={COLORS.body} strokeWidth={26} {...LIMB} />
+            {clip.outlineNearArm && (
+              <AnimatedPath animatedProps={nearArm} stroke={COLORS.background} strokeWidth={32} {...LIMB} />
+            )}
+            <AnimatedPath animatedProps={nearArm} stroke={COLORS.body} strokeWidth={22} {...LIMB} />
+          </>
+        )}
+        {(clip.band || clip.miniBand) && <AnimatedPath animatedProps={band} stroke={COLORS.band} strokeWidth={10} {...LIMB} />}
+        {clip.dumbbells && (
+          <>
+            <AnimatedPath animatedProps={dumbbellHandles} stroke={COLORS.weight} strokeWidth={8} {...LIMB} />
+            <AnimatedPath animatedProps={dumbbellPlates} stroke={COLORS.weight} strokeWidth={28} {...LIMB} />
+          </>
+        )}
       </Svg>
-      <Animated.View style={[StyleSheet.absoluteFill, fade]}>
-        <Svg width="100%" height="100%" viewBox={viewBox}>
-          <AnimatedPath animatedProps={farLeg} stroke={COLORS.far} strokeWidth={24} {...LIMB} />
-          <AnimatedPath animatedProps={farArm} stroke={COLORS.far} strokeWidth={20} {...LIMB} />
-          <AnimatedPath animatedProps={neck} stroke={COLORS.near} strokeWidth={22} {...LIMB} />
-          <AnimatedPath animatedProps={torso} stroke={COLORS.near} strokeWidth={38} {...LIMB} />
-          <AnimatedCircle animatedProps={head} r={HEAD_RADIUS} fill={COLORS.near} />
-          <AnimatedPath animatedProps={nearLeg} stroke={COLORS.near} strokeWidth={26} {...LIMB} />
-          {clip.outlineNearArm && (
-            <AnimatedPath animatedProps={nearArm} stroke={COLORS.background} strokeWidth={32} {...LIMB} />
-          )}
-          <AnimatedPath animatedProps={nearArm} stroke={COLORS.near} strokeWidth={22} {...LIMB} />
-          {(clip.band || clip.miniBand) && <AnimatedPath animatedProps={band} stroke={COLORS.band} strokeWidth={10} {...LIMB} />}
-          {clip.dumbbells && (
-            <>
-              <AnimatedPath animatedProps={dumbbellHandles} stroke={COLORS.weight} strokeWidth={8} {...LIMB} />
-              <AnimatedPath animatedProps={dumbbellPlates} stroke={COLORS.weight} strokeWidth={28} {...LIMB} />
-            </>
-          )}
-        </Svg>
-      </Animated.View>
     </View>
   );
 }

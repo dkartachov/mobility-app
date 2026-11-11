@@ -8,9 +8,11 @@ import {
   DUMBBELL,
   figureViewBox,
   FINGER,
+  floorMarks,
   keyframeTime,
-  opacityAt,
+  livePoseAt,
   poseAt,
+  travelAt,
   limbRoots,
   SCENE,
   solveFigure,
@@ -29,10 +31,10 @@ const hands = EXERCISES.flatMap((e) => (e.animation?.view === 'hand' ? [{ id: e.
 const ARM_REACH = BONES.upperArm + BONES.forearm;
 const LEG_REACH = BONES.thigh + BONES.shin;
 
-/** The clip's pose every 50ms, so problems between keyframes are caught too. */
+/** The clip's pose as it's drawn every 50ms, so problems between keyframes are caught too. */
 function samples(clip: FigureClip): Pose[] {
   const poses: Pose[] = [];
-  for (let t = 0; t <= clipDuration(clip); t += 50) poses.push(poseAt(clip, t));
+  for (let t = 0; t <= clipDuration(clip); t += 50) poses.push(livePoseAt(clip, t));
   return poses;
 }
 
@@ -106,6 +108,103 @@ describe('dumbbells', () => {
   });
 });
 
+describe('body shapes', () => {
+  const stand = animated[0].animation.keyframes[0].pose;
+  const clip: FigureClip = { view: 'side', stillFrame: 0, keyframes: [{ ms: 0, pose: stand }] };
+
+  it('never draws a broken path', () => {
+    for (const { animation } of animated) {
+      for (const pose of samples(animation)) {
+        const { shapes } = solveFigure(pose, animation);
+        expect(Object.values(shapes).join('')).not.toMatch(/NaN|Infinity|undefined/);
+      }
+    }
+  });
+
+  it('shows the nose only from the side', () => {
+    expect(solveFigure(stand, clip).shapes.nose).not.toBe('');
+    expect(solveFigure(stand, { ...clip, widths: { shoulder: 28, hip: 16 } }).shapes.nose).toBe('');
+    expect(solveFigure(stand, { ...clip, view: 'above' }).shapes.nose).toBe('');
+  });
+
+  it('casts a wider shadow lying down than standing up', () => {
+    const upright: Pose = { ...stand, hip: [480, 260], torso: 90, neck: 90, nearFoot: [480, 456, 0], farFoot: [480, 456, 0] };
+    const lying: Pose = { ...upright, hip: [480, 450], torso: 180, neck: 180, nearFoot: [680, 456, 90], farFoot: [680, 456, 90] };
+    expect(solveFigure(lying, clip).shadowRadius).toBeGreaterThan(solveFigure(upright, clip).shadowRadius * 2);
+  });
+});
+
+describe('a clip the camera follows', () => {
+  const stand = animated[0].animation.keyframes[0].pose;
+  const ahead: Pose = {
+    ...stand,
+    hip: [stand.hip[0] + 100, stand.hip[1]],
+    nearFoot: [stand.nearFoot[0] + 100, stand.nearFoot[1], stand.nearFoot[2]],
+  };
+  const clip: FigureClip = {
+    view: 'side',
+    stillFrame: 0,
+    follow: true,
+    keyframes: [
+      { ms: 0, pose: stand },
+      { ms: 1000, pose: ahead },
+    ],
+  };
+
+  it('keeps the hips in place and moves the floor instead', () => {
+    expect(poseAt(clip, 1000).hip).toEqual(stand.hip);
+    expect(poseAt(clip, 1000).nearFoot).toEqual(stand.nearFoot);
+    expect(poseAt(clip, 1000).farFoot[0]).toBeCloseTo(stand.farFoot[0] - 100);
+    expect(travelAt(clip, 1000)).toBeCloseTo(100);
+    expect(travelAt({ ...clip, follow: false }, 1000)).toBe(0);
+  });
+
+  it('slides the floor marks back by how far it has gone, repeating', () => {
+    const xs = (path: string) => [...path.matchAll(/M(-?[\d.]+) /g)].map((m) => Number(m[1]));
+    expect(xs(floorMarks(30))[0]).toBeCloseTo(xs(floorMarks(0))[0] - 30);
+    expect(floorMarks(220)).toBe(floorMarks(0));
+  });
+});
+
+describe('livePoseAt', () => {
+  const stand = animated[0].animation.keyframes[0].pose;
+  const freeHands: Pose = { ...stand, nearHand: [stand.hip[0] + 20, stand.hip[1], -90], farHand: [stand.hip[0] + 20, stand.hip[1], -90] };
+  const nod: Pose = { ...freeHands, neck: freeHands.neck - 40 };
+  const clip: FigureClip = {
+    view: 'side',
+    stillFrame: 0,
+    keyframes: [
+      { ms: 0, pose: freeHands },
+      { ms: 2000, pose: nod },
+      { ms: 2000, pose: freeHands },
+    ],
+  };
+
+  it('breathes in and out once over a short clip, lifting the shoulders', () => {
+    expect(livePoseAt(clip, 0).breath ?? 0).toBe(0);
+    expect(livePoseAt(clip, 2000).breath).toBeCloseTo(1);
+    expect(livePoseAt(clip, 2000).torsoLength).toBeGreaterThan(BONES.torso + 1);
+    expect(solveFigure(livePoseAt(clip, 2000), clip).shapes.torso).not.toBe(solveFigure(poseAt(clip, 2000), clip).shapes.torso);
+  });
+
+  it('keeps the shoulders down under a hand at full stretch', () => {
+    const shoulderY = stand.hip[1] - BONES.torso;
+    const reaching: Pose = { ...freeHands, torso: 90, nearHand: [stand.hip[0], shoulderY + ARM_REACH, -90] };
+    const held: FigureClip = { ...clip, keyframes: clip.keyframes.map((k) => ({ ...k, pose: reaching })) };
+    expect(livePoseAt(held, 2000).torsoLength).toBeCloseTo(BONES.torso);
+  });
+
+  it('leaves clips too short to breathe in alone', () => {
+    const short: FigureClip = { ...clip, keyframes: clip.keyframes.map((k) => ({ ...k, ms: k.ms / 4 })) };
+    expect(livePoseAt(short, 500).breath).toBeUndefined();
+  });
+
+  it('turns the head a moment after the clip does', () => {
+    expect(livePoseAt(clip, 1000).neck).toBeGreaterThan(poseAt(clip, 1000).neck);
+    expect(livePoseAt(clip, 1000).neck).toBeCloseTo(poseAt(clip, 910).neck);
+  });
+});
+
 describe('exercise animations', () => {
   it('covers every exercise', () => {
     expect(EXERCISES.filter((e) => !e.animation).map((e) => e.id)).toEqual([]);
@@ -143,7 +242,7 @@ describe('exercise animations', () => {
           const start = i === 0 ? 0 : keyframeTime(clip, i - 1);
           const end = keyframeTime(clip, i);
           for (let t = held ? start : end; t <= end; t += 50) {
-            const pose = poseAt(clip, t);
+            const pose = livePoseAt(clip, t);
             const roots = limbRoots(pose, clip);
             const root = { nearHand: roots.nearShoulder, farHand: roots.farShoulder, nearFoot: roots.nearHip, farFoot: roots.farHip }[limb];
             const target = pose[limb];
@@ -187,17 +286,18 @@ describe('exercise animations', () => {
 
     it('loops without a jump', () => {
       const frames = clip.keyframes;
-      if (clip.fadeMs) {
-        expect(opacityAt(clip, 0)).toBe(0);
-        expect(opacityAt(clip, clipDuration(clip))).toBe(0);
-      } else {
-        expect(frames[frames.length - 1].pose).toEqual(frames[0].pose);
-      }
+      // A clip the camera follows ends in its first pose further along the floor, which looks the same.
+      if (clip.follow) expect(poseAt(clip, clipDuration(clip))).toEqual(poseAt(clip, 0));
+      else expect(frames[frames.length - 1].pose).toEqual(frames[0].pose);
+      // The breath and the head's lag come round to where they began too.
+      const [start, end] = [livePoseAt(clip, 0), livePoseAt(clip, clipDuration(clip))];
+      expect(end.neck).toBeCloseTo(start.neck);
+      expect(end.breath ?? 0).toBeCloseTo(start.breath ?? 0);
+      expect(end.torsoLength ?? BONES.torso).toBeCloseTo(start.torsoLength ?? BONES.torso);
     });
 
-    it('has a still frame for reduced motion that is fully visible', () => {
+    it('has a still frame for reduced motion', () => {
       expect(clip.keyframes[clip.stillFrame]).toBeDefined();
-      expect(opacityAt(clip, keyframeTime(clip, clip.stillFrame))).toBe(1);
     });
   });
 });
