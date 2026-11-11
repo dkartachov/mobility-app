@@ -66,8 +66,9 @@ describe('timeouts', () => {
 describe('side switch countdown', () => {
   const SWITCH_MS = 3000;
   const twoSided = EXERCISES.find((exercise) => exercise.twoSided)!;
+  const oneSided = EXERCISES.find((exercise) => !exercise.twoSided)!;
   const sided: WorkoutStep[] = [
-    { exercise: EXERCISES[0], durationSeconds: 60 },
+    { exercise: oneSided, durationSeconds: 60 },
     { exercise: twoSided, durationSeconds: 30, side: 1 },
     { exercise: twoSided, durationSeconds: 30, side: 2 },
   ];
