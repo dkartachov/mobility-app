@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { badgeLook } from '@/lib/badge-looks';
+import { badgeNumberScale } from '@/lib/badge-shapes';
 
 import { BadgeShape } from './milestone-badges';
 import { ThemedText } from './themed-text';
@@ -36,6 +37,8 @@ type BadgeCoinProps = {
 /** A milestone's badge drawn like a coin, turning in 3D with `rotation`. */
 export function BadgeCoin({ hours, size, rotation, scale }: BadgeCoinProps) {
   const look = badgeLook(hours);
+  // Small enough to sit inside the face in the middle of every shape.
+  const numberSize = size * 0.25 * badgeNumberScale(hours);
 
   const badgeStyle = useAnimatedStyle(() => ({
     transform: [{ perspective: 800 }, { rotateY: `${rotation.value}deg` }, { scale: scale.value }],
@@ -56,7 +59,7 @@ export function BadgeCoin({ hours, size, rotation, scale }: BadgeCoinProps) {
         <BadgeShape hours={hours} size={size} color="#000000" />
       </Animated.View>
       <Animated.View style={[styles.layer, styles.number, numberStyle]}>
-        <ThemedText type="stat" style={{ color: look.text, fontSize: size * 0.32, lineHeight: size * 0.36 }}>
+        <ThemedText type="stat" style={{ color: look.text, fontSize: numberSize, lineHeight: numberSize * 1.125 }}>
           {hours}
         </ThemedText>
       </Animated.View>

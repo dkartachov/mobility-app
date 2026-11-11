@@ -10,11 +10,23 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import Svg, { Circle, ClipPath, Defs, G, LinearGradient, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, {
+  Circle,
+  ClipPath,
+  Defs,
+  G,
+  LinearGradient,
+  Path,
+  Polygon,
+  RadialGradient,
+  Rect,
+  Stop,
+} from 'react-native-svg';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { badgeLook, PRISM_COLORS } from '@/lib/badge-looks';
+import { badgeLook, PRISM_COLORS, type BadgeLook } from '@/lib/badge-looks';
+import { badgeNumberScale, badgeShape, type BadgeShape as Shape } from '@/lib/badge-shapes';
 import { MILESTONE_HOURS } from '@/lib/milestones';
 
 import { PressableScale } from './pressable-scale';
@@ -25,8 +37,14 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 const BADGE_SIZE = 76;
 const BADGE_GAP = Spacing.three;
-/** Drawn in the fill color with round joins, which softens the shapes' corners. */
-const OUTLINE = 6;
+const NUMBER_SIZE = 16;
+/**
+ * Shapes are drawn reaching 1 each way from the middle, so the measurements below are fractions
+ * of half a badge's size. This outline is drawn in the fill color with round joins, which softens corners.
+ */
+const OUTLINE = 0.06;
+/** Leaves room for the outline, which would otherwise be cut off at the edges. */
+const SHAPE_SCALE = 0.94;
 /** One sweep of the shine, then a pause, then again. */
 const SHINE_MS = 900;
 const SHINE_CYCLE_MS = 3600;
@@ -36,19 +54,9 @@ const AURA_MS = 2800;
 const AURA_SCALE = 1.5;
 const SPARKLES = 6;
 
-/** Placeholder artwork, repeating along the list. 32 sides reads as a circle. */
-const SHAPES = [
-  { sides: 6 },
-  { sides: 4 },
-  { sides: 32 },
-  { sides: 5 },
-  { sides: 5, star: true },
-  { sides: 8 },
-];
-
 /**
- * SVG points for a shape with a corner at the top. A star alternates with corners further in,
- * at `inner` times the radius.
+ * SVG points for a shape with a corner at the top, which is what sparkles are made of. A star
+ * alternates with corners further in, at `inner` times the radius.
  */
 export function shapePoints(size: number, sides: number, star = false, inner = 0.65) {
   const radius = size / 2;
@@ -117,26 +125,31 @@ export function BadgeShape({
   still?: boolean;
 }) {
   const id = useSvgId();
-  const shape = SHAPES[MILESTONE_HOURS.indexOf(hours) % SHAPES.length];
-  const outline = (OUTLINE * size) / BADGE_SIZE;
-  const points = shapePoints(size - outline, shape.sides, shape.star);
+  const shape = badgeShape(hours);
   const look = color ? null : badgeLook(hours);
   const gradient = look && look.fill.length > 1;
   const fill = color ?? (gradient ? `url(#${id}-fill)` : look!.fill[0]);
-  const ringInset = size * 0.09;
   const shine = look?.shine && !still;
 
   return (
-    <Svg width={size} height={size} viewBox={`${-outline / 2} ${-outline / 2} ${size} ${size}`}>
+    <Svg width={size} height={size} viewBox="-1 -1 2 2">
       {look && (
         <Defs>
+          {/* Set across the whole badge rather than each part, so the parts share one sweep of color. */}
           {gradient && (
-            <LinearGradient id={`${id}-fill`} x1="0" y1="0" x2="1" y2="1">
+            <LinearGradient id={`${id}-fill`} gradientUnits="userSpaceOnUse" x1={-1} y1={-1} x2={1} y2={1}>
               {look.fill.map((stop, i) => (
                 <Stop key={i} offset={i / (look.fill.length - 1)} stopColor={stop} />
               ))}
             </LinearGradient>
           )}
+          {/* Light from above: brightens the top of whatever it's laid over and darkens the bottom. */}
+          <LinearGradient id={`${id}-light`} gradientUnits="userSpaceOnUse" x1={0} y1={-1} x2={0} y2={1}>
+            <Stop offset={0} stopColor="#FFFFFF" stopOpacity={0.5} />
+            <Stop offset={0.5} stopColor="#FFFFFF" stopOpacity={0} />
+            <Stop offset={0.5} stopColor="#000000" stopOpacity={0} />
+            <Stop offset={1} stopColor="#000000" stopOpacity={0.3} />
+          </LinearGradient>
           {shine && (
             <>
               <LinearGradient id={`${id}-shine`} x1="0" y1="0" x2="1" y2="0">
@@ -145,32 +158,100 @@ export function BadgeShape({
                 <Stop offset={1} stopColor="#FFFFFF" stopOpacity={0} />
               </LinearGradient>
               <ClipPath id={`${id}-clip`}>
-                <Polygon points={points} />
+                {shape.silhouette.map((d, i) => (
+                  <Path key={i} d={d} />
+                ))}
               </ClipPath>
             </>
           )}
         </Defs>
       )}
-      <Polygon points={points} fill={fill} stroke={fill} strokeWidth={outline} strokeLinejoin="round" />
-      {look?.ring && (
-        <Polygon
-          points={shapePoints(size - outline - ringInset * 2, shape.sides, shape.star)}
-          transform={`translate(${ringInset} ${ringInset})`}
-          fill="none"
-          stroke={look.ring}
-          strokeWidth={size * 0.03}
-          strokeLinejoin="round"
-        />
-      )}
-      {shine && <Shine size={size - outline} gradientId={`${id}-shine`} clipId={`${id}-clip`} />}
+      <G transform={`scale(${SHAPE_SCALE})`}>
+        {shape.silhouette.map((d, i) => (
+          <Path key={i} d={d} fill={fill} stroke={fill} strokeWidth={OUTLINE} strokeLinejoin="round" />
+        ))}
+        {look && <BadgeDetail shape={shape} look={look} fill={fill} lightId={`${id}-light`} />}
+        {shine && <Shine gradientId={`${id}-shine`} clipId={`${id}-clip`} />}
+      </G>
     </Svg>
   );
 }
 
+/** The outline of a part: the look's ring where it has one, otherwise a faint highlight. */
+function edge(look: BadgeLook, width: number) {
+  return look.ring
+    ? { stroke: look.ring, strokeWidth: width }
+    : { stroke: '#FFFFFF', strokeOpacity: 0.3, strokeWidth: width * 0.6 };
+}
+
+/** What's drawn inside a badge's silhouette to give it depth, leaving the middle clear for its number. */
+function BadgeDetail({ shape, look, fill, lightId }: { shape: Shape; look: BadgeLook; fill: string; lightId: string }) {
+  const { silhouette, detail } = shape;
+  const light = `url(#${lightId})`;
+
+  switch (detail.kind) {
+    case 'face':
+      return (
+        <>
+          <Path d={silhouette[0]} fill={light} />
+          <Path
+            d={silhouette[0]}
+            transform={`scale(${detail.scale})`}
+            fill={fill}
+            strokeLinejoin="round"
+            {...edge(look, 0.05)}
+          />
+        </>
+      );
+    case 'disc':
+      return (
+        <>
+          <Path d={silhouette[0]} fill={light} />
+          <Circle r={detail.radius} fill={fill} {...edge(look, 0.045)} />
+          {detail.double && <Circle r={detail.radius - 0.09} fill="none" opacity={0.7} {...edge(look, 0.02)} />}
+        </>
+      );
+    case 'facets':
+      return (
+        <>
+          {detail.facets.map((facet, i) => (
+            <Path
+              key={i}
+              d={facet.path}
+              fill={facet.light > 0 ? '#FFFFFF' : '#000000'}
+              fillOpacity={facet.light > 0 ? Math.min(0.5, facet.light * 0.42) : Math.min(0.4, facet.light * -0.34)}
+              stroke="#FFFFFF"
+              strokeOpacity={0.3}
+              strokeWidth={0.014}
+              strokeLinejoin="round"
+            />
+          ))}
+          <Path d={detail.table} fill={fill} strokeLinejoin="round" {...edge(look, 0.035)} />
+        </>
+      );
+    case 'layers':
+      return (
+        <>
+          <Path d={silhouette[0]} fill={light} />
+          <Path d={silhouette[1]} fill={fill} />
+          <Path
+            d={silhouette[1]}
+            fill="#FFFFFF"
+            fillOpacity={0.26}
+            stroke="#FFFFFF"
+            strokeOpacity={0.5}
+            strokeWidth={0.02}
+            strokeLinejoin="round"
+          />
+          <Circle r={detail.disc} fill={fill} {...edge(look, 0.04)} />
+        </>
+      );
+  }
+}
+
 /** A slanted band of light sweeping across the badge, clipped to its shape. */
-function Shine({ size, gradientId, clipId }: { size: number; gradientId: string; clipId: string }) {
+function Shine({ gradientId, clipId }: { gradientId: string; clipId: string }) {
   const progress = useSharedValue(0);
-  const band = size * 0.3;
 
   useEffect(() => {
     progress.set(withRepeat(withTiming(1, { duration: SHINE_CYCLE_MS, easing: Easing.linear }), -1, false));
@@ -178,13 +259,13 @@ function Shine({ size, gradientId, clipId }: { size: number; gradientId: string;
 
   const animatedProps = useAnimatedProps(() => {
     const sweep = Math.min(1, (progress.get() * SHINE_CYCLE_MS) / SHINE_MS);
-    return { x: -size + sweep * size * 2.5 };
+    return { x: -2.4 + sweep * 4.4 };
   });
 
   return (
     <G clipPath={`url(#${clipId})`}>
-      <G transform={`rotate(20 ${size / 2} ${size / 2})`}>
-        <AnimatedRect animatedProps={animatedProps} y={-size / 2} width={band} height={size * 2} fill={`url(#${gradientId})`} />
+      <G transform="rotate(20)">
+        <AnimatedRect animatedProps={animatedProps} y={-2} width={0.6} height={4} fill={`url(#${gradientId})`} />
       </G>
     </G>
   );
@@ -306,13 +387,14 @@ function Sparkle({
 function MilestoneBadge({ hours, reached }: { hours: number; reached: boolean }) {
   const theme = useTheme();
   const label = `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  const numberSize = { fontSize: NUMBER_SIZE * badgeNumberScale(hours) };
 
   if (!reached) {
     return (
       <View accessible accessibilityLabel={`${label}, not reached yet`} style={styles.badge}>
         <BadgeShape hours={hours} size={BADGE_SIZE} color={theme.backgroundSelected} />
         <View style={styles.number}>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.numberText}>
+          <ThemedText type="smallBold" themeColor="textSecondary" style={numberSize}>
             {hours}
           </ThemedText>
         </View>
@@ -329,7 +411,7 @@ function MilestoneBadge({ hours, reached }: { hours: number; reached: boolean })
       style={styles.badge}>
       <BadgeShape hours={hours} size={BADGE_SIZE} still />
       <View style={styles.number}>
-        <ThemedText type="smallBold" style={[styles.numberText, { color: badgeLook(hours).text }]}>
+        <ThemedText type="smallBold" style={[numberSize, { color: badgeLook(hours).text }]}>
           {hours}
         </ThemedText>
       </View>
@@ -352,8 +434,5 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  numberText: {
-    fontSize: 16,
   },
 });
