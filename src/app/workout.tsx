@@ -30,6 +30,7 @@ import {
   FAST_BUFFER_SECONDS,
   FAST_STEP_SECONDS,
   buildFocusWorkout,
+  buildWindDownWorkout,
   buildWorkout,
   filterExercises,
 } from '@/lib/workout';
@@ -49,6 +50,18 @@ function parseMinutes(value: string | undefined) {
   return (DAILY_MINUTES as readonly number[]).includes(minutes) ? minutes : DAILY_MINUTES[0];
 }
 
+type Routine = 'daily' | 'focus' | 'wind-down';
+
+const ROUTINE_TITLES: Record<Routine, string> = {
+  daily: 'Daily',
+  focus: 'Focus',
+  'wind-down': 'Wind down',
+};
+
+function parseRoutine(value: string | undefined): Routine {
+  return value === 'focus' || value === 'wind-down' ? value : 'daily';
+}
+
 /** The areas a focus workout targets, in the order given, skipping any that don't exist. */
 function parseAreas(value: string | undefined): ScoreArea[] {
   const ids = value?.split(',') ?? [];
@@ -63,15 +76,18 @@ function parseTests(value: string | undefined) {
 
 export default function WorkoutScreen() {
   const db = useSQLiteContext();
-  const params = useLocalSearchParams<{ minutes: string; routine?: 'focus'; areas?: string; tests?: string }>();
+  const params = useLocalSearchParams<{ minutes: string; routine?: Routine; areas?: string; tests?: string }>();
   const totalMinutes = parseMinutes(params.minutes);
-  const focus = params.routine === 'focus';
+  const routine = parseRoutine(params.routine);
   // Read once: toggling fast mode mid-workout shouldn't change the running workout.
   const [fast] = useState(getFastWorkouts);
   const [steps] = useState(() => {
-    const built = focus
-      ? buildFocusWorkout(totalMinutes, parseAreas(params.areas), parseTests(params.tests))
-      : buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
+    const built =
+      routine === 'focus'
+        ? buildFocusWorkout(totalMinutes, parseAreas(params.areas), parseTests(params.tests))
+        : routine === 'wind-down'
+          ? buildWindDownWorkout(totalMinutes)
+          : buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
     return fast ? built.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : built;
   });
   const [startedAt] = useState(() => new Date());
@@ -114,7 +130,7 @@ export default function WorkoutScreen() {
   const complete = async () => {
     const plannedSeconds = totalMinutes * 60;
     const fromSeconds = await getTotalSeconds(db);
-    await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: focus ? 'focus' : 'daily' });
+    await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: routine });
     countWorkoutForReminderPrompt();
     showDashboardUnderneath();
     setResult({ fromSeconds, toSeconds: fromSeconds + plannedSeconds });
@@ -122,7 +138,7 @@ export default function WorkoutScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: `${focus ? 'Focus' : 'Daily'} · ${totalMinutes} min` }} />
+      <Stack.Screen options={{ title: `${ROUTINE_TITLES[routine]} · ${totalMinutes} min` }} />
       {result ? (
         <WorkoutSummary {...result} onLeave={() => setLeaving(true)} />
       ) : (

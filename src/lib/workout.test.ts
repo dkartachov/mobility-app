@@ -11,10 +11,12 @@ import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 
 import {
   buildFocusWorkout,
+  buildWindDownWorkout,
   buildWorkout,
   DAILY_MINUTES,
   filterExercises,
   formatClock,
+  WIND_DOWN_EXERCISES,
   type WorkoutStep,
 } from './workout';
 
@@ -258,6 +260,16 @@ describe('buildFocusWorkout', () => {
 
   it('is a plain workout without focus areas', () => {
     expect(totalMinutes(buildFocusWorkout(8, []))).toBe(8);
+  });
+});
+
+describe('buildWindDownWorkout', () => {
+  it.each(DAILY_MINUTES)('fills %i minutes using only wind-down exercises', (minutes) => {
+    for (let run = 0; run < 20; run++) {
+      const steps = buildWindDownWorkout(minutes);
+      expect(steps.reduce((sum, step) => sum + step.durationSeconds, 0)).toBe(minutes * 60);
+      for (const step of steps) expect(WIND_DOWN_EXERCISES).toContain(step.exercise);
+    }
   });
 });
 

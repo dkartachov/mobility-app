@@ -118,6 +118,7 @@ function RootNavigator() {
             <Stack.Screen name="sign-in" />
             <Stack.Screen name="training-days" />
             {/* Draws its own back button, so its summary can drop it without the header jumping away. */}
+            <Stack.Screen name="wind-down" />
             <Stack.Screen name="workout" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>

@@ -1,4 +1,4 @@
-import { EXERCISES, type Exercise } from '@/data/exercises';
+import { EXERCISES, getExercises, WIND_DOWN_EXERCISE_IDS, type Exercise } from '@/data/exercises';
 import type { ScoreArea } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 
@@ -78,6 +78,14 @@ export function buildWorkout(minutes: number, library: readonly Exercise[] = EXE
   }
 
   return steps;
+}
+
+/** The exercises wind-down workouts pick from: only easy passive stretches and gentle mobility drills. */
+export const WIND_DOWN_EXERCISES = getExercises(WIND_DOWN_EXERCISE_IDS);
+
+/** A low intensity workout for after training, from `WIND_DOWN_EXERCISES`. */
+export function buildWindDownWorkout(minutes: number): WorkoutStep[] {
+  return buildWorkout(minutes, WIND_DOWN_EXERCISES);
 }
 
 /** Share of a focus workout's minutes given to exercises for other areas, for variety. */

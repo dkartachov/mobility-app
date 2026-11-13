@@ -1373,6 +1373,44 @@ export function getExercise(id: string | undefined) {
   return EXERCISES.find((exercise) => exercise.id === id);
 }
 
+/**
+ * The exercises wind-down routines pick from, for after a workout: easy passive stretches and a few
+ * gentle mobility drills, none needing equipment. Deep or effortful holds (pancake, frog, bottom
+ * squat, horse stance…) and anything loaded are left out, to keep it low intensity.
+ */
+export const WIND_DOWN_EXERCISE_IDS = [
+  // Passive stretches
+  '90-to-90',
+  'behind-the-back-chest-opener',
+  'butterfly',
+  'cross-body-shoulder-stretch',
+  'figure-four-stretch',
+  'half-spinal-twist',
+  'happy-baby',
+  'kneeling-wrist-stretch',
+  'knight-stretch',
+  'lying-knee-hug',
+  'lying-windshield-wiper-hold',
+  'manual-extensor-forearm-stretch',
+  'manual-flexor-forearm-stretch',
+  'neck-side-stretch',
+  'overhead-triceps-stretch',
+  'pec-stretch-on-the-ground',
+  'pigeon-stretch',
+  'prayer-pose',
+  'puppy-pose',
+  'seated-pike-stretch',
+  'seated-straddle-side-bend',
+  'sleeper-stretch',
+  'standing-forward-fold',
+  // Gentle mobility
+  'cat-cow',
+  'finger-tendon-glides',
+  'open-book',
+  'thread-the-needle',
+  'wrist-rocks',
+] as const;
+
 /** The exercises with these ids, in the same order, skipping any that don't exist. */
 export function getExercises(ids: readonly string[]) {
   return ids.flatMap((id) => getExercise(id) ?? []);

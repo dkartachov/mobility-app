@@ -40,6 +40,13 @@ export default function StartScreen() {
         style={styles.tile}
       />
       <StartTile
+        title="Wind down"
+        subtitle="Easy stretches after a workout"
+        tag={`${DAILY_MINUTES[0]}–${DAILY_MINUTES[DAILY_MINUTES.length - 1]} min`}
+        onPress={() => router.push('/wind-down')}
+        style={styles.tile}
+      />
+      <StartTile
         title="Library"
         subtitle="Browse every exercise"
         tag={`${EXERCISES.length} exercises`}

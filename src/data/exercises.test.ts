@@ -1,4 +1,4 @@
-import { EXERCISES, getExercise, getExercises, searchExercises } from './exercises';
+import { EXERCISES, getExercise, getExercises, searchExercises, WIND_DOWN_EXERCISE_IDS } from './exercises';
 import { SCORE_AREAS } from './mobility-score';
 import { FLEXIBILITY_TESTS } from './mobility-tests';
 
@@ -77,5 +77,28 @@ describe('searchExercises', () => {
 
   it('returns nothing when no name matches', () => {
     expect(searchExercises('zzz')).toEqual([]);
+  });
+});
+
+describe('WIND_DOWN_EXERCISE_IDS', () => {
+  const windDown = getExercises(WIND_DOWN_EXERCISE_IDS);
+
+  it('only lists exercises that exist, once each', () => {
+    expect(windDown).toHaveLength(WIND_DOWN_EXERCISE_IDS.length);
+    expect(new Set(WIND_DOWN_EXERCISE_IDS).size).toBe(WIND_DOWN_EXERCISE_IDS.length);
+  });
+
+  it('is mostly passive stretches, so the routine stays low intensity', () => {
+    const passive = windDown.filter((e) => !e.active);
+    expect(passive.length / windDown.length).toBeGreaterThanOrEqual(0.75);
+  });
+
+  it('needs no equipment', () => {
+    for (const exercise of windDown) expect(exercise.equipment ?? []).toEqual([]);
+  });
+
+  it('has enough exercises to fill the longest workout without repeats, and one-sided ones for odd minutes', () => {
+    expect(windDown.length).toBeGreaterThanOrEqual(22);
+    expect(windDown.filter((e) => !e.twoSided).length).toBeGreaterThanOrEqual(3);
   });
 });
