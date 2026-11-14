@@ -12,18 +12,15 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimePicker } from '@/components/time-picker';
 import { Spacing } from '@/constants/theme';
-import { focusAreas, focusTests } from '@/data/mobility-score';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
-import { useMobilityScore } from '@/db/mobility-tests';
+import { useFocusPlan } from '@/hooks/use-focus-plan';
 import { DAILY_MINUTES } from '@/lib/workout';
 
 export default function FocusScreen() {
   const insets = useSafeAreaInsets();
   const [minutes, setMinutes] = useState<number | null>(null);
-  const score = useMobilityScore();
-  const areas = score ? focusAreas(score.areas) : [];
-  // The weakest movement in each focus area, which the routine always includes exercises for.
-  const tests = score ? focusTests(score.tests, areas) : [];
+  // `tests` is the weakest movement in each focus area, which the routine always includes exercises for.
+  const { score, areas, tests } = useFocusPlan();
   const movements = Object.fromEntries(
     FLEXIBILITY_TESTS.filter((test) => tests.includes(test.id)).map((test) => [test.area, test.movement])
   );

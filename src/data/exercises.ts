@@ -1374,7 +1374,7 @@ export function getExercise(id: string | undefined) {
 }
 
 /**
- * The exercises wind-down routines pick from, for after a workout: easy passive stretches and a few
+ * The exercises wind-down routines pick from, for after a workout or at the end of the day: easy passive stretches and a few
  * gentle mobility drills, none needing equipment. Deep or effortful holds (pancake, frog, bottom
  * squat, horse stance…) and anything loaded are left out, to keep it low intensity.
  */

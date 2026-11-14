@@ -1,11 +1,12 @@
 import { Image, type ImageSource } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { css, useReducedMotion } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { haptic } from '@/lib/haptics';
 
 import { PressableScale } from './pressable-scale';
 import { ThemedText } from './themed-text';
@@ -20,20 +21,29 @@ type StartTileProps = {
   image?: ImageSource;
   /** E.g. `flex: 1` to fill the space left on the screen instead of the default fixed height. */
   style?: StyleProp<ViewStyle>;
+  /** Smaller text and padding and no arrow, for tiles sharing a row. */
+  compact?: boolean;
+  /** Workout lengths shown as buttons that start one straight away, in place of the arrow. */
+  minutes?: readonly number[];
+  onStart?: (minutes: number) => void;
 };
 
 /** Large tappable tile on the Start tab. */
-export function StartTile({ title, subtitle, onPress, tag, image, style }: StartTileProps) {
+export function StartTile({ title, subtitle, onPress, tag, image, style, compact, minutes, onStart }: StartTileProps) {
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
   const onImage = image !== undefined;
+  const lengths = onStart ? (minutes ?? []) : [];
 
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${subtitle}`}
+      // The length buttons sit inside this tile, so screen readers reach them as its actions instead.
+      accessibilityActions={lengths.map((value) => ({ name: String(value), label: `Start ${value} minutes` }))}
+      onAccessibilityAction={(event) => onStart?.(Number(event.nativeEvent.actionName))}
       onPress={onPress}
-      style={[styles.tile, { backgroundColor: theme.backgroundElement }, style]}>
+      style={[styles.tile, compact && styles.compact, { backgroundColor: theme.backgroundElement }, style]}>
       {onImage && (
         <>
           {/* Drifts slowly in and out, so the photo feels alive. A CSS animation, which doesn't follow reduce motion by itself. */}
@@ -60,22 +70,51 @@ export function StartTile({ title, subtitle, onPress, tag, image, style }: Start
           </ThemedText>
         </View>
       )}
-      <View style={styles.footer}>
+      <View style={[styles.footer, lengths.length > 0 && styles.footerStacked]}>
         <View style={styles.text}>
-          <ThemedText type="title" style={onImage && styles.onImage}>
+          <ThemedText type={compact ? 'subtitle' : 'title'} style={onImage && styles.onImage}>
             {title}
           </ThemedText>
-          <ThemedText themeColor="textSecondary" style={onImage && styles.onImageSecondary}>
+          <ThemedText
+            type={compact ? 'small' : 'default'}
+            themeColor="textSecondary"
+            numberOfLines={compact ? 2 : undefined}
+            style={onImage && styles.onImageSecondary}>
             {subtitle}
           </ThemedText>
         </View>
-        <View style={[styles.go, { backgroundColor: onImage ? 'rgba(255, 255, 255, 0.22)' : theme.tintSoft }]}>
-          <SymbolView
-            name={{ ios: 'arrow.right', android: 'arrow_forward' }}
-            size={20}
-            tintColor={onImage ? '#FFFFFF' : theme.tint}
-          />
-        </View>
+        {lengths.length > 0 ? (
+          <View style={styles.lengths}>
+            {lengths.map((value) => (
+              <Pressable
+                key={value}
+                importantForAccessibility="no"
+                onPress={() => {
+                  haptic.select();
+                  onStart?.(value);
+                }}
+                style={({ pressed }) => [
+                  styles.length,
+                  { backgroundColor: onImage ? 'rgba(255, 255, 255, 0.22)' : theme.tintSoft },
+                  pressed && styles.pressed,
+                ]}>
+                <ThemedText type="smallBold" style={onImage ? styles.onImage : { color: theme.tint }}>
+                  {value} min
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          !compact && (
+            <View style={[styles.go, { backgroundColor: onImage ? 'rgba(255, 255, 255, 0.22)' : theme.tintSoft }]}>
+              <SymbolView
+                name={{ ios: 'arrow.right', android: 'arrow_forward' }}
+                size={20}
+                tintColor={onImage ? '#FFFFFF' : theme.tint}
+              />
+            </View>
+          )
+        )}
       </View>
     </PressableScale>
   );
@@ -89,6 +128,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'space-between',
     padding: Spacing.threeAndHalf,
+  },
+  compact: {
+    padding: Spacing.three,
   },
   tag: {
     alignSelf: 'flex-start',
@@ -105,6 +147,10 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     marginTop: 'auto',
   },
+  footerStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
   text: {
     flex: 1,
     gap: Spacing.half,
@@ -115,6 +161,19 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  lengths: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  length: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.twoAndHalf,
+    borderRadius: Radius.full,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   onImage: {
     color: '#FFFFFF',

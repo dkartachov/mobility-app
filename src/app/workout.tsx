@@ -12,6 +12,7 @@ import { showDialog } from '@/components/dialog';
 import { IconBadge } from '@/components/icon-badge';
 import { MilestoneBar } from '@/components/milestone-bar';
 import { promptForReminderIfDue } from '@/components/reminder-prompt';
+import { RoutinePrep } from '@/components/routine-prep';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WorkoutPlayer } from '@/components/workout-player';
@@ -33,6 +34,7 @@ import {
   buildWindDownWorkout,
   buildWorkout,
   filterExercises,
+  type WorkoutStep,
 } from '@/lib/workout';
 import { getWorkoutFilters } from '@/lib/workout-filters';
 
@@ -81,16 +83,24 @@ export default function WorkoutScreen() {
   const routine = parseRoutine(params.routine);
   // Read once: toggling fast mode mid-workout shouldn't change the running workout.
   const [fast] = useState(getFastWorkouts);
-  const [steps] = useState(() => {
-    const built =
-      routine === 'focus'
-        ? buildFocusWorkout(totalMinutes, parseAreas(params.areas), parseTests(params.tests))
-        : routine === 'wind-down'
-          ? buildWindDownWorkout(totalMinutes)
-          : buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
-    return fast ? built.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : built;
-  });
-  const [startedAt] = useState(() => new Date());
+  // Built just after the first frame, so the "Building your routine" screen is up while it runs.
+  const [steps, setSteps] = useState<WorkoutStep[] | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const built =
+        routine === 'focus'
+          ? buildFocusWorkout(totalMinutes, parseAreas(params.areas), parseTests(params.tests))
+          : routine === 'wind-down'
+            ? buildWindDownWorkout(totalMinutes)
+            : buildWorkout(totalMinutes, filterExercises(getWorkoutFilters()));
+      setSteps(fast ? built.map((step) => ({ ...step, durationSeconds: FAST_STEP_SECONDS })) : built);
+    });
+    return () => clearTimeout(timer);
+    // Built once, from the params the screen opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Set by the prep screen's Start button.
+  const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [result, setResult] = useState<{ fromSeconds: number; toSeconds: number }>();
   const [leaving, setLeaving] = useState(false);
   const navigation = useNavigation();
@@ -98,7 +108,8 @@ export default function WorkoutScreen() {
 
   // Leaving mid-workout loses it, so confirm first and then go all the way back to the start screen.
   // The summary has nothing to confirm: going back does nothing there, and only its Done button leaves.
-  usePreventRemove(!leaving, () => {
+  // Before the workout starts there's nothing to lose, so back just returns to picking a length.
+  usePreventRemove(startedAt !== null && !leaving, () => {
     if (result) return;
     showDialog({
       title: 'Cancel workout?',
@@ -130,7 +141,7 @@ export default function WorkoutScreen() {
   const complete = async () => {
     const plannedSeconds = totalMinutes * 60;
     const fromSeconds = await getTotalSeconds(db);
-    await logSession(db, { startedAt, durationSeconds: plannedSeconds, routineId: routine });
+    await logSession(db, { startedAt: startedAt ?? new Date(), durationSeconds: plannedSeconds, routineId: routine });
     countWorkoutForReminderPrompt();
     showDashboardUnderneath();
     setResult({ fromSeconds, toSeconds: fromSeconds + plannedSeconds });
@@ -141,6 +152,13 @@ export default function WorkoutScreen() {
       <Stack.Screen options={{ title: `${ROUTINE_TITLES[routine]} · ${totalMinutes} min` }} />
       {result ? (
         <WorkoutSummary {...result} onLeave={() => setLeaving(true)} />
+      ) : startedAt === null || steps === null ? (
+        <RoutinePrep
+          title={`${ROUTINE_TITLES[routine]} · ${totalMinutes} min`}
+          built={steps !== null}
+          onStart={() => setStartedAt(new Date())}
+          onBack={() => router.back()}
+        />
       ) : (
         <WorkoutPlayer
           steps={steps}
