@@ -20,7 +20,7 @@ const routes = {
   feedback: FeedbackScreen,
 };
 
-async function open(params: { exerciseId?: string } = {}) {
+async function open(params: Record<string, string> = {}) {
   await renderRouter(routes, { initialUrl: '/' });
   await screen.findByText('Home');
   await act(() => router.push({ pathname: '/feedback', params }));
@@ -87,5 +87,43 @@ describe('feedback screen', () => {
     expect(await screen.findByText("Couldn't send your feedback.")).toBeTruthy();
     expect(screen.getByDisplayValue('Love it')).toBeTruthy();
     expect(screen.queryByText('Thanks!')).toBeNull();
+  });
+
+  it('reports a problem with a test, with its side and reading', async () => {
+    await open({ testId: 'knee-to-wall', side: 'Left side', reading: '9.5cm' });
+
+    expect(await screen.findByRole('header', { name: 'Knee to wall' })).toBeTruthy();
+    expect(screen.getByText(/Left side · What's wrong with this test\?/)).toBeTruthy();
+    // Test reasons, not exercise ones.
+    expect(screen.queryByRole('radio', { name: 'Too easy' })).toBeNull();
+
+    await fireEvent.press(screen.getByRole('radio', { name: 'Measurement seems wrong' }));
+    await fireEvent.press(sendButton());
+
+    expect(mockSend).toHaveBeenCalledWith({
+      kind: 'test',
+      testId: 'knee-to-wall',
+      testName: 'Knee to wall',
+      reason: 'measurement',
+      side: 'Left side',
+      reading: '9.5cm',
+      message: '',
+    });
+    expect(await screen.findByText('Thanks!')).toBeTruthy();
+  });
+
+  it('leaves out the side and reading when there are none', async () => {
+    await open({ testId: 'knee-to-wall', side: '', reading: '' });
+
+    await fireEvent.press(await screen.findByRole('radio', { name: "Phone measuring didn't work" }));
+    await fireEvent.press(sendButton());
+
+    expect(mockSend).toHaveBeenCalledWith({
+      kind: 'test',
+      testId: 'knee-to-wall',
+      testName: 'Knee to wall',
+      reason: 'phone',
+      message: '',
+    });
   });
 });

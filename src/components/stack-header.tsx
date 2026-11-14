@@ -18,8 +18,8 @@ const TITLE_FADE_MS = 150;
  * native header doesn't pick up a runtime theme switch and stays dark until the app reloads,
  * while plain views re-render with the new colors immediately.
  *
- * Just a back (or close) button: screens show their own large title in the content, like the tab
- * screens. Once that title scrolls out of view, `PageHeader` sets `headerTitle` and it shows here
+ * Just a back (or close) button, and whatever a screen puts in `headerRight`: screens show their own
+ * large title in the content, like the tab screens. Once that title scrolls out of view, `PageHeader` sets `headerTitle` and it shows here
  * small, with a line under the header to separate it from the content passing beneath.
  */
 export function StackHeader({ back, options, navigation }: NativeStackHeaderProps) {
@@ -27,6 +27,7 @@ export function StackHeader({ back, options, navigation }: NativeStackHeaderProp
   const insets = useSafeAreaInsets();
   const isModal = options.presentation === 'modal';
   const title = typeof options.headerTitle === 'string' ? options.headerTitle : undefined;
+  const right = options.headerRight?.({ canGoBack: back !== undefined, tintColor: theme.text });
 
   return (
     <ThemedView
@@ -42,6 +43,13 @@ export function StackHeader({ back, options, navigation }: NativeStackHeaderProp
             {title}
           </ThemedText>
         </Animated.View>
+      )}
+      {right && (
+        <>
+          {/* Keeps the button on the right when there's no title to push it there. */}
+          {!title && <View style={styles.title} />}
+          {right}
+        </>
       )}
     </ThemedView>
   );

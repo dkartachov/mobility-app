@@ -19,6 +19,7 @@ import { InstructionList } from '@/components/instruction-list';
 import { Pager } from '@/components/pager';
 import { Pill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
+import { ReportButton } from '@/components/report-button';
 import { ScrollView } from '@/components/scroll-view';
 import { BackButton, HEADER_HEIGHT } from '@/components/stack-header';
 import { ThemedText } from '@/components/themed-text';
@@ -142,6 +143,7 @@ export function WorkoutPlayer({
         <BackButton onPress={onBack} />
         {onReport && (
           <ReportButton
+            label="Report a problem with this exercise"
             onPress={() => {
               if (!state.paused && !finished) dispatch({ type: 'pause' });
               onReport(step.exercise);
@@ -332,26 +334,6 @@ function ControlButton({ label, icon, onPress, primary, disabled, glow, finishes
   );
 }
 
-/** Opens a report about the exercise on screen, from the top bar so it's out of the way of the controls. */
-function ReportButton({ onPress }: { onPress: () => void }) {
-  const theme = useTheme();
-
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel="Report a problem with this exercise"
-      hitSlop={Spacing.two}
-      pressedScale={0.9}
-      onPress={() => {
-        haptic.tap();
-        onPress();
-      }}
-      style={[styles.reportButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-      <Icon name={{ ios: 'flag', android: 'flag' }} size={18} color="text" />
-    </PressableScale>
-  );
-}
-
 /** Sits beside the clock, so it doesn't crowd the row of controls or get pressed instead of them. */
 function TimeoutButton({ onPress, disabled }: { onPress: () => void; disabled: boolean }) {
   const theme = useTheme();
@@ -488,14 +470,6 @@ const styles = StyleSheet.create({
     fontSize: 64,
     lineHeight: 72,
     letterSpacing: -2,
-  },
-  reportButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   timeoutButton: {
     position: 'absolute',

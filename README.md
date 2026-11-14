@@ -95,7 +95,7 @@ Settings showing the last backup and any error is also how you'd notice the free
 
 ## Feedback
 
-Signed-in users can send feedback from Settings (About, Send feedback) and report a problem with an exercise from the flag button in a workout or warm-up, which pauses it first. Both open `src/app/feedback.tsx`. An exercise report picks a reason (caused pain, instructions unclear, video doesn't match, too hard, too easy, other) with optional details; general feedback is a message. Phones used offline, and builds without Supabase settings, don't show either button.
+Signed-in users can send feedback from Settings (About, Send feedback), and report a problem from a flag button in two places: with an exercise during a workout or warm-up, which pauses it first, and with a flexibility test while measuring, in the header. All three open `src/app/feedback.tsx`. A report picks a reason with optional details. Exercises offer caused pain, instructions unclear, video doesn't match, too hard, too easy and other. Tests offer measurement seems wrong, phone measuring didn't work, instructions unclear, can't get into position, caused pain, video doesn't match and other, and the email also gives the side and the reading on screen. General feedback is a message. Phones used offline, and builds without Supabase settings, don't show any of these buttons.
 
 The app calls the `send-feedback` Edge Function, which checks the session and emails the report to your Gmail inbox, with the user's email as Reply-To so you can answer them directly. The SMTP settings under Authentication only send Auth emails (the sign-in codes), so the function connects to Gmail itself, on port 465: Edge Functions can't connect out on 25 or 587. Gmail allows about 500 emails a day.
 

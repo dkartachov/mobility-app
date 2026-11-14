@@ -1,4 +1,4 @@
-// Emails feedback and exercise reports from the app to the developer's Gmail inbox.
+// Emails feedback, and reports about exercises and flexibility tests, from the app to the developer's Gmail inbox.
 // Deploy with `supabase functions deploy send-feedback` after setting its two secrets:
 //   supabase secrets set GMAIL_USER=you@gmail.com GMAIL_APP_PASSWORD=<16-character app password>
 // The SMTP settings under Authentication in the dashboard only send Auth emails (the sign-in
@@ -7,15 +7,20 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 import nodemailer from 'npm:nodemailer@6.10.1';
 
-/** Matches `FEEDBACK_REASONS` in `src/lib/feedback.ts`. */
+/** Matches `EXERCISE_REASONS` and `TEST_REASONS` in `src/lib/feedback.ts`. */
 const REASONS: Record<string, string> = {
   pain: 'Caused pain',
   unclear: 'Instructions unclear',
   video: "Video doesn't match",
   too_hard: 'Too hard',
   too_easy: 'Too easy',
+  measurement: 'Measurement seems wrong',
+  phone: "Phone measuring didn't work",
+  position: "Can't get into position",
   other: 'Other',
 };
+
+const SUBJECT_LABELS = { exercise: 'Exercise', test: 'Test' } as const;
 const MAX_MESSAGE = 2000;
 const MAX_FIELD = 100;
 
@@ -49,22 +54,29 @@ Deno.serve(async (request) => {
   } catch {
     return respond({ error: 'Send JSON' }, 400);
   }
-  const kind = body.kind === 'exercise' ? 'exercise' : 'general';
-  const reason = typeof body.reason === 'string' && body.reason in REASONS ? body.reason : null;
+  const kind = body.kind === 'exercise' ? 'exercise' : body.kind === 'test' ? 'test' : 'general';
+  const reason = typeof body.reason === 'string' && Object.hasOwn(REASONS, body.reason) ? body.reason : null;
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, MAX_MESSAGE) : '';
-  const exerciseId = field(body.exerciseId);
-  const exerciseName = field(body.exerciseName) || exerciseId;
-  if (kind === 'exercise' && (!exerciseId || !reason)) return respond({ error: 'Pick a reason' }, 400);
   if (kind === 'general' && !message) return respond({ error: 'Write a message' }, 400);
 
-  const subject =
-    kind === 'exercise' ? `[Plié] Exercise report: ${exerciseName} — ${REASONS[reason!]}` : '[Plié] Feedback';
-  const details = [
-    kind === 'exercise' ? `Exercise: ${exerciseName} (${exerciseId})` : null,
-    kind === 'exercise' ? `Reason: ${REASONS[reason!]}` : null,
+  const details: string[] = [];
+  let subject = '[Plié] Feedback';
+  if (kind !== 'general') {
+    const id = field(kind === 'exercise' ? body.exerciseId : body.testId);
+    const name = field(kind === 'exercise' ? body.exerciseName : body.testName) || id;
+    if (!id || !reason) return respond({ error: 'Pick a reason' }, 400);
+    const side = kind === 'test' ? field(body.side) : '';
+    const reading = kind === 'test' ? field(body.reading) : '';
+    const label = SUBJECT_LABELS[kind];
+    subject = `[Plié] ${label} report: ${name}${side ? ` (${side})` : ''} — ${REASONS[reason]}`;
+    details.push(`${label}: ${name} (${id})`, `Reason: ${REASONS[reason]}`);
+    if (side) details.push(`Side: ${side}`);
+    if (reading) details.push(`Reading on screen: ${reading}`);
+  }
+  details.push(
     `From: ${user.email ?? 'no email'} (${user.id})`,
-    `App: ${field(body.appVersion) || 'unknown'} (${field(body.variant) || 'unknown'}) on ${field(body.platform) || 'unknown'}`,
-  ].filter((line) => line !== null);
+    `App: ${field(body.appVersion) || 'unknown'} (${field(body.variant) || 'unknown'}) on ${field(body.platform) || 'unknown'}`
+  );
 
   const gmail = Deno.env.get('GMAIL_USER');
   const password = Deno.env.get('GMAIL_APP_PASSWORD');

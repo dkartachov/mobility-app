@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/page-header';
 import { Pager } from '@/components/pager';
 import { Pill, ScoreChangePill } from '@/components/pill';
 import { ProgressBar } from '@/components/progress-bar';
+import { ReportButton } from '@/components/report-button';
 import { ScoreBars } from '@/components/score-bars';
 import { ScoreBreakdown } from '@/components/score-breakdown';
 import { ScoreRing } from '@/components/score-ring';
@@ -26,7 +27,7 @@ import { ThemedView } from '@/components/themed-view';
 import { WorkoutPlayer } from '@/components/workout-player';
 import { Spacing } from '@/constants/theme';
 import { focusAreas, SCORE_AREAS, SCORE_BAND_LABELS, scoreBand } from '@/data/mobility-score';
-import { FLEXIBILITY_TESTS, METHOD_UNITS, SIDE_LABELS, TEST_STEPS } from '@/data/mobility-tests';
+import { FLEXIBILITY_TESTS, METHOD_UNITS, SIDE_LABELS, TEST_STEPS, UNIT_LABELS } from '@/data/mobility-tests';
 import {
   TEST_WARMUP,
   WARMUP_BUFFER_SECONDS,
@@ -165,6 +166,21 @@ export default function MobilityTestScreen() {
   };
 
   const fullScreen = phase === 'calculating' || phase === 'results';
+  const canSendFeedback = useCanSendFeedback();
+
+  // Opens a report about the measurement on screen, with its side and reading so far.
+  const reportTest = () => {
+    const { test, side } = TEST_STEPS[index];
+    const value = values[index];
+    router.push({
+      pathname: '/feedback',
+      params: {
+        testId: test.id,
+        side: side ? SIDE_LABELS[side] : '',
+        reading: value === null ? '' : `${Math.round(value * 10) / 10}${UNIT_LABELS[METHOD_UNITS[test.method.kind]]}`,
+      },
+    });
+  };
 
   return (
     <>
@@ -174,6 +190,10 @@ export default function MobilityTestScreen() {
           // The warm-up player has its own back button in place of the header.
           headerShown: !fullScreen && phase !== 'warmup',
           gestureEnabled: !fullScreen,
+          headerRight:
+            phase === 'measuring' && canSendFeedback
+              ? () => <ReportButton label="Report a problem with this test" onPress={reportTest} />
+              : undefined,
         }}
       />
       {phase === 'intro' && (

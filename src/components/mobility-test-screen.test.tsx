@@ -1,5 +1,5 @@
 import { act, fireEvent, screen } from '@testing-library/react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
 
@@ -29,6 +29,14 @@ jest.mock('@/components/workout-player', () => {
   };
 });
 jest.mock('@/components/test-measurement', () => ({ TestMeasurement: () => null }));
+const mockCanSendFeedback = { value: true };
+jest.mock('@/lib/feedback', () => ({ useCanSendFeedback: () => mockCanSendFeedback.value }));
+
+/** Stands in for the feedback sheet, showing what it was opened with. */
+function FeedbackStub() {
+  const params = useLocalSearchParams();
+  return <Text>Feedback for {JSON.stringify(params)}</Text>;
+}
 
 const routes = {
   _layout: () => (
@@ -39,6 +47,7 @@ const routes = {
   ),
   index: () => <Text>Home</Text>,
   'mobility-test': MobilityTestScreen,
+  feedback: FeedbackStub,
 };
 
 const button = (name: string) => screen.getByRole('button', { name });
@@ -126,5 +135,48 @@ describe('flexibility test warm-up', () => {
     await fireEvent.press(button('Skip warm-up'));
 
     expect(screen.getByText('Warm-up done')).toBeTruthy();
+  });
+});
+
+describe('flexibility test reports', () => {
+  const reportButton = 'Report a problem with this test';
+
+  beforeEach(() => {
+    setSkipTestMeasurements(false);
+    mockCanSendFeedback.value = true;
+  });
+
+  async function startMeasuring() {
+    await openTest();
+    await fireEvent.press(button('Start warm-up'));
+    await fireEvent.press(button('Finish warm-up'));
+    await fireEvent.press(button('Start test'));
+  }
+
+  it('reports the test and side being measured', async () => {
+    await startMeasuring();
+
+    await fireEvent.press(button(reportButton));
+
+    const feedback = await screen.findByText(/Feedback for/);
+    expect(feedback).toHaveTextContent(/"testId":"knee-to-wall"/);
+    expect(feedback).toHaveTextContent(/"side":"Left side"/);
+  });
+
+  it('only offers a report while measuring', async () => {
+    await openTest();
+    expect(screen.queryByRole('button', { name: reportButton })).toBeNull();
+
+    await fireEvent.press(button('Start warm-up'));
+    await fireEvent.press(button('Finish warm-up'));
+    expect(screen.queryByRole('button', { name: reportButton })).toBeNull();
+  });
+
+  it("doesn't offer a report where feedback can't be sent", async () => {
+    mockCanSendFeedback.value = false;
+    await startMeasuring();
+
+    expect(screen.getByText('Knee to wall')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: reportButton })).toBeNull();
   });
 });
