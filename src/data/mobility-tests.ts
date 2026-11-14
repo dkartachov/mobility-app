@@ -135,7 +135,8 @@ export type FlexibilityTest = {
   twoSided: boolean;
   /** Shows the start position and the move into the measurement, above the instructions. */
   animation: FigureClip;
-  instructions: string;
+  /** Steps to follow, one sentence each, shown as a numbered list like an exercise's. */
+  instructions: string[];
   /** What the number means. */
   measurement: string;
   method: MeasurementMethod;
@@ -165,8 +166,11 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Smallest real change of 1.9 cm measuring the same person again (Powden 2015, 12 studies).
     measurementError: 0.7,
     twoSided: true,
-    instructions:
-      'Face a wall with this foot in front, pointing straight at the wall, the other foot behind and a hand on the wall for balance. Keeping the front heel on the floor, bend the knee forward until it touches the wall. Move the foot back a little at a time until it is as far as it can be with the knee still touching and the heel still down.',
+    instructions: [
+      'Face a wall with this foot in front, pointing straight at the wall, the other foot behind and a hand on the wall for balance.',
+      'Keeping the front heel on the floor, bend the knee forward until it touches the wall.',
+      'Move the foot back a little at a time until it is as far as it can be with the knee still touching and the heel still down.',
+    ],
     measurement: 'Distance from your big toe to the wall',
     animation: KNEE_TO_WALL,
     // Half centimetres, since a centimetre is a third of the spread between people.
@@ -188,8 +192,10 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Standing, with a phone, the same person measuring again (Shin 2012, in Keogh 2019).
     measurementError: 6.3,
     twoSided: true,
-    instructions:
-      'Stand tall with this arm hanging straight by your side, holding the phone in this hand with the palm facing forward. Keeping the arm and wrist straight, raise it out to the side and up overhead as far as you can, without leaning to the other side or shrugging.',
+    instructions: [
+      'Stand tall with this arm hanging straight by your side, holding the phone in this hand with the palm facing forward.',
+      'Keeping the arm and wrist straight, raise it out to the side and up overhead as far as you can, without leaning to the other side or shrugging.',
+    ],
     measurement: 'Shoulder angle, with the arm by your side as 0°',
     method: { kind: 'tilt', startPosition: 'Arm hanging straight by your side', startAngle: 0 },
     animation: SHOULDER_ABDUCTION,
@@ -211,8 +217,11 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Standing, with a phone, the same person measuring again (Shin 2012, in Keogh 2019).
     measurementError: 3.3,
     twoSided: true,
-    instructions:
-      'Stand tall with this elbow tucked against your side and bent to 90°, forearm pointing straight ahead. Hold the phone in this hand, in line with the forearm, and keep the wrist straight. Keeping the elbow against your side, rotate the forearm outwards as far as you can.',
+    instructions: [
+      'Stand tall with this elbow tucked against your side and bent to 90°, forearm pointing straight ahead.',
+      'Hold the phone in this hand, in line with the forearm, and keep the wrist straight.',
+      'Keeping the elbow against your side, rotate the forearm outwards as far as you can.',
+    ],
     measurement: 'Rotation angle of the forearm',
     // The forearm stays level, so its turn outwards is turning around the vertical axis. Only that
     // turning counts, so how the phone is gripped doesn't matter, but a wrist bending sideways does.
@@ -238,8 +247,12 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Seated, with a phone, the same person measuring again (Charlton 2015, in Keogh 2019).
     measurementError: 2.8,
     twoSided: true,
-    instructions:
-      'Sit tall on the edge of a table with your thighs supported and feet hanging free, and tuck the other foot back under the table. Strap the phone along the front of this shin. Relax the leg while a partner holds the knee still and slowly swings the foot inwards, towards the other leg, until it stops or you feel a firm stretch. Keep both sit bones on the table.',
+    instructions: [
+      'Sit tall on the edge of a table with your thighs supported and feet hanging free, and tuck the other foot back under the table.',
+      'Strap the phone along the front of this shin.',
+      'Relax the leg while a partner holds the knee still and slowly swings the foot inwards, towards the other leg, until it stops or you feel a firm stretch.',
+      'Keep both sit bones on the table.',
+    ],
     measurement: 'Angle of the shin from vertical',
     method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
     animation: HIP_EXTERNAL_ROTATION,
@@ -262,8 +275,12 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Seated, with a phone, the same person measuring again (Charlton 2015, in Keogh 2019).
     measurementError: 3.4,
     twoSided: true,
-    instructions:
-      'Sit tall on the edge of a table with your thighs supported and feet hanging free. Strap the phone along the front of this shin. Relax the leg while a partner holds the knee still and slowly swings the foot outwards, away from the other leg, until it stops or you feel a firm stretch. Keep both sit bones on the table.',
+    instructions: [
+      'Sit tall on the edge of a table with your thighs supported and feet hanging free.',
+      'Strap the phone along the front of this shin.',
+      'Relax the leg while a partner holds the knee still and slowly swings the foot outwards, away from the other leg, until it stops or you feel a firm stretch.',
+      'Keep both sit bones on the table.',
+    ],
     measurement: 'Angle of the shin from vertical',
     method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
     animation: HIP_INTERNAL_ROTATION,
@@ -285,9 +302,13 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Retested 3 days apart by the same rater, 40 young adults (Liu 2022).
     measurementError: 1.6,
     twoSided: false,
-    instructions:
-      'Sit on the floor with your legs straight and together, and the soles of your feet flat against the bottom stair or a sturdy box. Lay a tape measure along the top with 0 at the edge by your toes, running away from you. With one hand on top of the other, slowly reach forward along the tape as far as you can, keeping the knees straight. Hold the furthest point for 2 seconds without bouncing, and take the best of three.',
-    measurement: 'Fingertip distance past your toes, negative if you fall short',
+    instructions: [
+      'Sit on the floor with your legs straight and together, and the soles of your feet flat against the bottom stair or a sturdy box.',
+      'Lay a tape measure along the top with 0 at the edge by your toes, running away from you.',
+      'With one hand on top of the other, slowly reach forward along the tape as far as you can, keeping the knees straight.',
+      'Hold the furthest point for 2 seconds without bouncing, and take the best of three.',
+    ],
+    measurement: 'Fingertip distance past your toes, negative if you fall short, best of 3',
     method: { kind: 'distance', min: -30, max: 30 },
     animation: SIT_AND_REACH,
   },
@@ -309,8 +330,11 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Charlton 2015).
     measurementError: 3.9,
     twoSided: true,
-    instructions:
-      'Lie on your back with both legs straight. Strap the phone to the outside of this thigh, just above the knee, so your hands are free. Keep the other leg flat on the floor and, holding this knee with both hands, pull it towards your chest as far as you can without the straight leg lifting.',
+    instructions: [
+      'Lie on your back with both legs straight.',
+      'Strap the phone to the outside of this thigh, just above the knee, so your hands are free.',
+      'Keep the other leg flat on the floor and, holding this knee with both hands, pull it towards your chest as far as you can without the straight leg lifting.',
+    ],
     measurement: 'Angle of the thigh from the floor',
     // Tilt follows the phone's angle to gravity, so it reads the thigh's angle on the side of the
     // thigh as well as on top. Above the knee, not across it, so bending the knee doesn't move it.
@@ -335,8 +359,12 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Inclinometer on the thigh, retested 3 days apart by the same rater (Liu 2022).
     measurementError: 3.6,
     twoSided: true,
-    instructions:
-      "Lie on your back with both legs straight. Strap the phone to the outside of this thigh, just above the knee, and loop a towel, belt or strap around the ball of this foot. Use something that doesn't stretch, so the leg stays still at the top. Keeping both knees straight and the other leg flat on the floor, pull the leg up with it as far as you can, stopping at a firm stretch behind the thigh.",
+    instructions: [
+      'Lie on your back with both legs straight.',
+      'Strap the phone to the outside of this thigh, just above the knee, and loop a towel, belt or strap around the ball of this foot.',
+      "Use something that doesn't stretch, so the leg stays still at the top.",
+      'Keeping both knees straight and the other leg flat on the floor, pull the leg up with it as far as you can, stopping at a firm stretch behind the thigh.',
+    ],
     measurement: 'Angle of the leg from the floor',
     // Same phone position as knee to chest. With the knee straight, the thigh's angle is the leg's.
     method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
@@ -360,8 +388,11 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Retested a week apart with a goniometer (Nussbaumer 2010).
     measurementError: 2.4,
     twoSided: true,
-    instructions:
-      'Lie on your back with both legs straight. Strap the phone to the front of this leg, just below the knee. Keeping the knee straight and pointing at the ceiling and your hips level, slide this leg out to the side along the floor as far as you can.',
+    instructions: [
+      'Lie on your back with both legs straight.',
+      'Strap the phone to the front of this leg, just below the knee.',
+      'Keeping the knee straight and pointing at the ceiling and your hips level, slide this leg out to the side along the floor as far as you can.',
+    ],
     measurement: 'Angle of the leg out from straight',
     // The leg stays on the floor, so sliding it out is turning around the vertical axis. Only that
     // turning counts, so it doesn't matter where on the leg the phone sits or which way it faces,
@@ -385,8 +416,11 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // With a phone, the same person measuring again (Shin 2012, in Keogh 2019).
     measurementError: 2.7,
     twoSided: true,
-    instructions:
-      'Lie on your back with knees bent and lower back pressed into the floor. Hold the phone in this hand with the arm and wrist straight, pointing at the ceiling. Keeping the arm straight, lower it overhead towards the floor without letting your back arch, your ribs flare or your body bend to the side.',
+    instructions: [
+      'Lie on your back with knees bent and lower back pressed into the floor.',
+      'Hold the phone in this hand with the arm and wrist straight, pointing at the ceiling.',
+      'Keeping the arm straight, lower it overhead towards the floor without letting your back arch, your ribs flare or your body bend to the side.',
+    ],
     measurement: 'Shoulder angle, with the arm by your side as 0°',
     method: { kind: 'tilt', startPosition: 'Arm straight, pointing at the ceiling', startAngle: 90 },
     animation: OVERHEAD_REACH,

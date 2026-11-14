@@ -12,8 +12,9 @@ import { ExerciseVideo } from '@/components/exercise-video';
 import { FocusAreas } from '@/components/focus-areas';
 import { Icon } from '@/components/icon';
 import { IconBadge } from '@/components/icon-badge';
+import { InstructionList } from '@/components/instruction-list';
 import { PageHeader } from '@/components/page-header';
-import { Pager } from '@/components/pager';
+import { Pager, SWIPE_FOR_INSTRUCTIONS } from '@/components/pager';
 import { Pill, ScoreChangePill } from '@/components/pill';
 import { ProgressBar } from '@/components/progress-bar';
 import { ReportButton } from '@/components/report-button';
@@ -335,7 +336,7 @@ function Measure({ index, value, onChange, onBack, onNext, canSkip }: MeasurePro
       </View>
       <ExerciseVideo animation={test.animation} />
       {/* The animation shows what to do, so the full instructions are a swipe away for whoever needs them. */}
-      <Pager>
+      <Pager hint={SWIPE_FOR_INSTRUCTIONS}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.heading}>
             <View style={styles.headingRow}>
@@ -360,7 +361,7 @@ function Measure({ index, value, onChange, onBack, onNext, canSkip }: MeasurePro
           </View>
         </ScrollView>
         <ScrollView contentContainerStyle={styles.content}>
-          <ThemedText>{test.instructions}</ThemedText>
+          <InstructionList instructions={test.instructions} />
         </ScrollView>
       </Pager>
       {/* Outside the scroll view, so the reading and Cancel stay in view however long the instructions are. */}

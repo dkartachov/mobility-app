@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { ThemedText } from './themed-text';
 
-/** An exercise's instructions as numbered steps. */
+/** An exercise's or a test's instructions as numbered steps. */
 export function InstructionList({ instructions }: { instructions: string[] }) {
   const theme = useTheme();
 

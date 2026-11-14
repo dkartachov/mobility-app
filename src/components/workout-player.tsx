@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExerciseVideo } from '@/components/exercise-video';
 import { Icon } from '@/components/icon';
 import { InstructionList } from '@/components/instruction-list';
-import { Pager } from '@/components/pager';
+import { Pager, SWIPE_FOR_INSTRUCTIONS } from '@/components/pager';
 import { Pill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
 import { ReportButton } from '@/components/report-button';
@@ -177,7 +177,7 @@ export function WorkoutPlayer({
       </View>
 
       {/* Takes up whatever space is left, so long names or instructions scroll instead of moving the timer. */}
-      <Pager>
+      <Pager hint={SWIPE_FOR_INSTRUCTIONS}>
         <ScrollView key={state.index} contentContainerStyle={styles.page}>
           <Animated.View entering={FadeIn.duration(CHANGE_MS)} style={styles.pageContent}>
             <ThemedText type="title" accessibilityRole="header">
