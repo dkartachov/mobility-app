@@ -20,6 +20,7 @@ import { Spacing } from '@/constants/theme';
 import { RETEST_INTERVAL_DAYS } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 import { isBackupConfigured, useBackupState } from '@/lib/backup';
+import { useCanSendFeedback } from '@/lib/feedback';
 import { resetInstructions } from '@/lib/instructions';
 import { requestNotificationPermission } from '@/lib/reminders';
 import { setSoundEffectsEnabled, useSoundEffectsEnabled } from '@/lib/sound-preference';
@@ -45,6 +46,7 @@ export default function SettingsScreen() {
   const soundEffectsEnabled = useSoundEffectsEnabled();
   const theme = useTheme();
   const { offline } = useBackupState();
+  const canSendFeedback = useCanSendFeedback();
   const { section } = useLocalSearchParams<{ section?: 'reminders' }>();
   const scrollView = useRef<ScrollViewInstance>(null);
   const scrolledToSection = useRef(false);
@@ -195,6 +197,9 @@ export default function SettingsScreen() {
             About
           </ThemedText>
           <Card style={styles.card}>
+            {canSendFeedback && (
+              <Button title="Send feedback" variant="secondary" onPress={() => router.push('/feedback')} />
+            )}
             <Button title="Privacy policy" variant="secondary" onPress={() => router.push('/privacy-policy')} />
           </Card>
         </View>

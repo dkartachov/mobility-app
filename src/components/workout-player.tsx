@@ -19,6 +19,7 @@ import { InstructionList } from '@/components/instruction-list';
 import { Pager } from '@/components/pager';
 import { Pill } from '@/components/pill';
 import { PressableScale } from '@/components/pressable-scale';
+import { ReportButton } from '@/components/report-button';
 import { ScrollView } from '@/components/scroll-view';
 import { BackButton, HEADER_HEIGHT } from '@/components/stack-header';
 import { ThemedText } from '@/components/themed-text';
@@ -55,6 +56,11 @@ type WorkoutPlayerProps = {
   onComplete: () => void;
   /** The back button. Confirming that leaving loses progress is up to the screen. */
   onBack: () => void;
+  /**
+   * Shows a report button for the exercise on screen, which pauses the workout first. Left out
+   * where feedback can't be sent, like a phone used offline.
+   */
+  onReport?: (exercise: WorkoutStep['exercise']) => void;
 };
 
 /**
@@ -69,6 +75,7 @@ export function WorkoutPlayer({
   celebrate,
   onComplete,
   onBack,
+  onReport,
 }: WorkoutPlayerProps) {
   const insets = useSafeAreaInsets();
   const [reducer] = useState(() => createPlayerReducer(steps, bufferMs, sideSwitchBufferMs));
@@ -134,6 +141,15 @@ export function WorkoutPlayer({
       {/* In place of the stack header, which this screen hides. */}
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <BackButton onPress={onBack} />
+        {onReport && (
+          <ReportButton
+            label="Report a problem with this exercise"
+            onPress={() => {
+              if (!state.paused && !finished) dispatch({ type: 'pause' });
+              onReport(step.exercise);
+            }}
+          />
+        )}
       </View>
       <View>
         {/* Fades in each new exercise, rather than snapping to it; the second side is the same exercise, so it stays. */}
@@ -392,7 +408,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topBar: {
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     minHeight: HEADER_HEIGHT,
     paddingHorizontal: Spacing.screen,
   },
