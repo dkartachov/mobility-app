@@ -93,6 +93,21 @@ Settings showing the last backup and any error is also how you'd notice the free
 
 6. Make new builds with `npm run build:dev` and `npm run build:preview`, then sign in with your email. Use a different email for dev and prod, or the same: either way each variant has its own bucket.
 
+## Feedback
+
+Signed-in users can send feedback from Settings (About, Send feedback) and report a problem with an exercise from the flag button in a workout or warm-up, which pauses it first. Both open `src/app/feedback.tsx`. An exercise report picks a reason (caused pain, instructions unclear, video doesn't match, too hard, too easy, other) with optional details; general feedback is a message. Phones used offline, and builds without Supabase settings, don't show either button.
+
+The app calls the `send-feedback` Edge Function, which checks the session and emails the report to your Gmail inbox, with the user's email as Reply-To so you can answer them directly. The SMTP settings under Authentication only send Auth emails (the sign-in codes), so the function connects to Gmail itself, on port 465: Edge Functions can't connect out on 25 or 587. Gmail allows about 500 emails a day.
+
+To set it up, with a Gmail [app password](https://myaccount.google.com/apppasswords) (the same kind the Auth SMTP settings use):
+
+```bash
+supabase secrets set GMAIL_USER=you@gmail.com GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
+supabase functions deploy send-feedback
+```
+
+Then send yourself one from Settings to check it arrives. If it doesn't, the function's logs in the Supabase dashboard say why.
+
 ## Mobility score and its sources
 
 Each flexibility test result is scored against published data on healthy adults, so a score means the same thing as it would in a physio's clinic rather than an arbitrary scale.

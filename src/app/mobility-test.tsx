@@ -36,6 +36,7 @@ import {
 import { logMobilityTest, useMobilityScore } from '@/db/mobility-tests';
 import { useTheme } from '@/hooks/use-theme';
 import { getFastWorkouts, useSkipTestMeasurements } from '@/lib/dev-settings';
+import { useCanSendFeedback } from '@/lib/feedback';
 import { requestNotificationPermission } from '@/lib/reminders';
 import { getTestRemindersEnabled } from '@/lib/test-reminder-preference';
 import { FAST_BUFFER_SECONDS, FAST_STEP_SECONDS } from '@/lib/workout';
@@ -247,6 +248,7 @@ function Intro({ onStart, onSkipWarmup }: { onStart: () => void; onSkipWarmup?: 
 function Warmup({ onComplete }: { onComplete: () => void }) {
   // Read once: toggling fast mode mid-warm-up shouldn't change the running warm-up.
   const [plan] = useState(warmupPlan);
+  const canSendFeedback = useCanSendFeedback();
 
   return (
     <WorkoutPlayer
@@ -255,6 +257,11 @@ function Warmup({ onComplete }: { onComplete: () => void }) {
       onComplete={onComplete}
       // Asks to stop the warm-up first, see the screen's prevent-remove.
       onBack={() => router.back()}
+      onReport={
+        canSendFeedback
+          ? (exercise) => router.push({ pathname: '/feedback', params: { exerciseId: exercise.id } })
+          : undefined
+      }
     />
   );
 }

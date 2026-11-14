@@ -22,6 +22,7 @@ import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { getTotalSeconds, logSession } from '@/db/sessions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDuration } from '@/lib/dates';
+import { useCanSendFeedback } from '@/lib/feedback';
 import { getFastWorkouts } from '@/lib/dev-settings';
 import { milestoneReached } from '@/lib/milestones';
 import { countWorkoutForReminderPrompt } from '@/lib/reminder-prompt';
@@ -105,6 +106,7 @@ export default function WorkoutScreen() {
   const [leaving, setLeaving] = useState(false);
   const navigation = useNavigation();
   const onDashboard = useRef(false);
+  const canSendFeedback = useCanSendFeedback();
 
   // Leaving mid-workout loses it, so confirm first and then go all the way back to the start screen.
   // The summary has nothing to confirm: going back does nothing there, and only its Done button leaves.
@@ -167,6 +169,11 @@ export default function WorkoutScreen() {
           celebrate
           onComplete={complete}
           onBack={() => router.back()}
+          onReport={
+            canSendFeedback
+              ? (exercise) => router.push({ pathname: '/feedback', params: { exerciseId: exercise.id } })
+              : undefined
+          }
         />
       )}
     </>
