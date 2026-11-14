@@ -26,6 +26,11 @@ import {
 type Params = {
   /** Reports a problem with this exercise. */
   exerciseId?: string;
+  /**
+   * Its name, for exercises outside the library, like the test warm-up's marching. Without it, an
+   * id the library doesn't know shows as itself.
+   */
+  exerciseName?: string;
   /** Reports a problem with this flexibility test, with the side and reading on screen at the time. */
   testId?: string;
   side?: string;
@@ -37,11 +42,19 @@ type Subject =
   | { kind: 'exercise'; id: string; name: string }
   | { kind: 'test'; id: string; name: string; side?: string; reading?: string };
 
-function findSubject({ exerciseId, testId, side, reading }: Params): Subject | null {
-  const exercise = getExercise(exerciseId);
-  if (exercise) return { kind: 'exercise', id: exercise.id, name: exercise.name };
-  const test = FLEXIBILITY_TESTS.find(({ id }) => id === testId);
-  if (test) return { kind: 'test', id: test.id, name: test.name, side: side || undefined, reading: reading || undefined };
+/**
+ * An id always means a report, even one the app doesn't know, rather than quietly turning into
+ * general feedback.
+ */
+function findSubject({ exerciseId, exerciseName, testId, side, reading }: Params): Subject | null {
+  if (exerciseId) {
+    const name = getExercise(exerciseId)?.name || exerciseName || exerciseId;
+    return { kind: 'exercise', id: exerciseId, name };
+  }
+  if (testId) {
+    const name = FLEXIBILITY_TESTS.find(({ id }) => id === testId)?.name ?? testId;
+    return { kind: 'test', id: testId, name, side: side || undefined, reading: reading || undefined };
+  }
   return null;
 }
 

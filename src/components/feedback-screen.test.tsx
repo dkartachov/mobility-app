@@ -4,6 +4,7 @@ import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
 
 import FeedbackScreen from '@/app/feedback';
+import { MARCHING_EXERCISE } from '@/data/test-warmup';
 
 const mockSend = jest.fn();
 
@@ -125,5 +126,26 @@ describe('feedback screen', () => {
       reason: 'phone',
       message: '',
     });
+  });
+
+  // Like the test warm-up's marching, which isn't in the library.
+  it('reports an exercise outside the library by the name it was opened with', async () => {
+    await open({ exerciseId: MARCHING_EXERCISE.id, exerciseName: MARCHING_EXERCISE.name });
+
+    expect(await screen.findByRole('header', { name: 'Marching' })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('radio', { name: 'Too easy' }));
+    await fireEvent.press(sendButton());
+
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'exercise', exerciseId: 'warmup-marching', exerciseName: 'Marching' })
+    );
+  });
+
+  it("still reports an id it doesn't know, rather than switching to general feedback", async () => {
+    await open({ exerciseId: 'gone-exercise' });
+
+    expect(await screen.findByRole('header', { name: 'gone-exercise' })).toBeTruthy();
+    expect(screen.getByText('Report a problem')).toBeTruthy();
+    expect(screen.queryByRole('header', { name: 'Send feedback' })).toBeNull();
   });
 });

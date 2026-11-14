@@ -279,7 +279,10 @@ function Warmup({ onComplete }: { onComplete: () => void }) {
       onBack={() => router.back()}
       onReport={
         canSendFeedback
-          ? (exercise) => router.push({ pathname: '/feedback', params: { exerciseId: exercise.id } })
+          ? (exercise) => router.push({
+              pathname: '/feedback',
+              params: { exerciseId: exercise.id, exerciseName: exercise.name },
+            })
           : undefined
       }
     />
