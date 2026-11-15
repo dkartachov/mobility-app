@@ -9,6 +9,7 @@
  */
 
 import type { FigureClip } from '@/lib/figure-rig';
+import type { Clip3D } from '@/lib/rig3d';
 
 import {
   HIP_ABDUCTION,
@@ -18,10 +19,10 @@ import {
   KNEE_TO_WALL,
   OVERHEAD_REACH,
   SHOULDER_ABDUCTION,
-  SHOULDER_EXTERNAL_ROTATION,
   SIT_AND_REACH,
   STRAIGHT_LEG_RAISE,
 } from './exercise-animations';
+import { SHOULDER_EXTERNAL_ROTATION_3D } from './exercise-animations-3d';
 import type { ScoreArea } from './mobility-score';
 
 export type Side = 'left' | 'right';
@@ -134,7 +135,7 @@ export type FlexibilityTest = {
   /** Tested once per side when true. */
   twoSided: boolean;
   /** Shows the start position and the move into the measurement, above the instructions. */
-  animation: FigureClip;
+  animation: FigureClip | Clip3D;
   /** Steps to follow, one sentence each, shown as a numbered list like an exercise's. */
   instructions: string[];
   /** What the number means. */
@@ -226,7 +227,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // The forearm stays level, so its turn outwards is turning around the vertical axis. Only that
     // turning counts, so how the phone is gripped doesn't matter, but a wrist bending sideways does.
     method: { kind: 'rotation', startPosition: 'Forearm pointing straight ahead' },
-    animation: SHOULDER_EXTERNAL_ROTATION,
+    animation: SHOULDER_EXTERNAL_ROTATION_3D,
   },
   {
     id: 'hip-external-rotation',

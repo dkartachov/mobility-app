@@ -4,6 +4,8 @@ import type { ExerciseAnimation } from '@/lib/figure-rig';
 
 import type { ScoreArea } from './mobility-score';
 
+import { CAT_COW_3D } from './exercise-animations-3d';
+
 import {
   ACTIVE_PANCAKE,
   ACTIVE_STRAIGHT_LEG_RAISE,
@@ -15,7 +17,6 @@ import {
   BOTTOM_SQUAT,
   BOTTOM_SQUAT_ROTATION,
   BUTTERFLY,
-  CAT_COW,
   COBRA_TO_PRAYER,
   COSSACK_SQUAT,
   COUCH_STRETCH,
@@ -724,7 +725,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Let your belly drop and lift your chest and gaze, and keep flowing between the two',
     ],
     photo: require('@/assets/images/exercises/cat-cow.png'),
-    animation: CAT_COW,
+    animation: CAT_COW_3D,
     active: true,
     oneMinuteOnly: true,
   },

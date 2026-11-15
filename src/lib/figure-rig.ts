@@ -7,6 +7,8 @@
  * angles are in degrees, counterclockwise from pointing right (the way the figure faces).
  */
 
+import type { Clip3D } from './rig3d';
+
 export const SCENE = { width: 960, height: 540, floorY: 470 };
 
 export const BONES = {
@@ -129,7 +131,8 @@ export type HandClip = {
   stillFrame: number;
 };
 
-export type ExerciseAnimation = FigureClip | HandClip;
+/** A clip for either engine: this one, or the one in `rig3d` that exercises are moving over to. */
+export type ExerciseAnimation = FigureClip | HandClip | Clip3D;
 
 export type FigurePaths = {
   /** The bones of each limb as a line through its joints. The body drawn over them is in `shapes`. */

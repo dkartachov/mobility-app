@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import type { ExerciseAnimation } from '@/lib/figure-rig';
 
 import { ExerciseFigure, ExerciseHand } from './exercise-figure';
+import { ExerciseFigure3D } from './exercise-figure-3d';
 import { Icon } from './icon';
 import { ThemedText } from './themed-text';
 
@@ -27,7 +28,9 @@ export function ExerciseVideo({
   if (animation) {
     return (
       <View style={styles.video}>
-        {animation.view === 'hand' ? (
+        {animation.view === '3d' ? (
+          <ExerciseFigure3D clip={animation} playing={playing} paused={paused} />
+        ) : animation.view === 'hand' ? (
           <ExerciseHand clip={animation} playing={playing} paused={paused} />
         ) : (
           <ExerciseFigure clip={animation} playing={playing} paused={paused} />

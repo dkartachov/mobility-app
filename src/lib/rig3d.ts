@@ -1,0 +1,740 @@
+/**
+ * The second figure engine: a skeleton posed in three dimensions and then drawn from a camera.
+ * A pose is the pelvis's place in the room plus joint angles in anatomical terms, so a rotation is
+ * a rotation rather than a limb changing length, and moving between poses turns joints, which
+ * carries hands and feet along arcs without being told to. A limb can instead be pinned to a spot,
+ * and its elbow or knee is solved so it stays there as the body moves.
+ *
+ * The room has x pointing the way a figure with no turn faces, y up from a floor at 0, and z out to
+ * the figure's right. Lengths are in the same units as the first engine's scene; angles in degrees.
+ * Everything that runs per frame is a worklet.
+ */
+
+export type Vec3 = readonly [x: number, y: number, z: number];
+type Vec2 = readonly [x: number, y: number];
+/** A rotation, as the rows of a 3x3 matrix. */
+type Mat3 = readonly number[];
+
+export const SKELETON = {
+  thigh: 100,
+  shin: 100,
+  foot: 42,
+  torso: 125,
+  neck: 48,
+  upperArm: 75,
+  forearm: 75,
+  hand: 24,
+  /** How far each shoulder and hip joint sits from the spine. */
+  shoulder: 30,
+  hip: 16,
+  head: 30,
+};
+
+/** How a run of the spine curves, shared evenly along it. */
+export type Bend = {
+  /** Rounding forward. Negative arches back. */
+  flex?: number;
+  /** Turning to the figure's left. */
+  twist?: number;
+  /** Bending to the figure's right. */
+  side?: number;
+};
+
+/** An arm hanging at the side with the palm in is all zeros. */
+export type ArmPose = {
+  /** Raising the arm forward. Negative reaches back. */
+  flex?: number;
+  /** Raising the arm out to its own side. */
+  abduct?: number;
+  /** Turning the upper arm outward around its own length, which swings a bent forearm away from the body. */
+  rotate?: number;
+  /** Bending the elbow. */
+  elbow?: number;
+};
+
+/** A leg standing straight with the foot pointing ahead is all zeros. */
+export type LegPose = {
+  /** Raising the thigh forward. Negative reaches back. */
+  flex?: number;
+  /** Raising the leg out to its own side. */
+  abduct?: number;
+  /** Turning the thigh outward around its own length, which turns the toes out. */
+  rotate?: number;
+  /** Bending the knee. */
+  knee?: number;
+  /** Pulling the toes up toward the shin. Negative points them. */
+  ankle?: number;
+};
+
+/** Holds a wrist or ankle at a spot in the room, whatever the body does. Overrides the limb's angles. */
+export type Pin = {
+  at: Vec3;
+  /** The direction the hand or foot points in. A hand carries on from its forearm by default; a foot points the way the pelvis faces. */
+  toward?: Vec3;
+  /** The direction the elbow or knee sticks out in. Elbows go back and knees forward by default. */
+  pole?: Vec3;
+};
+
+export type Pose3 = {
+  /** Where the middle of the pelvis is. */
+  pelvis: Vec3;
+  /** Tipping the whole body forward from the pelvis: 90 lays the spine level, facing the floor. */
+  lean?: number;
+  /** Turning the whole body to its left. */
+  turn?: number;
+  /** Tipping the whole body to its right. */
+  tilt?: number;
+  spine?: Bend;
+  neck?: Bend;
+  rightArm?: ArmPose;
+  leftArm?: ArmPose;
+  rightLeg?: LegPose;
+  leftLeg?: LegPose;
+  /** Pin a limb in every pose of a clip or in none: a pin can move between poses, but not come and go. */
+  pins?: { rightHand?: Pin; leftHand?: Pin; rightFoot?: Pin; leftFoot?: Pin };
+};
+
+export type Keyframe3 = {
+  /** Time taken to arrive at this pose from the one before it. */
+  ms: number;
+  pose: Pose3;
+  /** Eases in and out by default, which stops at every keyframe. */
+  ease?: 'in' | 'out' | 'none';
+};
+
+/** The parts of the body that are drawn, and sorted by depth, as one shape each. */
+export type Part = 'torso' | 'head' | 'rightArm' | 'leftArm' | 'rightLeg' | 'leftLeg';
+
+export type Camera = {
+  /** Where the camera stands around the figure: 0 looks at its right side, 90 at its front, 180 at its left. */
+  yaw: number;
+  /** How far the camera is raised: 0 is level with the floor, 90 looks straight down. */
+  pitch: number;
+  /** Frame the whole body, or move in on everything from the pelvis up. */
+  fit?: 'body' | 'upper';
+};
+
+export type Clip3D = {
+  view: '3d';
+  /** The first keyframe's `ms` is ignored; the clip starts on its pose. */
+  keyframes: readonly Keyframe3[];
+  /** Index of the keyframe to show, unmoving, when reduced motion is on. */
+  stillFrame: number;
+  camera: Camera;
+  /** The parts the exercise is about, drawn in the accent color. */
+  highlight?: readonly Part[];
+  /** Draws the path this hand or foot takes through the clip behind the figure, so the movement shows even in a still. */
+  trail?: 'rightHand' | 'leftHand' | 'rightFoot' | 'leftFoot';
+};
+
+/** Where every joint is in the room. Limbs run from the body outward: root, middle joint, wrist or ankle, tip. */
+export type Skeleton = {
+  /** From the pelvis to the base of the neck. */
+  spine: Vec3[];
+  /** The body's right and its front at each point of the spine. */
+  spineRight: Vec3[];
+  spineFront: Vec3[];
+  head: Vec3;
+  /** The way the face points. */
+  facing: Vec3;
+  rightArm: Vec3[];
+  leftArm: Vec3[];
+  rightLeg: Vec3[];
+  leftLeg: Vec3[];
+};
+
+export type FigureSlot = {
+  part: Part;
+  d: string;
+  /** From 0, furthest from the camera, to 1, nearest. */
+  shade: number;
+  accent: boolean;
+};
+
+export type FigureFrame = {
+  /** The body's parts, furthest from the camera first, which is the order to draw them in. */
+  slots: FigureSlot[];
+  shadow: string;
+};
+
+/** The spine bends at this many places between the pelvis and the neck. */
+const SPINE_SEGMENTS = 6;
+
+// Worklets capture what they call when they're defined, so unlike ordinary functions these aren't
+// hoisted: everything here has to be defined above whatever uses it.
+
+function rotX(degrees: number): Mat3 {
+  'worklet';
+  const r = (degrees * Math.PI) / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return [1, 0, 0, 0, c, -s, 0, s, c];
+}
+
+function rotY(degrees: number): Mat3 {
+  'worklet';
+  const r = (degrees * Math.PI) / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return [c, 0, s, 0, 1, 0, -s, 0, c];
+}
+
+function rotZ(degrees: number): Mat3 {
+  'worklet';
+  const r = (degrees * Math.PI) / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return [c, -s, 0, s, c, 0, 0, 0, 1];
+}
+
+function mul(a: Mat3, b: Mat3): Mat3 {
+  'worklet';
+  const out = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (let row = 0; row < 3; row++) {
+    for (let column = 0; column < 3; column++) {
+      out[row * 3 + column] = a[row * 3] * b[column] + a[row * 3 + 1] * b[3 + column] + a[row * 3 + 2] * b[6 + column];
+    }
+  }
+  return out;
+}
+
+function turned(m: Mat3, v: Vec3): Vec3 {
+  'worklet';
+  return [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]];
+}
+
+function add(a: Vec3, b: Vec3): Vec3 {
+  'worklet';
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function sub(a: Vec3, b: Vec3): Vec3 {
+  'worklet';
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function scaled(v: Vec3, by: number): Vec3 {
+  'worklet';
+  return [v[0] * by, v[1] * by, v[2] * by];
+}
+
+function dot(a: Vec3, b: Vec3): number {
+  'worklet';
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+export function distance(a: Vec3, b: Vec3): number {
+  'worklet';
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+/** The same direction at length 1, or `fallback` for a vector too short to have one. */
+function unit(v: Vec3, fallback: Vec3): Vec3 {
+  'worklet';
+  const length = Math.hypot(v[0], v[1], v[2]);
+  return length < 1e-6 ? fallback : [v[0] / length, v[1] / length, v[2] / length];
+}
+
+function lerp(a: number, b: number, t: number): number {
+  'worklet';
+  return a + (b - a) * t;
+}
+
+function lerpVec(a: Vec3, b: Vec3, t: number): Vec3 {
+  'worklet';
+  return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+}
+
+function eased(linear: number, ease: Keyframe3['ease']): number {
+  'worklet';
+  if (ease === 'none') return linear;
+  if (ease === 'in') return linear * linear;
+  if (ease === 'out') return 1 - (1 - linear) * (1 - linear);
+  return linear * linear * (3 - 2 * linear);
+}
+
+function lerpBend(a: Bend | undefined, b: Bend | undefined, t: number): Bend {
+  'worklet';
+  return {
+    flex: lerp(a?.flex ?? 0, b?.flex ?? 0, t),
+    twist: lerp(a?.twist ?? 0, b?.twist ?? 0, t),
+    side: lerp(a?.side ?? 0, b?.side ?? 0, t),
+  };
+}
+
+function lerpArm(a: ArmPose | undefined, b: ArmPose | undefined, t: number): ArmPose {
+  'worklet';
+  return {
+    flex: lerp(a?.flex ?? 0, b?.flex ?? 0, t),
+    abduct: lerp(a?.abduct ?? 0, b?.abduct ?? 0, t),
+    rotate: lerp(a?.rotate ?? 0, b?.rotate ?? 0, t),
+    elbow: lerp(a?.elbow ?? 0, b?.elbow ?? 0, t),
+  };
+}
+
+function lerpLeg(a: LegPose | undefined, b: LegPose | undefined, t: number): LegPose {
+  'worklet';
+  return {
+    flex: lerp(a?.flex ?? 0, b?.flex ?? 0, t),
+    abduct: lerp(a?.abduct ?? 0, b?.abduct ?? 0, t),
+    rotate: lerp(a?.rotate ?? 0, b?.rotate ?? 0, t),
+    knee: lerp(a?.knee ?? 0, b?.knee ?? 0, t),
+    ankle: lerp(a?.ankle ?? 0, b?.ankle ?? 0, t),
+  };
+}
+
+function lerpPin(a: Pin | undefined, b: Pin | undefined, t: number): Pin | undefined {
+  'worklet';
+  if (!a || !b) return b ?? a;
+  return {
+    at: lerpVec(a.at, b.at, t),
+    toward: a.toward && b.toward ? lerpVec(a.toward, b.toward, t) : b.toward,
+    pole: a.pole && b.pole ? lerpVec(a.pole, b.pole, t) : b.pole,
+  };
+}
+
+/** The clip's pose at a time in `[0, clipDuration]`. */
+export function poseAt3(clip: Clip3D, timeMs: number): Pose3 {
+  'worklet';
+  const frames = clip.keyframes;
+  let elapsed = 0;
+  for (let i = 1; i < frames.length; i++) {
+    const { ms, ease } = frames[i];
+    if (timeMs <= elapsed + ms) {
+      const t = eased(ms === 0 ? 1 : (timeMs - elapsed) / ms, ease);
+      const a = frames[i - 1].pose;
+      const b = frames[i].pose;
+      return {
+        pelvis: lerpVec(a.pelvis, b.pelvis, t),
+        lean: lerp(a.lean ?? 0, b.lean ?? 0, t),
+        turn: lerp(a.turn ?? 0, b.turn ?? 0, t),
+        tilt: lerp(a.tilt ?? 0, b.tilt ?? 0, t),
+        spine: lerpBend(a.spine, b.spine, t),
+        neck: lerpBend(a.neck, b.neck, t),
+        rightArm: lerpArm(a.rightArm, b.rightArm, t),
+        leftArm: lerpArm(a.leftArm, b.leftArm, t),
+        rightLeg: lerpLeg(a.rightLeg, b.rightLeg, t),
+        leftLeg: lerpLeg(a.leftLeg, b.leftLeg, t),
+        pins: {
+          rightHand: lerpPin(a.pins?.rightHand, b.pins?.rightHand, t),
+          leftHand: lerpPin(a.pins?.leftHand, b.pins?.leftHand, t),
+          rightFoot: lerpPin(a.pins?.rightFoot, b.pins?.rightFoot, t),
+          leftFoot: lerpPin(a.pins?.leftFoot, b.pins?.leftFoot, t),
+        },
+      };
+    }
+    elapsed += ms;
+  }
+  return frames[frames.length - 1].pose;
+}
+
+/**
+ * Where the middle joint goes in a two-bone limb reaching from `root` to `tip`, sticking out toward
+ * `pole`. A tip out of reach just straightens the limb toward it.
+ */
+export function solveJoint3(root: Vec3, tip: Vec3, first: number, second: number, pole: Vec3): Vec3 {
+  'worklet';
+  const along = unit(sub(tip, root), [0, -1, 0]);
+  const reach = Math.min(first + second, Math.max(0.001, distance(root, tip)));
+  const a = (first * first - second * second + reach * reach) / (2 * reach);
+  const h = Math.sqrt(Math.max(0, first * first - a * a));
+  // The part of the pole that's square to the limb. A pole along the limb has none, so any side will do.
+  const out = unit(sub(pole, scaled(along, dot(pole, along))), Math.abs(along[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]);
+  return add(root, add(scaled(along, a), scaled(out, h)));
+}
+
+/** A pinned limb: its end goes to the pin, or as far toward it as the bones reach. */
+function pinnedLimb(root: Vec3, pin: Pin, first: number, second: number, endLength: number, pole: Vec3, toward: Vec3 | undefined): Vec3[] {
+  'worklet';
+  const reach = first + second;
+  const gap = distance(root, pin.at);
+  const end = gap <= reach ? pin.at : add(root, scaled(sub(pin.at, root), reach / gap));
+  const joint = solveJoint3(root, end, first, second, pin.pole ?? pole);
+  const direction = unit(pin.toward ?? toward ?? sub(end, joint), [1, 0, 0]);
+  return [root, joint, end, add(end, scaled(direction, endLength))];
+}
+
+/** `side` is 1 for the right limb and -1 for the left, which mirrors what "outward" means. */
+function armJoints(root: Vec3, chest: Mat3, arm: ArmPose | undefined, side: number): Vec3[] {
+  'worklet';
+  const upper = mul(mul(mul(chest, rotZ(arm?.flex ?? 0)), rotX(-side * (arm?.abduct ?? 0))), rotY(-side * (arm?.rotate ?? 0)));
+  const elbow = add(root, turned(upper, [0, -SKELETON.upperArm, 0]));
+  const lower = mul(upper, rotZ(arm?.elbow ?? 0));
+  const wrist = add(elbow, turned(lower, [0, -SKELETON.forearm, 0]));
+  return [root, elbow, wrist, add(wrist, turned(lower, [0, -SKELETON.hand, 0]))];
+}
+
+function legJoints(root: Vec3, pelvis: Mat3, leg: LegPose | undefined, side: number): Vec3[] {
+  'worklet';
+  const upper = mul(mul(mul(pelvis, rotZ(leg?.flex ?? 0)), rotX(-side * (leg?.abduct ?? 0))), rotY(-side * (leg?.rotate ?? 0)));
+  const knee = add(root, turned(upper, [0, -SKELETON.thigh, 0]));
+  const lower = mul(upper, rotZ(-(leg?.knee ?? 0)));
+  const ankle = add(knee, turned(lower, [0, -SKELETON.shin, 0]));
+  return [root, knee, ankle, add(ankle, turned(mul(lower, rotZ(leg?.ankle ?? 0)), [SKELETON.foot, 0, 0]))];
+}
+
+/** Places every joint of the figure in the room. */
+export function solvePose(pose: Pose3): Skeleton {
+  'worklet';
+  const pelvis = mul(mul(rotY(pose.turn ?? 0), rotZ(-(pose.lean ?? 0))), rotX(pose.tilt ?? 0));
+
+  // Each segment turns half its share of the curve before it and half after, so the spine leaves
+  // the pelvis the way the pelvis points and bends evenly from there.
+  const share = 1 / (2 * SPINE_SEGMENTS);
+  const half = mul(
+    mul(rotY((pose.spine?.twist ?? 0) * share), rotZ(-(pose.spine?.flex ?? 0) * share)),
+    rotX((pose.spine?.side ?? 0) * share)
+  );
+  const spine: Vec3[] = [pose.pelvis];
+  const spineRight: Vec3[] = [turned(pelvis, [0, 0, 1])];
+  const spineFront: Vec3[] = [turned(pelvis, [1, 0, 0])];
+  let chest = pelvis;
+  for (let i = 0; i < SPINE_SEGMENTS; i++) {
+    chest = mul(chest, half);
+    spine.push(add(spine[i], turned(chest, [0, SKELETON.torso / SPINE_SEGMENTS, 0])));
+    chest = mul(chest, half);
+    spineRight.push(turned(chest, [0, 0, 1]));
+    spineFront.push(turned(chest, [1, 0, 0]));
+  }
+  const neckBase = spine[SPINE_SEGMENTS];
+
+  const skull = mul(mul(mul(chest, rotY(pose.neck?.twist ?? 0)), rotZ(-(pose.neck?.flex ?? 0))), rotX(pose.neck?.side ?? 0));
+  const head = add(neckBase, turned(skull, [0, SKELETON.neck, 0]));
+
+  const rightShoulder = add(neckBase, turned(chest, [0, 0, SKELETON.shoulder]));
+  const leftShoulder = add(neckBase, turned(chest, [0, 0, -SKELETON.shoulder]));
+  const rightHip = add(pose.pelvis, turned(pelvis, [0, 0, SKELETON.hip]));
+  const leftHip = add(pose.pelvis, turned(pelvis, [0, 0, -SKELETON.hip]));
+
+  // Elbows bend back and toward the hips, which is behind an arm that hangs and toward the feet
+  // under one that props the body up. Knees bend forward, and toward the head when the hips fold.
+  const elbowPole = turned(chest, [-1, -1, 0]);
+  const kneePole = turned(pelvis, [1, 1, 0]);
+  const ahead = unit([spineFront[0][0], 0, spineFront[0][2]], [1, 0, 0]);
+  const arm = (root: Vec3, angles: ArmPose | undefined, pin: Pin | undefined, side: number) =>
+    pin ? pinnedLimb(root, pin, SKELETON.upperArm, SKELETON.forearm, SKELETON.hand, elbowPole, undefined) : armJoints(root, chest, angles, side);
+  const leg = (root: Vec3, angles: LegPose | undefined, pin: Pin | undefined, side: number) =>
+    pin ? pinnedLimb(root, pin, SKELETON.thigh, SKELETON.shin, SKELETON.foot, kneePole, ahead) : legJoints(root, pelvis, angles, side);
+
+  return {
+    spine,
+    spineRight,
+    spineFront,
+    head,
+    facing: turned(skull, [1, 0, 0]),
+    rightArm: arm(rightShoulder, pose.rightArm, pose.pins?.rightHand, 1),
+    leftArm: arm(leftShoulder, pose.leftArm, pose.pins?.leftHand, -1),
+    rightLeg: leg(rightHip, pose.rightLeg, pose.pins?.rightFoot, 1),
+    leftLeg: leg(leftHip, pose.leftLeg, pose.pins?.leftFoot, -1),
+  };
+}
+
+/** Turns the room so the camera looks down -z: x is then across the screen, y up it, and z toward the viewer. */
+export function viewOf(camera: Camera): Mat3 {
+  'worklet';
+  return mul(rotX(camera.pitch), rotY(-camera.yaw));
+}
+
+/** A point in the room as the camera sees it: across the screen, down it, and how near it is. */
+export function project(view: Mat3, point: Vec3): Vec3 {
+  'worklet';
+  const seen = turned(view, point);
+  return [seen[0], -seen[1], seen[2]];
+}
+
+/** To a tenth of a unit, which is finer than a pixel and keeps the paths sent to the screen every frame short. */
+function fixed(value: number): number {
+  'worklet';
+  return Math.round(value * 10) / 10;
+}
+
+function disc(center: Vec2 | Vec3, rx: number, ry: number): string {
+  'worklet';
+  return `M${fixed(center[0] - rx)} ${fixed(center[1])}a${fixed(rx)} ${fixed(ry)} 0 1 0 ${fixed(2 * rx)} 0a${fixed(rx)} ${fixed(ry)} 0 1 0 ${fixed(-2 * rx)} 0Z`;
+}
+
+/** The outline of a bone with a round end of its own radius at each joint. */
+function capsule(a: Vec2 | Vec3, ra: number, b: Vec2 | Vec3, rb: number): string {
+  'worklet';
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const length = Math.hypot(dx, dy);
+  // A bone pointing straight at the camera is just its thicker end.
+  if (length < 0.5) return disc(a, Math.max(ra, rb), Math.max(ra, rb));
+  const nx = -dy / length;
+  const ny = dx / length;
+  return (
+    `M${fixed(a[0] + nx * ra)} ${fixed(a[1] + ny * ra)}L${fixed(b[0] + nx * rb)} ${fixed(b[1] + ny * rb)}` +
+    `A${rb} ${rb} 0 0 0 ${fixed(b[0] - nx * rb)} ${fixed(b[1] - ny * rb)}L${fixed(a[0] - nx * ra)} ${fixed(a[1] - ny * ra)}` +
+    `A${ra} ${ra} 0 0 0 ${fixed(a[0] + nx * ra)} ${fixed(a[1] + ny * ra)}Z`
+  );
+}
+
+/**
+ * Half the thickness of each limb at the [start, end] of its bones, from the body outward. The foot
+ * and hand start wider than the shin and forearm end, which leaves a heel and the ball of the hand.
+ */
+const LEG_RADII = [
+  [15, 12.5],
+  [12.5, 9.5],
+  [12.5, 10.5],
+] as const;
+const ARM_RADII = [
+  [12.5, 10.5],
+  [10.5, 8.5],
+  [10.5, 8.5],
+] as const;
+
+/** The outline of a whole limb, one capsule a bone, all wound the same way so they fill as one shape. */
+function limbShape(points: readonly Vec3[], radii: readonly (readonly [number, number])[]): string {
+  'worklet';
+  let path = '';
+  for (let i = 1; i < points.length; i++) path += capsule(points[i - 1], radii[i - 1][0], points[i], radii[i - 1][1]);
+  return path;
+}
+
+/** The torso's cross-section along the spine from the hips: how far along, then half its width and half its depth there. */
+const TORSO_SECTIONS = [
+  [0, 27, 20],
+  [0.2, 25, 19],
+  [0.4, 24, 18],
+  [0.6, 27, 20],
+  [0.8, 31, 22],
+  [1, 30, 17],
+] as const;
+/** The rounded ends of the torso: a bar through the hip joints and one through the shoulders. */
+const HIP_RADIUS = 19;
+const SHOULDER_RADIUS = 15;
+const NECK_RADIUS = 11;
+
+function sectionAt(t: number, column: 1 | 2): number {
+  'worklet';
+  for (let i = 1; i < TORSO_SECTIONS.length; i++) {
+    const from = TORSO_SECTIONS[i - 1];
+    const to = TORSO_SECTIONS[i];
+    if (t <= to[0]) return lerp(from[column], to[column], (t - from[0]) / (to[0] - from[0]));
+  }
+  return TORSO_SECTIONS[TORSO_SECTIONS.length - 1][column];
+}
+
+/**
+ * The torso's silhouette. Its cross-section is an oval, wider than it is deep, so how far the
+ * outline sits from the spine depends on which way the body is turned to the camera.
+ */
+function torsoShape(view: Mat3, skeleton: Skeleton, spine: readonly Vec3[]): string {
+  'worklet';
+  const last = spine.length - 1;
+  let front = '';
+  let back = '';
+  for (let i = 0; i <= last; i++) {
+    const before = spine[Math.max(0, i - 1)];
+    const after = spine[Math.min(last, i + 1)];
+    const dx = after[0] - before[0];
+    const dy = after[1] - before[1];
+    const length = Math.hypot(dx, dy);
+    // A spine pointing straight at the camera has no sides to trace; its rounded ends stand in.
+    if (length < 0.5) continue;
+    const nx = -dy / length;
+    const ny = dx / length;
+    const right = turned(view, skeleton.spineRight[i]);
+    const ahead = turned(view, skeleton.spineFront[i]);
+    const t = i / last;
+    // On screen y runs down, so the y of a direction in the room flips.
+    const across = sectionAt(t, 1) * (right[0] * nx - right[1] * ny);
+    const deep = sectionAt(t, 2) * (ahead[0] * nx - ahead[1] * ny);
+    const reach = Math.hypot(across, deep);
+    front += `${front === '' ? 'M' : 'L'}${fixed(spine[i][0] + nx * reach)} ${fixed(spine[i][1] + ny * reach)}`;
+    back = `L${fixed(spine[i][0] - nx * reach)} ${fixed(spine[i][1] - ny * reach)}` + back;
+  }
+  return front === '' ? '' : `${front}${back}Z`;
+}
+
+function meanDepth(points: readonly Vec3[]): number {
+  'worklet';
+  let total = 0;
+  for (let i = 0; i < points.length; i++) total += points[i][2];
+  return total / points.length;
+}
+
+/** The size of the shadow under each part of the body. */
+const SHADOW = { trunk: 36, head: 28, knee: 22, foot: 24 };
+/** A shadow seen from floor level is still this thick, so the figure never floats. */
+const SHADOW_MIN_DEPTH = 5;
+
+/** How much nearer than the torso a part has to be to get the darkest shade. */
+const SHADE_RANGE = 2 * SKELETON.shoulder;
+/** The head goes over the torso unless it's clearly behind it. */
+const HEAD_BIAS = 8;
+
+/** Draws the figure as the camera sees it. `view` comes from `viewOf`. */
+export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly Part[]): FigureFrame {
+  'worklet';
+  const flat = (points: readonly Vec3[]): Vec3[] => {
+    const out: Vec3[] = [];
+    for (let i = 0; i < points.length; i++) out.push(project(view, points[i]));
+    return out;
+  };
+  const spine = flat(skeleton.spine);
+  const head = project(view, skeleton.head);
+  const rightArm = flat(skeleton.rightArm);
+  const leftArm = flat(skeleton.leftArm);
+  const rightLeg = flat(skeleton.rightLeg);
+  const leftLeg = flat(skeleton.leftLeg);
+  const neckBase = spine[spine.length - 1];
+
+  // The neck belongs to the torso's shape, so there's no seam where it meets the shoulders.
+  const torso =
+    torsoShape(view, skeleton, spine) +
+    capsule(rightLeg[0], HIP_RADIUS, leftLeg[0], HIP_RADIUS) +
+    capsule(rightArm[0], SHOULDER_RADIUS, leftArm[0], SHOULDER_RADIUS) +
+    capsule(neckBase, NECK_RADIUS, head, NECK_RADIUS);
+
+  // The nose sticks out the way the figure is looking, and hides inside the head when that's at the camera.
+  const noseFrom = project(view, add(skeleton.head, scaled(skeleton.facing, SKELETON.head - 12)));
+  const noseTo = project(view, add(skeleton.head, scaled(skeleton.facing, SKELETON.head + 2)));
+  const headShape = disc(head, SKELETON.head, SKELETON.head) + capsule(noseFrom, 10, noseTo, 5);
+
+  const torsoDepth = meanDepth(spine);
+  const parts: { part: Part; d: string; depth: number }[] = [
+    { part: 'leftLeg', d: limbShape(leftLeg, LEG_RADII), depth: meanDepth(leftLeg) },
+    { part: 'leftArm', d: limbShape(leftArm, ARM_RADII), depth: meanDepth(leftArm) },
+    { part: 'torso', d: torso, depth: torsoDepth },
+    { part: 'head', d: headShape, depth: head[2] + HEAD_BIAS },
+    { part: 'rightLeg', d: limbShape(rightLeg, LEG_RADII), depth: meanDepth(rightLeg) },
+    { part: 'rightArm', d: limbShape(rightArm, ARM_RADII), depth: meanDepth(rightArm) },
+  ];
+  // Furthest first. Parts at the same depth keep the order above, so nothing flickers.
+  for (let i = 1; i < parts.length; i++) {
+    const moving = parts[i];
+    let j = i - 1;
+    while (j >= 0 && parts[j].depth > moving.depth) {
+      parts[j + 1] = parts[j];
+      j--;
+    }
+    parts[j + 1] = moving;
+  }
+
+  const slots: FigureSlot[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const { part, d, depth } = parts[i];
+    // The head takes the torso's shade, so the neck doesn't change color halfway up.
+    const offset = part === 'head' || part === 'torso' ? 0 : depth - torsoDepth;
+    slots.push({
+      part,
+      d,
+      shade: Math.max(0, Math.min(1, 0.5 + offset / (2 * SHADE_RANGE))),
+      accent: highlight ? highlight.includes(part) : false,
+    });
+  }
+
+  // A circle on the floor is an oval to the camera, flatter the lower the camera is.
+  const flatness = Math.abs(view[5]);
+  const under = (point: Vec3, radius: number): string =>
+    disc(project(view, [point[0], 0, point[2]]), radius, Math.max(SHADOW_MIN_DEPTH, radius * flatness));
+  const middle = skeleton.spine[Math.floor(skeleton.spine.length / 2)];
+  const shadow =
+    under(skeleton.spine[0], SHADOW.trunk) +
+    under(middle, SHADOW.trunk) +
+    under(skeleton.spine[skeleton.spine.length - 1], SHADOW.trunk) +
+    under(skeleton.head, SHADOW.head) +
+    under(skeleton.rightLeg[1], SHADOW.knee) +
+    under(skeleton.leftLeg[1], SHADOW.knee) +
+    under(skeleton.rightLeg[2], SHADOW.foot) +
+    under(skeleton.leftLeg[2], SHADOW.foot) +
+    under(skeleton.rightLeg[3], SHADOW.foot) +
+    under(skeleton.leftLeg[3], SHADOW.foot);
+
+  return { slots, shadow };
+}
+
+/** The clip at a moment, drawn. */
+export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
+  'worklet';
+  return traceFigure(solvePose(poseAt3(clip, timeMs)), view, clip.highlight);
+}
+
+function duration(clip: Clip3D): number {
+  let total = 0;
+  for (let i = 1; i < clip.keyframes.length; i++) total += clip.keyframes[i].ms;
+  return total;
+}
+
+/** The shape of the frame the figure is shown in. */
+const ASPECT = 16 / 9;
+/** Room around the outermost joints for the body drawn over them, and a little air. */
+const FRAME_MARGIN = 52;
+/** How often the clip is looked at to see where it goes. */
+const SAMPLE_MS = 50;
+/** How far the mat reaches past the figure, and the least it reaches to either side of it. */
+const MAT_MARGIN = 55;
+const MAT_MIN_HALF_WIDTH = 70;
+
+export type Staging = {
+  view: Mat3;
+  viewBox: string;
+  /** The corners of the mat under the figure, as a closed path. */
+  mat: string;
+  /** The path the clip's `trail` takes, or empty without one. */
+  trail: string;
+};
+
+/**
+ * Everything about a clip that doesn't change while it plays: the camera, the part of the room it
+ * frames, the mat and the trail. The frame fits the whole movement, so the figure fills it and
+ * nothing it does leaves it.
+ */
+export function stageClip(clip: Clip3D): Staging {
+  const view = viewOf(clip.camera);
+  const upper = clip.camera.fit === 'upper';
+  let left = Infinity;
+  let right = -Infinity;
+  let top = Infinity;
+  let bottom = -Infinity;
+  const floor = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+  let trail = '';
+
+  const total = duration(clip);
+  const steps = Math.max(1, Math.ceil(total / SAMPLE_MS));
+  for (let step = 0; step <= steps; step++) {
+    const skeleton = solvePose(poseAt3(clip, (total * step) / steps));
+    const body = [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm];
+    const legs = [...skeleton.rightLeg, ...skeleton.leftLeg];
+    for (const joint of upper ? body : [...body, ...legs]) {
+      const [x, y] = project(view, joint);
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+    }
+    for (const joint of [...body, ...legs]) {
+      floor.minX = Math.min(floor.minX, joint[0]);
+      floor.maxX = Math.max(floor.maxX, joint[0]);
+      floor.minZ = Math.min(floor.minZ, joint[2]);
+      floor.maxZ = Math.max(floor.maxZ, joint[2]);
+    }
+    if (clip.trail) {
+      const limb = clip.trail === 'rightHand' ? skeleton.rightArm : clip.trail === 'leftHand' ? skeleton.leftArm : clip.trail === 'rightFoot' ? skeleton.rightLeg : skeleton.leftLeg;
+      const [x, y] = project(view, limb[3]);
+      trail += `${trail === '' ? 'M' : 'L'}${fixed(x)} ${fixed(y)}`;
+    }
+  }
+
+  // The smallest 16:9 frame around everything, the floor under a whole body included.
+  if (!upper) bottom = Math.max(bottom, project(view, [0, 0, 0])[1]);
+  let width = right - left + 2 * FRAME_MARGIN;
+  let height = bottom - top + 2 * FRAME_MARGIN;
+  if (width / height < ASPECT) width = height * ASPECT;
+  else height = width / ASPECT;
+  const viewBox = [(left + right - width) / 2, (top + bottom - height) / 2, width, height].map(fixed).join(' ');
+
+  const halfWidth = Math.max(MAT_MIN_HALF_WIDTH, Math.max(Math.abs(floor.minZ), Math.abs(floor.maxZ)) + MAT_MARGIN);
+  const corners: Vec3[] = [
+    [floor.minX - MAT_MARGIN, 0, -halfWidth],
+    [floor.maxX + MAT_MARGIN, 0, -halfWidth],
+    [floor.maxX + MAT_MARGIN, 0, halfWidth],
+    [floor.minX - MAT_MARGIN, 0, halfWidth],
+  ];
+  const mat = corners.map((corner, i) => `${i === 0 ? 'M' : 'L'}${fixed(project(view, corner)[0])} ${fixed(project(view, corner)[1])}`).join('') + 'Z';
+
+  return { view, viewBox, mat, trail };
+}

@@ -54,12 +54,15 @@ const COLORS = {
 
 const VIEW_BOX = `0 0 ${SCENE.width} ${SCENE.height}`;
 
+/** Any engine's clip: poses to arrive at one after another, and the one to hold when nothing should move. */
+type Clip = { keyframes: readonly { ms: number }[]; stillFrame: number };
+
 /**
  * Loops a clip's time for as long as it's on screen, or holds its key pose if reduced motion is on.
  * While not `playing` it waits on its first frame, and starts from the beginning once it is.
  * While `paused` it freezes where it is, and carries on from that frame once it isn't.
  */
-function useClipTime(clip: FigureClip | HandClip, playing: boolean, paused: boolean) {
+export function useClipTime(clip: Clip, playing: boolean, paused: boolean) {
   const reducedMotion = useReducedMotion();
   const time = useSharedValue(keyframeTime(clip, clip.stillFrame));
 

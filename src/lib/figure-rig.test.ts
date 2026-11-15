@@ -24,8 +24,9 @@ import {
 } from './figure-rig';
 
 // The warm-up's marching and the flexibility tests aren't in the library, but are held to the same standard.
+// Clips that have moved to the 3D engine are held to theirs, in `rig3d.test.ts`.
 const animated = [...EXERCISES, MARCHING_EXERCISE, ...FLEXIBILITY_TESTS].flatMap((e) =>
-  e.animation && e.animation.view !== 'hand' ? [{ id: e.id, animation: e.animation }] : []
+  e.animation && e.animation.view !== 'hand' && e.animation.view !== '3d' ? [{ id: e.id, animation: e.animation }] : []
 );
 const hands = EXERCISES.flatMap((e) => (e.animation?.view === 'hand' ? [{ id: e.id, animation: e.animation }] : []));
 const ARM_REACH = BONES.upperArm + BONES.forearm;
