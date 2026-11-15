@@ -38,6 +38,7 @@ The animation engine is being reworked. A new 3D engine (`src/lib/rig3d.ts`, cli
 - Pick the camera that makes the movement readable, highlight the working body part, and add a `trail` for sweeps and rotations.
 - No eyes on the figure. The nose is drawn only on a face turned toward the camera, as a line on the face; in profile and from behind the head is a plain circle.
 - When you move an exercise over, keep the old clip until it's been checked on a device, add a test for what matters in that exercise to `src/lib/rig3d.test.ts`, and update the migration list in `README.md`.
+- A library exercise's photo (its tile in the library, `assets/images/exercises/`) is its clip's still frame, drawn without the highlight. Redraw it whenever the exercise moves to the new engine or its clip's still frame or camera changes: `node scripts/render-exercise-photo.mjs <CLIP_NAME_3D> assets/images/exercises/<file>.png`. Keep the file name.
 
 ## Building with EAS
 

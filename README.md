@@ -87,8 +87,15 @@ The old engine poses a flat figure in screen coordinates. Anything moving toward
 
 1. Write the clip in `src/data/exercise-animations-3d.ts`, named after the old one with a `_3D` suffix.
 2. Point the exercise's `animation` at it (in `src/data/exercises.ts`, `mobility-tests.ts` or `test-warmup.ts`). Leave the old clip in `exercise-animations.ts` until the new one has been checked on a device, so switching back is a one-line change. Delete the old clip after that.
-3. `rig3d.test.ts` picks up every 3D clip used by an exercise and holds it to the same checks: bones never stretch, pinned hands and feet don't slip, nothing goes through the floor, the clip loops, its still frame exists, and everything it shows stays in frame. Add a test for what matters in that exercise (for example, the knees stay planted in cat cow; the elbow stays at the side in shoulder external rotation).
-4. Check it on a phone before merging, and update the list below.
+3. If it's a library exercise, redraw its photo, the still image on its tile in the library, from the new clip, so the tile matches the animation:
+
+   ```bash
+   node scripts/render-exercise-photo.mjs CAT_COW_3D assets/images/exercises/cat-cow.png
+   ```
+
+   It draws the clip's still frame (`stillFrame`) at 960x540, the way the app draws the figure but without the highlight, over the existing file. The still frame is also what shows when reduced motion is on, so make it the pose that best shows the exercise. Redraw the photo whenever a clip's still frame or camera changes. Keep the file name: a new name with the same image bytes doesn't arrive by over-the-air update.
+4. `rig3d.test.ts` picks up every 3D clip used by an exercise and holds it to the same checks: bones never stretch, pinned hands and feet don't slip, nothing goes through the floor, the clip loops, its still frame exists, and everything it shows stays in frame. Add a test for what matters in that exercise (for example, the knees stay planted in cat cow; the elbow stays at the side in shoulder external rotation).
+5. Check it on a phone before merging, and update the list below.
 
 Tip: the rig is plain TypeScript, so frames can be checked without a device. Import `rig3d.ts` and the clip in Node 22 or newer (`node --experimental-strip-types`, after replacing the `@/` import with a relative path), then write `stageClip(clip)` and `frameAt(clip, view, time)` out as SVG paths in an HTML page and screenshot it in a browser.
 
