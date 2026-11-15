@@ -70,8 +70,8 @@ The old engine poses a flat figure in screen coordinates. Anything moving toward
 - **Pins** hold a wrist or ankle at a spot in the room (hands and feet planted on the floor); the elbow or knee is solved so the bones keep their length. Pin a limb in every pose of a clip or in none.
 - **The room**: x points the way an unturned figure faces, y is up from the floor at 0, z is out to the figure's right. Lengths match the old scene (the head's radius is 30, a shin 100).
 - **The camera** is per clip: `yaw` 0 looks at the figure's right side, 90 at its front, 180 at its left; `pitch` 0 is level with the floor, 90 looks straight down. The frame is fitted to the whole movement, so the figure fills it; `fit: 'upper'` frames from the pelvis up.
-- **Draw order** is by depth every frame, and parts are shaded darker the nearer they are, with a background-colored outline so crossing limbs stay apart. The head is ordered against the part of a limb right beside it rather than the limb's average depth, so a head dropping between the arms (cat cow) stays behind the near arm.
-- **Teaching cues**: `highlight` draws the parts the exercise is about in the accent color; `trail` draws the path one hand or foot takes as a dotted line, which helps for rotations and sweeps.
+- **Draw order** is by depth every frame, and parts are shaded darker the nearer they are, with a background-colored outline so crossing limbs stay apart. The head is ordered against the part of a limb right beside it rather than the limb's average depth, so a head dropping between the arms (cat cow) stays behind the near arm. Limbs go over or under the torso the same way, by where they overlap it: the side of the body the shoulder or hip is on, unless part of the limb comes out clear of the torso's surface further out (an arm across the chest). Passing the middle of the torso isn't enough, or a far thigh lifting forward (marching) flips over the hips partway up. Averages put the high chest in front of a whole leg below it when the camera looks down, which tucked a leg swinging back behind the hips. Square to the camera (a figure seen straight from the front), arms go over the torso and legs under the hips. Turn the camera a little toward the arm or leg that moves if the still one should tuck behind its shoulder or hip, as the shoulder tests do. The head goes over the torso unless the neck points well away from the camera; by average depth, a body lying away from the camera (overhead reach) covered the head and the neck showed through it.
+- **Teaching cues**: `highlight` draws the parts the exercise is about in the accent color; `trail` draws the path one hand or foot takes as a dotted line, which helps for rotations and sweeps. It's drawn just under the limb making it, so it shows over the rest of the body behind that limb (the standing leg in leg swings).
 
 ### Rules we've settled on
 
@@ -118,6 +118,11 @@ Moved to the new engine:
 |---|---|---|
 | Cat cow | Library | `CAT_COW_3D` |
 | Shoulder external rotation | Flexibility test | `SHOULDER_EXTERNAL_ROTATION_3D` |
+| Shoulder abduction | Flexibility test | `SHOULDER_ABDUCTION_3D` |
+| Hip abduction | Flexibility test | `HIP_ABDUCTION_3D` |
+| Overhead reach | Flexibility test | `OVERHEAD_REACH_3D` |
+| Marching | Warm-up | `MARCHING_3D` |
+| Leg swings | Library | `LEG_SWINGS_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
@@ -126,16 +131,11 @@ Flexibility tests (`src/data/mobility-tests.ts`):
 | Test | Clip | Needs |
 |---|---|---|
 | Knee to wall | `KNEE_TO_WALL` | scenery (wall) |
-| Shoulder abduction | `SHOULDER_ABDUCTION` | |
 | Hip external rotation | `HIP_EXTERNAL_ROTATION` | scenery (table) |
 | Hip internal rotation | `HIP_INTERNAL_ROTATION` | scenery (table) |
 | Sit and reach | `SIT_AND_REACH` | scenery (box) |
 | Knee to chest | `KNEE_TO_CHEST` | |
 | Straight leg raise | `STRAIGHT_LEG_RAISE` | band |
-| Hip abduction | `HIP_ABDUCTION` | |
-| Overhead reach | `OVERHEAD_REACH` | |
-
-Warm-up (`src/data/test-warmup.ts`): Marching (`MARCHING`).
 
 Library (`src/data/exercises.ts`):
 
@@ -178,7 +178,6 @@ Library (`src/data/exercises.ts`):
 | Kneeling wrist stretch | `KNEELING_WRIST_STRETCH` | |
 | Knight stretch | `KNIGHT_STRETCH` | |
 | Knight to hamstring | `KNIGHT_TO_HAMSTRING` | |
-| Leg swings | `LEG_SWINGS` | |
 | Lizard pose | `LIZARD_POSE` | |
 | Lying external rotation stretch | `LYING_EXTERNAL_ROTATION_STRETCH` | dumbbell |
 | Lying hamstring stretch | `LYING_HAMSTRING_STRETCH` | band |

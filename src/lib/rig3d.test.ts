@@ -1,6 +1,15 @@
 import { EXERCISES } from '@/data/exercises';
-import { CAT_COW_3D, SHOULDER_EXTERNAL_ROTATION_3D } from '@/data/exercise-animations-3d';
+import {
+  CAT_COW_3D,
+  HIP_ABDUCTION_3D,
+  LEG_SWINGS_3D,
+  MARCHING_3D,
+  OVERHEAD_REACH_3D,
+  SHOULDER_ABDUCTION_3D,
+  SHOULDER_EXTERNAL_ROTATION_3D,
+} from '@/data/exercise-animations-3d';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
+import { MARCHING_EXERCISE } from '@/data/test-warmup';
 
 import {
   distance,
@@ -11,6 +20,7 @@ import {
   solvePose,
   stageClip,
   traceFigure,
+  trailedPart,
   viewOf,
   type Clip3D,
   type Pose3,
@@ -18,7 +28,7 @@ import {
   type Vec3,
 } from './rig3d';
 
-const clips = [...EXERCISES, ...FLEXIBILITY_TESTS].flatMap((e) =>
+const clips = [...EXERCISES, ...FLEXIBILITY_TESTS, MARCHING_EXERCISE].flatMap((e) =>
   e.animation?.view === '3d' ? [[e.id, e.animation] as const] : []
 );
 
@@ -38,6 +48,19 @@ function joints(skeleton: Skeleton): Vec3[] {
 }
 
 const STANDING: Pose3 = { pelvis: [0, 213, 0] };
+
+/** The angle at `b` between the bones to `a` and `c`: 180 for a straight limb. */
+function angleAt(a: Vec3, b: Vec3, c: Vec3): number {
+  const u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const v = [c[0] - b[0], c[1] - b[1], c[2] - b[2]];
+  const cos = (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / (Math.hypot(...u) * Math.hypot(...v));
+  return (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI;
+}
+
+/** How far a limb from `root` to `end` is turned from pointing straight down, in degrees. */
+function fromHanging(root: Vec3, end: Vec3): number {
+  return angleAt([root[0], root[1] - 1, root[2]], root, end);
+}
 
 describe('solveJoint3', () => {
   it('keeps both bones their length', () => {
@@ -231,7 +254,15 @@ describe('project', () => {
 
 describe('3D clips', () => {
   it('covers the clips that have moved over', () => {
-    expect(clips.map(([id]) => id)).toEqual(expect.arrayContaining(['cat-cow', 'shoulder-external-rotation']));
+    expect(clips.map(([id]) => id)).toEqual(expect.arrayContaining([
+      'cat-cow',
+      'shoulder-external-rotation',
+      'shoulder-abduction',
+      'overhead-reach',
+      'hip-abduction',
+      'leg-swings',
+      'warmup-marching',
+    ]));
   });
 
   describe.each(clips)('%s', (_, clip) => {
@@ -332,8 +363,106 @@ describe('3D clips', () => {
     expect(widest).toBeCloseTo(SKELETON.forearm * Math.sin((65 * Math.PI) / 180));
   });
 
+  it('raises a straight arm out to the side and on overhead in shoulder abduction', () => {
+    const skeletons = samples(SHOULDER_ABDUCTION_3D).map(solvePose);
+    for (const { rightArm } of skeletons) {
+      expect(angleAt(rightArm[0], rightArm[1], rightArm[2])).toBeCloseTo(180);
+      // Out to the side, never forward or back.
+      expect(rightArm[2][0]).toBeCloseTo(rightArm[0][0]);
+    }
+    const highest = Math.max(...skeletons.map(({ rightArm }) => fromHanging(rightArm[0], rightArm[2])));
+    expect(highest).toBeCloseTo(160);
+    // The moving arm stays over the torso and the still one behind its shoulder, without flipping
+    // partway up.
+    const view = viewOf(SHOULDER_ABDUCTION_3D.camera);
+    for (const skeleton of skeletons) {
+      const order = traceFigure(skeleton, view).slots.map((slot) => slot.part);
+      expect(order.indexOf('rightArm')).toBeGreaterThan(order.indexOf('torso'));
+      expect(order.indexOf('leftArm')).toBeLessThan(order.indexOf('torso'));
+    }
+  });
+
+  it('lowers a straight arm from the ceiling to overhead, back flat on the floor, in overhead reach', () => {
+    const skeletons = samples(OVERHEAD_REACH_3D).map(solvePose);
+    for (const { rightArm, spine } of skeletons) {
+      expect(angleAt(rightArm[0], rightArm[1], rightArm[2])).toBeCloseTo(180);
+      // Straight overhead, never out to the side.
+      expect(rightArm[2][2]).toBeCloseTo(rightArm[0][2]);
+      for (const point of spine) expect(point[1]).toBeCloseTo(spine[0][1]);
+    }
+    // Measured from the arm by the side, which lying down points at the feet.
+    const shoulderAngle = ({ rightArm }: Skeleton) => angleAt([rightArm[0][0] + 1, rightArm[0][1], rightArm[0][2]], rightArm[0], rightArm[2]);
+    expect(shoulderAngle(skeletons[0])).toBeCloseTo(90);
+    expect(Math.max(...skeletons.map(shoulderAngle))).toBeCloseTo(165);
+    // The head lies beyond the shoulders, away from the camera, and still goes over the neck.
+    const view = viewOf(OVERHEAD_REACH_3D.camera);
+    for (const skeleton of skeletons) {
+      const order = traceFigure(skeleton, view).slots.map((slot) => slot.part);
+      expect(order.indexOf('head')).toBeGreaterThan(order.indexOf('torso'));
+    }
+  });
+
+  it('slides a straight leg out along the floor in hip abduction', () => {
+    const skeletons = samples(HIP_ABDUCTION_3D).map(solvePose);
+    for (const { rightLeg } of skeletons) {
+      expect(angleAt(rightLeg[0], rightLeg[1], rightLeg[2])).toBeCloseTo(180);
+      expect(rightLeg[2][1]).toBeCloseTo(rightLeg[0][1]);
+    }
+    const widest = Math.max(
+      ...skeletons.map(({ rightLeg }) => (Math.atan2(rightLeg[2][2] - rightLeg[0][2], rightLeg[2][0] - rightLeg[0][0]) * 180) / Math.PI)
+    );
+    expect(widest).toBeCloseTo(40);
+  });
+
+  it('lifts each thigh level in turn with the opposite arm forward when marching', () => {
+    for (const [frame, lifted, forwardArm] of [
+      [1, 'rightLeg', 'leftArm'],
+      [3, 'leftLeg', 'rightArm'],
+    ] as const) {
+      const skeleton = solvePose(MARCHING_3D.keyframes[frame].pose);
+      const leg = skeleton[lifted];
+      expect(leg[1][1]).toBeCloseTo(leg[0][1]);
+      expect(skeleton[forwardArm][2][0]).toBeGreaterThan(skeleton[forwardArm][0][0] + 50);
+    }
+    // The far leg rises from behind the hips without flipping over them partway up.
+    const view = viewOf(MARCHING_3D.camera);
+    for (const pose of samples(MARCHING_3D)) {
+      const order = traceFigure(solvePose(pose), view).slots.map((slot) => slot.part);
+      expect(order.indexOf('leftLeg')).toBeLessThan(order.indexOf('torso'));
+    }
+  });
+
+  it('swings the leg forward and back with the torso and the hand on the wall still in leg swings', () => {
+    const skeletons = samples(LEG_SWINGS_3D).map(solvePose);
+    for (const { spine, rightLeg } of skeletons) {
+      spine.forEach((point, i) => expect(distance(point, skeletons[0].spine[i])).toBeCloseTo(0));
+      // Straight ahead and back, not out to the side.
+      expect(Math.abs(rightLeg[2][2] - rightLeg[0][2])).toBeLessThan(15);
+    }
+    const swing = skeletons.map(({ rightLeg }) => rightLeg[2][0] - rightLeg[0][0]);
+    expect(Math.max(...swing)).toBeGreaterThan(150);
+    expect(Math.min(...swing)).toBeLessThan(-80);
+    // The swinging leg is drawn over the torso all the way through, never tucked behind the hips.
+    const view = viewOf(LEG_SWINGS_3D.camera);
+    for (const skeleton of skeletons) {
+      const order = traceFigure(skeleton, view).slots.map((slot) => slot.part);
+      expect(order.indexOf('rightLeg')).toBeGreaterThan(order.indexOf('torso'));
+    }
+  });
+
   it('traces the path of the hand a clip trails, and nothing otherwise', () => {
     expect(stageClip(SHOULDER_EXTERNAL_ROTATION_3D).trail).toMatch(/^M[-\d. ]+(L[-\d. ]+)+$/);
     expect(stageClip(CAT_COW_3D).trail).toBe('');
+  });
+
+  it('draws a trail just under the limb that makes it, over the standing leg in leg swings', () => {
+    expect(trailedPart(LEG_SWINGS_3D.trail)).toBe('rightLeg');
+    expect(trailedPart(SHOULDER_ABDUCTION_3D.trail)).toBe('rightArm');
+    expect(trailedPart(CAT_COW_3D.trail)).toBeUndefined();
+    const view = viewOf(LEG_SWINGS_3D.camera);
+    for (const pose of samples(LEG_SWINGS_3D)) {
+      const order = traceFigure(solvePose(pose), view).slots.map((slot) => slot.part);
+      expect(order.indexOf('leftLeg')).toBeLessThan(order.indexOf('rightLeg'));
+    }
   });
 });

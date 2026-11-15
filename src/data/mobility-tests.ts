@@ -12,17 +12,14 @@ import type { FigureClip } from '@/lib/figure-rig';
 import type { Clip3D } from '@/lib/rig3d';
 
 import {
-  HIP_ABDUCTION,
   HIP_EXTERNAL_ROTATION,
   HIP_INTERNAL_ROTATION,
   KNEE_TO_CHEST,
   KNEE_TO_WALL,
-  OVERHEAD_REACH,
-  SHOULDER_ABDUCTION,
   SIT_AND_REACH,
   STRAIGHT_LEG_RAISE,
 } from './exercise-animations';
-import { SHOULDER_EXTERNAL_ROTATION_3D } from './exercise-animations-3d';
+import { HIP_ABDUCTION_3D, OVERHEAD_REACH_3D, SHOULDER_ABDUCTION_3D, SHOULDER_EXTERNAL_ROTATION_3D } from './exercise-animations-3d';
 import type { ScoreArea } from './mobility-score';
 
 export type Side = 'left' | 'right';
@@ -199,7 +196,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     ],
     measurement: 'Shoulder angle, with the arm by your side as 0°',
     method: { kind: 'tilt', startPosition: 'Arm hanging straight by your side', startAngle: 0 },
-    animation: SHOULDER_ABDUCTION,
+    animation: SHOULDER_ABDUCTION_3D,
   },
   {
     id: 'shoulder-external-rotation',
@@ -399,7 +396,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // turning counts, so it doesn't matter where on the leg the phone sits or which way it faces,
     // as long as the knee stays straight so the shin moves with the thigh.
     method: { kind: 'rotation', startPosition: 'Both legs straight and together' },
-    animation: HIP_ABDUCTION,
+    animation: HIP_ABDUCTION_3D,
   },
   {
     id: 'overhead-reach',
@@ -424,7 +421,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     ],
     measurement: 'Shoulder angle, with the arm by your side as 0°',
     method: { kind: 'tilt', startPosition: 'Arm straight, pointing at the ceiling', startAngle: 90 },
-    animation: OVERHEAD_REACH,
+    animation: OVERHEAD_REACH_3D,
   },
 ];
 

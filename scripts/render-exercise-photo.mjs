@@ -69,10 +69,12 @@ const frame = rig.frameAt({ ...clip, highlight: undefined }, stage.view, time);
 let body = `<rect x="-100000" y="-100000" width="200000" height="200000" fill="${COLORS.background}"/>`;
 body += `<path d="${stage.mat}" fill="${COLORS.mat}" stroke="${COLORS.mat}" stroke-width="10" stroke-linejoin="round"/>`;
 body += `<path d="${frame.shadow}" fill="${COLORS.shadow}" opacity="0.14"/>`;
-if (stage.trail) {
-  body += `<path d="${stage.trail}" fill="none" stroke="${COLORS.accent}" stroke-width="5" stroke-dasharray="2 12" stroke-linecap="round" opacity="0.8"/>`;
-}
+// The trail goes just under the part of the body it traces, as the app draws it.
+const trailed = rig.trailedPart(clip.trail);
 for (const slot of frame.slots) {
+  if (stage.trail && slot.part === trailed) {
+    body += `<path d="${stage.trail}" fill="none" stroke="${COLORS.accent}" stroke-width="5" stroke-dasharray="2 12" stroke-linecap="round" opacity="0.8"/>`;
+  }
   body += `<path d="${slot.d}" fill="none" stroke="${COLORS.background}" stroke-width="${2 * OUTLINE}" stroke-linejoin="round"/>`;
   body += slot.accent
     ? `<path d="${slot.d}" fill="${COLORS.accent}"/>`

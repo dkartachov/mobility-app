@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedProps, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import { frameAt, stageClip, type Clip3D, type FigureFrame } from '@/lib/rig3d';
+import { frameAt, stageClip, trailedPart, type Clip3D, type FigureFrame, type Part } from '@/lib/rig3d';
 
 import { useClipTime } from './exercise-figure';
 
@@ -29,9 +29,11 @@ const SLOTS = [0, 1, 2, 3, 4, 5];
  * Whichever part of the body is this far from the camera right now. The slots are drawn furthest
  * first, and the parts move between them as they pass in front of each other. Colors can't follow
  * them, so every slot has each color laid over the last: the far shade, the near shade let through
- * by how near the part is, and the accent, which is only drawn for a highlighted part.
+ * by how near the part is, and the accent, which is only drawn for a highlighted part. The clip's
+ * trail goes under whichever slot holds the part it traces.
  */
-function Slot({ frame, index }: { frame: SharedValue<FigureFrame>; index: number }) {
+function Slot({ frame, index, trail, trailed }: { frame: SharedValue<FigureFrame>; index: number; trail: string; trailed?: Part }) {
+  const path = useAnimatedProps(() => ({ d: frame.get().slots[index].part === trailed ? trail : '' }));
   const outline = useAnimatedProps(() => ({ d: frame.get().slots[index].d }));
   const far = useAnimatedProps(() => {
     const slot = frame.get().slots[index];
@@ -48,6 +50,7 @@ function Slot({ frame, index }: { frame: SharedValue<FigureFrame>; index: number
 
   return (
     <>
+      <AnimatedPath animatedProps={path} fill="none" stroke={COLORS.accent} strokeWidth={5} strokeDasharray="2 12" strokeLinecap="round" opacity={0.8} />
       <AnimatedPath animatedProps={outline} fill="none" stroke={COLORS.background} strokeWidth={2 * OUTLINE} strokeLinejoin="round" />
       <AnimatedPath animatedProps={far} fill={COLORS.far} />
       <AnimatedPath animatedProps={near} fill={COLORS.near} />
@@ -74,11 +77,8 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
         {/* Outlined in its own color, which rounds its corners and gives it an edge when the camera is level with the floor. */}
         <Path d={stage.mat} fill={COLORS.mat} stroke={COLORS.mat} strokeWidth={10} strokeLinejoin="round" />
         <AnimatedPath animatedProps={shadow} fill={COLORS.shadow} opacity={0.14} />
-        {stage.trail !== '' && (
-          <Path d={stage.trail} fill="none" stroke={COLORS.accent} strokeWidth={5} strokeDasharray="2 12" strokeLinecap="round" opacity={0.8} />
-        )}
         {SLOTS.map((index) => (
-          <Slot key={index} frame={frame} index={index} />
+          <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} />
         ))}
       </Svg>
     </View>

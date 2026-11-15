@@ -123,7 +123,7 @@ export type Clip3D = {
   camera: Camera;
   /** The parts the exercise is about, drawn in the accent color. */
   highlight?: readonly Part[];
-  /** Draws the path this hand or foot takes through the clip behind the figure, so the movement shows even in a still. */
+  /** Draws the path this hand or foot takes through the clip, just under its own limb, so the movement shows even in a still. */
   trail?: 'rightHand' | 'leftHand' | 'rightFoot' | 'leftFoot';
 };
 
@@ -570,6 +570,12 @@ const SHADE_RANGE = 2 * SKELETON.shoulder;
 /** The head goes over the torso unless it's clearly behind it. */
 const HEAD_BIAS = 8;
 
+/**
+ * How directly the neck has to point away from the camera, from the shoulders to the head, for the
+ * head to go under the torso: -1 is straight away, 0 square to the camera.
+ */
+const HEAD_TIPPED_AWAY = -0.5;
+
 /** How far from the head on screen a limb can be and still overlap it, nose included. */
 const HEAD_REACH = SKELETON.head + 24;
 
@@ -760,6 +766,70 @@ function nearestOnScreen(points: readonly Vec3[], to: Vec3): { gap: number; dept
   return { gap, depth };
 }
 
+/** How close on screen to the line of the spine a limb has to come to be crossing the torso. */
+const TORSO_REACH = 30;
+/** How many points along each bone are checked against the torso. */
+const BONE_STEPS = 4;
+/** About how thick a limb is either side of its bones, which lets it clear the torso a little sooner. */
+const LIMB_RADIUS = 12;
+
+/**
+ * Whether a limb is drawn over the torso. It goes by where the two actually overlap, not by the
+ * average depth of each: a leg swinging back is still beside the hips where it meets them, and the
+ * torso's high chest seen from above would otherwise count as nearer than a whole leg below it.
+ * A limb starts on the side of the body its shoulder or hip is on, compared with the spine at the
+ * same height (`anchor`), and a part of it further out that crosses the torso decides instead,
+ * like a forearm across the chest.
+ *
+ * Crossing means coming out clear of the torso's surface, in front or behind, not just passing its
+ * middle: `thickness` is how far the torso's surface comes toward the camera from each point of
+ * the spine. A far thigh lifting forward stays under the hips until it's out in front of them.
+ */
+function overTorso(points: readonly Vec3[], spine: readonly Vec3[], thickness: readonly number[], anchor: Vec3, isLeg: boolean): boolean {
+  'worklet';
+  // Square to the camera, the shoulder or hip is as near as the spine. An arm then hangs beside the
+  // chest and goes over it; a thigh starts inside the hips and goes under them, which keeps its
+  // rounded top hidden. Averages would tip either one by the camera's tilt, and flip it partway
+  // through a movement.
+  const root = points[0][2] - anchor[2];
+  let over = Math.abs(root) < 1 ? !isLeg : root > 0;
+  const last = spine.length - 1;
+  for (let i = 1; i < points.length; i++) {
+    for (let step = 1; step <= BONE_STEPS; step++) {
+      const point = lerpVec(points[i - 1], points[i], step / BONE_STEPS);
+      let gap = Infinity;
+      let spineDepth = 0;
+      let surface = 0;
+      for (let k = 1; k <= last; k++) {
+        const a = spine[k - 1];
+        const b = spine[k];
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const lengthSquared = dx * dx + dy * dy;
+        // The spine carries on a little past each end, through the rounded hips and shoulders. A
+        // point beside the hips is then compared with the body at its own height, rather than with
+        // the end of the spine, which seen from above is nearer just for being higher.
+        const past = TORSO_REACH / Math.sqrt(Math.max(lengthSquared, 1e-6));
+        const t =
+          lengthSquared < 1e-6
+            ? 0
+            : Math.max(k === 1 ? -past : 0, Math.min(k === last ? 1 + past : 1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / lengthSquared));
+        const distance = Math.hypot(a[0] + dx * t - point[0], a[1] + dy * t - point[1]);
+        if (distance < gap) {
+          gap = distance;
+          spineDepth = lerp(a[2], b[2], t);
+          surface = lerp(thickness[k - 1], thickness[k], Math.max(0, Math.min(1, t)));
+        }
+      }
+      if (gap >= TORSO_REACH) continue;
+      const clear = Math.max(0, surface - LIMB_RADIUS);
+      if (point[2] - spineDepth > clear) over = true;
+      else if (point[2] - spineDepth < -clear) over = false;
+    }
+  }
+  return over;
+}
+
 /** Draws the figure as the camera sees it. `view` comes from `viewOf`. */
 export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly Part[]): FigureFrame {
   'worklet';
@@ -785,19 +855,33 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
 
 
   const torsoDepth = meanDepth(spine);
+  // How far the torso's surface comes toward the camera from each point of the spine. Its
+  // cross-section is an oval, wider than it is deep, so that depends on which way it's turned.
+  const thickness: number[] = [];
+  for (let i = 0; i < spine.length; i++) {
+    const t = i / (spine.length - 1);
+    thickness.push(Math.hypot(sectionAt(t, 1) * turned(view, skeleton.spineRight[i])[2], sectionAt(t, 2) * turned(view, skeleton.spineFront[i])[2]));
+  }
   const headDepth = head[2] + HEAD_BIAS;
-  const parts: { part: Part; d: string; depth: number; points: Vec3[] }[] = [
-    { part: 'leftLeg', d: limbShape(leftLeg, LEG_RADII), depth: meanDepth(leftLeg), points: leftLeg },
-    { part: 'leftArm', d: limbShape(leftArm, ARM_RADII), depth: meanDepth(leftArm), points: leftArm },
-    { part: 'torso', d: torso, depth: torsoDepth, points: spine },
-    { part: 'rightLeg', d: limbShape(rightLeg, LEG_RADII), depth: meanDepth(rightLeg), points: rightLeg },
-    { part: 'rightArm', d: limbShape(rightArm, ARM_RADII), depth: meanDepth(rightArm), points: rightArm },
+  // Each limb is under the torso (0) or over it (2), by where the two overlap on screen.
+  const limb = (part: Part, points: Vec3[], isLeg: boolean) => {
+    const depth = meanDepth(points);
+    const over = overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg);
+    return { part, d: limbShape(points, isLeg ? LEG_RADII : ARM_RADII), depth, points, layer: over ? 2 : 0 };
+  };
+  const parts: { part: Part; d: string; depth: number; points: Vec3[]; layer: number }[] = [
+    limb('leftLeg', leftLeg, true),
+    limb('leftArm', leftArm, false),
+    { part: 'torso', d: torso, depth: torsoDepth, points: spine, layer: 1 },
+    limb('rightLeg', rightLeg, true),
+    limb('rightArm', rightArm, false),
   ];
-  // Furthest first. Parts at the same depth keep the order above, so nothing flickers.
+  // Under the torso, the torso, then over it, and furthest first within each. Parts at the same
+  // depth keep the order above, so nothing flickers.
   for (let i = 1; i < parts.length; i++) {
     const moving = parts[i];
     let j = i - 1;
-    while (j >= 0 && parts[j].depth > moving.depth) {
+    while (j >= 0 && (parts[j].layer > moving.layer || (parts[j].layer === moving.layer && parts[j].depth > moving.depth))) {
       parts[j + 1] = parts[j];
       j--;
     }
@@ -814,15 +898,22 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
     const { part, depth, points } = parts[i];
     if (byDepth === parts.length && depth > headDepth) byDepth = i;
     // The torso is the head's own body: the neck joins them, so they always touch, and the head
-    // gets the benefit of the doubt over it. A limb is measured against the head itself.
-    const torso = part === 'torso';
-    const near = torso ? { gap: 0, depth } : nearestOnScreen(points, head);
+    // goes over it, or the neck shows through the face. Only a head tipped well away behind the
+    // body, like a forward fold seen from behind, goes under. The torso's average depth is no
+    // guide: a body lying away from the camera puts it in front of the head. A limb is measured
+    // against the head itself.
+    if (part === 'torso') {
+      if ((head[2] - neckBase[2]) / SKELETON.neck > HEAD_TIPPED_AWAY) lastBehind = i;
+      else if (firstInFront === parts.length) firstInFront = i;
+      continue;
+    }
+    const near = nearestOnScreen(points, head);
     if (near.gap > HEAD_REACH) continue;
-    if (near.depth < (torso ? headDepth : head[2])) lastBehind = i;
+    if (near.depth < head[2]) lastBehind = i;
     else if (firstInFront === parts.length) firstInFront = i;
   }
   const at = lastBehind < firstInFront ? lastBehind + 1 : byDepth;
-  parts.splice(at, 0, { part: 'head', d: headShape(view, skeleton, head), depth: headDepth, points: [head] });
+  parts.splice(at, 0, { part: 'head', d: headShape(view, skeleton, head), depth: headDepth, points: [head], layer: 1 });
 
   const slots: FigureSlot[] = [];
   for (let i = 0; i < parts.length; i++) {
@@ -858,6 +949,20 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
 }
 
 /** The clip at a moment, drawn. */
+/**
+ * The part of the body whose path a clip's `trail` traces. The trail is drawn just under that part,
+ * so it shows over whatever is behind the movement, like the standing leg, and under the limb
+ * making it.
+ */
+export function trailedPart(trail: Clip3D['trail']): Part | undefined {
+  'worklet';
+  if (trail === 'rightHand') return 'rightArm';
+  if (trail === 'leftHand') return 'leftArm';
+  if (trail === 'rightFoot') return 'rightLeg';
+  if (trail === 'leftFoot') return 'leftLeg';
+  return undefined;
+}
+
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
   return traceFigure(solvePose(poseAt3(clip, timeMs)), view, clip.highlight);

@@ -10,7 +10,7 @@
  */
 
 import { getExercise, type Exercise } from '@/data/exercises';
-import { MARCHING } from '@/data/exercise-animations';
+import { MARCHING_3D } from '@/data/exercise-animations-3d';
 import type { WorkoutStep } from '@/lib/workout';
 
 /** Get-ready countdown before each move. There's no setup between them, so it's short. */
@@ -34,7 +34,7 @@ export const MARCHING_EXERCISE: Exercise = {
     'Swing your arms in time, opposite arm to leg',
     'Pick up the pace until you feel warm, or switch to easy jumping jacks',
   ],
-  animation: MARCHING,
+  animation: MARCHING_3D,
   active: true,
 };
 
