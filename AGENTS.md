@@ -29,6 +29,16 @@ Run lint and typecheck before declaring any task done.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
 
+## Exercise animations
+
+The animation engine is being reworked. A new 3D engine (`src/lib/rig3d.ts`, clips in `src/data/exercise-animations-3d.ts`, drawn by `src/components/exercise-figure-3d.tsx`) runs alongside the old one (`src/lib/figure-rig.ts`, `src/data/exercise-animations.ts`), and exercises move over one at a time. Read the "Exercise animations" section of `README.md` before touching either; it has how the engine works, how to migrate a clip, and the migration status.
+
+- Write every new or reworked clip for the new engine. Don't add clips to the old one.
+- Joint angles stay true to the exercise instructions (90° means 90°). If it doesn't read on screen, change the camera, not the angle.
+- Pick the camera that makes the movement readable, highlight the working body part, and add a `trail` for sweeps and rotations.
+- No eyes on the figure. The nose is drawn only on a face turned toward the camera, as a line on the face; in profile and from behind the head is a plain circle.
+- When you move an exercise over, keep the old clip until it's been checked on a device, add a test for what matters in that exercise to `src/lib/rig3d.test.ts`, and update the migration list in `README.md`.
+
 ## Building with EAS
 
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.

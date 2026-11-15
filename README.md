@@ -47,6 +47,169 @@ The development and production builds are separate apps ([Expo app variants](htt
 
 EAS builds get `APP_VARIANT` from their profile in `eas.json`, but `eas update` doesn't read `eas.json`, so an update published without the right `APP_VARIANT` won't match its builds' fingerprint. Use `npm start` and the `update:*` scripts, which set it. They use POSIX `VAR=value` syntax, so on Windows run them from Git Bash or WSL.
 
+## Exercise animations
+
+Exercises are demonstrated by a looping animated figure. The animation engine is being rebuilt, and both engines run side by side while exercises move over one at a time. `ExerciseVideo` (`src/components/exercise-video.tsx`) picks the engine from the clip's `view`: `'3d'` is the new engine, anything else the old one.
+
+| | Old engine | New engine |
+|---|---|---|
+| Rig | `src/lib/figure-rig.ts` | `src/lib/rig3d.ts` |
+| Clips | `src/data/exercise-animations.ts` | `src/data/exercise-animations-3d.ts` |
+| Drawing | `src/components/exercise-figure.tsx` | `src/components/exercise-figure-3d.tsx` |
+| Tests | `src/lib/figure-rig.test.ts` | `src/lib/rig3d.test.ts` |
+
+**Every new clip goes in the new engine.** The old engine stays only until its clips have moved over.
+
+### Why a new engine
+
+The old engine poses a flat figure in screen coordinates. Anything moving toward or away from the camera has to be faked (`armLengths`, hand-placed `knees` and `elbows`, `widths`), so rotations read as limbs changing length, limbs crossing the body blend into it, and the figure is small in the frame. The new engine poses a skeleton in three dimensions and draws it from a camera each clip chooses.
+
+### How the new engine works
+
+- **Poses are joint angles**, in anatomical terms: `rightArm: { elbow: 90, rotate: 65 }`, `spine: { flex: 70 }`, `rightLeg: { flex: 30, knee: 45 }`. Moving between keyframes turns joints, so hands and feet travel on arcs by themselves. The `Pose3` type in `rig3d.ts` documents every angle and its direction.
+- **Pins** hold a wrist or ankle at a spot in the room (hands and feet planted on the floor); the elbow or knee is solved so the bones keep their length. Pin a limb in every pose of a clip or in none.
+- **The room**: x points the way an unturned figure faces, y is up from the floor at 0, z is out to the figure's right. Lengths match the old scene (the head's radius is 30, a shin 100).
+- **The camera** is per clip: `yaw` 0 looks at the figure's right side, 90 at its front, 180 at its left; `pitch` 0 is level with the floor, 90 looks straight down. The frame is fitted to the whole movement, so the figure fills it; `fit: 'upper'` frames from the pelvis up.
+- **Draw order** is by depth every frame, and parts are shaded darker the nearer they are, with a background-colored outline so crossing limbs stay apart. The head is ordered against the part of a limb right beside it rather than the limb's average depth, so a head dropping between the arms (cat cow) stays behind the near arm.
+- **Teaching cues**: `highlight` draws the parts the exercise is about in the accent color; `trail` draws the path one hand or foot takes as a dotted line, which helps for rotations and sweeps.
+
+### Rules we've settled on
+
+- **Joint angles stay true to the exercise.** If the instructions say the elbow is at 90°, the clip says 90°. When an angle doesn't read well on screen, change the camera, not the angle.
+- **Pick the camera that makes the movement readable**, not a default side view. Rotations around a limb read best where the turn sweeps across the screen; the shoulder external rotation test uses `{ yaw: 78, pitch: 40, fit: 'upper' }`.
+- **The face has no eyes**, only a nose, and the nose is only drawn where it's needed to tell which way the figure faces:
+  - On a face turned toward the camera, it's a line cut into the face: down the bridge, around the tip, and into the nostril on the far side, like a hand-drawn three-quarter nose.
+  - In profile (where it would stick out more than 2 units past the head) and from behind, the head is a plain circle. The body already shows which way the figure faces.
+- **Highlight the working body part** in every clip, and add a `trail` when the movement is a sweep or rotation.
+- **Clips loop**: the last keyframe is the first pose again.
+
+### Moving an exercise to the new engine
+
+1. Write the clip in `src/data/exercise-animations-3d.ts`, named after the old one with a `_3D` suffix.
+2. Point the exercise's `animation` at it (in `src/data/exercises.ts`, `mobility-tests.ts` or `test-warmup.ts`). Leave the old clip in `exercise-animations.ts` until the new one has been checked on a device, so switching back is a one-line change. Delete the old clip after that.
+3. `rig3d.test.ts` picks up every 3D clip used by an exercise and holds it to the same checks: bones never stretch, pinned hands and feet don't slip, nothing goes through the floor, the clip loops, its still frame exists, and everything it shows stays in frame. Add a test for what matters in that exercise (for example, the knees stay planted in cat cow; the elbow stays at the side in shoulder external rotation).
+4. Check it on a phone before merging, and update the list below.
+
+Tip: the rig is plain TypeScript, so frames can be checked without a device. Import `rig3d.ts` and the clip in Node 22 or newer (`node --experimental-strip-types`, after replacing the `@/` import with a relative path), then write `stageClip(clip)` and `frameAt(clip, view, time)` out as SVG paths in an HTML page and screenshot it in a browser.
+
+### Not in the new engine yet
+
+These block some clips from moving over (see the list below):
+
+- bands and mini bands, dumbbells, and scenery (walls, tables, boxes)
+- a camera that travels with the figure (inchworm)
+- the close-up hand view (finger tendon glides)
+- the breathing and the head trailing the body that the old engine adds to side views
+- a camera that moves during a clip, and phase labels ("hold", "exhale")
+- a limb drawn half in front of the torso and half behind it: limbs are ordered as a whole, so thread the needle will need limbs split
+
+### Migration status
+
+Moved to the new engine:
+
+| Exercise | Where | Clip |
+|---|---|---|
+| Cat cow | Library | `CAT_COW_3D` |
+| Shoulder external rotation | Flexibility test | `SHOULDER_EXTERNAL_ROTATION_3D` |
+
+Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
+
+Flexibility tests (`src/data/mobility-tests.ts`):
+
+| Test | Clip | Needs |
+|---|---|---|
+| Knee to wall | `KNEE_TO_WALL` | scenery (wall) |
+| Shoulder abduction | `SHOULDER_ABDUCTION` | |
+| Hip external rotation | `HIP_EXTERNAL_ROTATION` | scenery (table) |
+| Hip internal rotation | `HIP_INTERNAL_ROTATION` | scenery (table) |
+| Sit and reach | `SIT_AND_REACH` | scenery (box) |
+| Knee to chest | `KNEE_TO_CHEST` | |
+| Straight leg raise | `STRAIGHT_LEG_RAISE` | band |
+| Hip abduction | `HIP_ABDUCTION` | |
+| Overhead reach | `OVERHEAD_REACH` | |
+
+Warm-up (`src/data/test-warmup.ts`): Marching (`MARCHING`).
+
+Library (`src/data/exercises.ts`):
+
+| Exercise | Clip | Needs |
+|---|---|---|
+| 90 to 90 | `NINETY_TO_NINETY` | |
+| 90 to 90 rotations | `NINETY_TO_NINETY_ROTATIONS` | |
+| 90 to 90 side foot lifts | `NINETY_TO_NINETY_SIDE_FOOT_LIFTS` | |
+| Active pancake | `ACTIVE_PANCAKE` | |
+| Active straight leg raise | `ACTIVE_STRAIGHT_LEG_RAISE` | |
+| Ankle mobilization | `ANKLE_MOBILIZATION` | |
+| Back lying reverse pigeon | `BACK_LYING_REVERSE_PIGEON` | band |
+| Behind the back chest opener | `BEHIND_THE_BACK_CHEST_OPENER` | |
+| Belly down foot splay | `BELLY_DOWN_FOOT_SPLAY` | |
+| Blackburn | `BLACKBURN` | |
+| Bottom squat | `BOTTOM_SQUAT` | |
+| Bottom squat rotation | `BOTTOM_SQUAT_ROTATION` | |
+| Butterfly | `BUTTERFLY` | |
+| Cobra to prayer | `COBRA_TO_PRAYER` | |
+| Cossack squat | `COSSACK_SQUAT` | |
+| Couch stretch | `COUCH_STRETCH` | scenery (wall) |
+| Cow face arms | `COW_FACE_ARMS` | |
+| Cross-body shoulder stretch | `CROSS_BODY_SHOULDER_STRETCH` | |
+| Cuban rotation | `CUBAN_ROTATION` | dumbbells |
+| Downward facing dog | `DOWNWARD_FACING_DOG` | |
+| Downward facing dog to cobra | `DOWNWARD_FACING_DOG_TO_COBRA` | |
+| Elephant walk | `ELEPHANT_WALK` | |
+| Figure four stretch | `FIGURE_FOUR_STRETCH` | |
+| Finger tendon glides | `FINGER_TENDON_GLIDES` | the hand view |
+| Floor angels | `FLOOR_ANGELS` | |
+| Frog rocks | `FROG_ROCKS` | |
+| Frog stretch | `FROG_STRETCH` | |
+| Half kneeling frog stretch | `HALF_KNEELING_FROG_STRETCH` | |
+| Half spinal twist | `HALF_SPINAL_TWIST` | |
+| Half-twisted lizard | `HALF_TWISTED_LIZARD` | |
+| Happy baby | `HAPPY_BABY` | |
+| Hip circles | `HIP_CIRCLES` | |
+| Horse stance | `HORSE_STANCE` | |
+| Inchworm | `INCHWORM` | a travelling camera |
+| Kneeling wrist stretch | `KNEELING_WRIST_STRETCH` | |
+| Knight stretch | `KNIGHT_STRETCH` | |
+| Knight to hamstring | `KNIGHT_TO_HAMSTRING` | |
+| Leg swings | `LEG_SWINGS` | |
+| Lizard pose | `LIZARD_POSE` | |
+| Lying external rotation stretch | `LYING_EXTERNAL_ROTATION_STRETCH` | dumbbell |
+| Lying hamstring stretch | `LYING_HAMSTRING_STRETCH` | band |
+| Lying knee hug | `LYING_KNEE_HUG` | |
+| Lying windshield wiper hold | `LYING_WINDSHIELD_WIPER_HOLD` | |
+| Manual extensor forearm stretch | `MANUAL_EXTENSOR_FOREARM_STRETCH` | |
+| Manual flexor forearm stretch | `MANUAL_FLEXOR_FOREARM_STRETCH` | |
+| Neck side stretch | `NECK_SIDE_STRETCH` | |
+| Open book | `OPEN_BOOK` | |
+| Overhead triceps stretch | `OVERHEAD_TRICEPS_STRETCH` | |
+| Pancake | `PANCAKE` | |
+| Pec stretch on the ground | `PEC_STRETCH_ON_THE_GROUND` | |
+| Pigeon stretch | `PIGEON_STRETCH` | |
+| Prayer pose | `PRAYER_POSE` | |
+| Puppy pose | `PUPPY_POSE` | |
+| Pyramid stretch | `PYRAMID_STRETCH` | |
+| Resting Cossack squat | `RESTING_COSSACK_SQUAT` | |
+| Reverse clamshells | `REVERSE_CLAMSHELLS` | |
+| Reverse scorpion | `REVERSE_SCORPION` | |
+| Reverse tabletop | `REVERSE_TABLETOP` | |
+| Scap mobilization | `SCAP_MOBILIZATION` | |
+| Seated hip internal rotation | `SEATED_HIP_INTERNAL_ROTATION` | mini band, scenery (table) |
+| Seated pike stretch | `SEATED_PIKE_STRETCH` | |
+| Seated shoulder extension | `SEATED_SHOULDER_EXTENSION` | |
+| Seated straddle side bend | `SEATED_STRADDLE_SIDE_BEND` | |
+| Shoulder pass-throughs | `SHOULDER_PASS_THROUGHS` | |
+| Side-lying external rotation | `SIDE_LYING_EXTERNAL_ROTATION` | dumbbell |
+| Sleeper stretch | `SLEEPER_STRETCH` | |
+| Squat to stand | `SQUAT_TO_STAND` | |
+| Standing forward fold | `STANDING_FORWARD_FOLD` | |
+| The Breakdancer | `THE_BREAKDANCER` | |
+| The Sagittarius | `THE_SAGITTARIUS` | |
+| Thread the needle | `THREAD_THE_NEEDLE` | limbs split in front of and behind the torso |
+| Three legged downward facing dog | `THREE_LEGGED_DOWNWARD_FACING_DOG` | |
+| Windshield wipers with knee lift | `WINDSHIELD_WIPERS_WITH_KNEE_LIFT` | mini band |
+| World's greatest stretch | `WORLDS_GREATEST_STRETCH` | |
+| Wrist rocks | `WRIST_ROCKS` | |
+
 ## Exercise reminders
 
 Settings has a list of reminder times, each with its own days of the week and on/off switch. They're stored in the `reminders` table, so backups include them. `src/lib/reminders.ts` matches the scheduled local notifications to that table whenever it changes and whenever the app opens, with one weekly trigger per selected day. Reminders show while the app is open, and tapping one goes to the Start tab, except during a workout or flexibility test.
