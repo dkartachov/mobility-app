@@ -135,8 +135,10 @@ export type Skeleton = {
   spineRight: Vec3[];
   spineFront: Vec3[];
   head: Vec3;
-  /** The way the face points. */
+  /** The way the face points, and the head's own up and right, which shape the nose. */
   facing: Vec3;
+  headUp: Vec3;
+  headRight: Vec3;
   rightArm: Vec3[];
   leftArm: Vec3[];
   rightLeg: Vec3[];
@@ -422,6 +424,8 @@ export function solvePose(pose: Pose3): Skeleton {
     spineFront,
     head,
     facing: turned(skull, [1, 0, 0]),
+    headUp: turned(skull, [0, 1, 0]),
+    headRight: turned(skull, [0, 0, 1]),
     rightArm: arm(rightShoulder, pose.rightArm, pose.pins?.rightHand, 1),
     leftArm: arm(leftShoulder, pose.leftArm, pose.pins?.leftHand, -1),
     rightLeg: leg(rightHip, pose.rightLeg, pose.pins?.rightFoot, 1),
@@ -566,6 +570,196 @@ const SHADE_RANGE = 2 * SKELETON.shoulder;
 /** The head goes over the torso unless it's clearly behind it. */
 const HEAD_BIAS = 8;
 
+/** How far from the head on screen a limb can be and still overlap it, nose included. */
+const HEAD_REACH = SKELETON.head + 24;
+
+/**
+ * The nose, in the plane through the middle of the face: each point is how far it is along the way
+ * the face points from the middle of the head, then how far up. It runs from between the brows,
+ * down the bridge, around the tip, and back under it to the face above the lip.
+ */
+const NOSE_ROOT: Vec2 = [26.9, 10.9];
+const NOSE_TIP = { center: [36, -2] as Vec2, radius: 3.5, from: 70, to: -110 };
+const NOSE_BASE: Vec2 = [27.8, -9];
+/** How many points trace the round of the tip. */
+const NOSE_TIP_STEPS = 8;
+/** How wide the line drawing the nose on a face turned toward the camera is, and how far it keeps inside the head's outline. */
+const NOSE_LINE = 2.4;
+const NOSE_LINE_INSET = 1.5;
+/** How far past the head's outline the nose can reach and still be drawn. Any further, and the head is near enough to profile to leave plain. */
+const NOSE_STICKS_OUT = 2;
+/** The wings of the nostrils, either side of the base of the nose: how far along, up, and to the side. */
+const NOSE_WING = { f: 30, u: -6.5, side: 6.5 };
+/** How far along the bridge, and along the way to the nostril, the line starts and ends its turn around the tip. */
+const NOSE_TURN = { bridge: 0.78, nostril: 0.5 };
+/** How many points trace the turn. */
+const NOSE_TURN_STEPS = 8;
+
+/** A point on the face, as the camera sees it: along the way the face points, up the head, and to its right. */
+function onFace(view: Mat3, skeleton: Skeleton, f: number, u: number, side = 0): Vec2 {
+  'worklet';
+  const point = project(
+    view,
+    add(add(add(skeleton.head, scaled(skeleton.facing, f)), scaled(skeleton.headUp, u)), scaled(skeleton.headRight, side))
+  );
+  return [point[0], point[1]];
+}
+
+/** Drops points that sit on top of the one before, which would leave a line no way to run. */
+function spacedOut(points: readonly Vec2[]): Vec2[] {
+  'worklet';
+  const spaced: Vec2[] = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const last = spaced[spaced.length - 1];
+    if (Math.hypot(points[i][0] - last[0], points[i][1] - last[1]) > 0.3) spaced.push(points[i]);
+  }
+  return spaced;
+}
+
+/**
+ * The nose drawn on a face turned toward the camera, the way a drawing of a nose from three
+ * quarters goes: down the bridge from between the brows, around the tip, and into the wing of
+ * the nostril on the side away from the way the nose points, back toward the middle of the face.
+ */
+function noseLine(view: Mat3, skeleton: Skeleton, head: Vec3): Vec2[] {
+  'worklet';
+  const root = onFace(view, skeleton, NOSE_ROOT[0], NOSE_ROOT[1]);
+  const tip = onFace(view, skeleton, NOSE_TIP.center[0] + NOSE_TIP.radius, NOSE_TIP.center[1]);
+  const right = onFace(view, skeleton, NOSE_WING.f, NOSE_WING.u, NOSE_WING.side);
+  const left = onFace(view, skeleton, NOSE_WING.f, NOSE_WING.u, -NOSE_WING.side);
+  // The nose points out from the middle of the face; the nostril the line ends in is the one
+  // nearer the middle of the face.
+  const toRight = Math.hypot(right[0] - head[0], right[1] - head[1]);
+  const toLeft = Math.hypot(left[0] - head[0], left[1] - head[1]);
+  const wing = toRight < toLeft ? right : left;
+  const from: Vec2 = [root[0] + (tip[0] - root[0]) * NOSE_TURN.bridge, root[1] + (tip[1] - root[1]) * NOSE_TURN.bridge];
+  const to: Vec2 = [tip[0] + (wing[0] - tip[0]) * NOSE_TURN.nostril, tip[1] + (wing[1] - tip[1]) * NOSE_TURN.nostril];
+  const points: Vec2[] = [root];
+  for (let i = 0; i <= NOSE_TURN_STEPS; i++) {
+    const t = i / NOSE_TURN_STEPS;
+    const a = (1 - t) * (1 - t);
+    const b = 2 * (1 - t) * t;
+    const c = t * t;
+    points.push([a * from[0] + b * tip[0] + c * to[0], a * from[1] + b * tip[1] + c * to[1]]);
+  }
+  points.push(wing);
+  return spacedOut(points);
+}
+
+/** The nose's outline on screen, from between the brows to above the lip, which shows how far it would stick out past the head. */
+function noseOutline(view: Mat3, skeleton: Skeleton): Vec2[] {
+  'worklet';
+  const at = (f: number, u: number): Vec2 => onFace(view, skeleton, f, u);
+  const points: Vec2[] = [at(NOSE_ROOT[0], NOSE_ROOT[1])];
+  for (let i = 0; i <= NOSE_TIP_STEPS; i++) {
+    const angle = ((NOSE_TIP.from + ((NOSE_TIP.to - NOSE_TIP.from) * i) / NOSE_TIP_STEPS) * Math.PI) / 180;
+    points.push(at(NOSE_TIP.center[0] + NOSE_TIP.radius * Math.cos(angle), NOSE_TIP.center[1] + NOSE_TIP.radius * Math.sin(angle)));
+  }
+  points.push(at(NOSE_BASE[0], NOSE_BASE[1]));
+  return spacedOut(points);
+}
+
+/** Twice the area inside a closed run of points: negative when it runs counterclockwise on screen, as `disc` does. */
+function signedArea(points: readonly Vec2[]): number {
+  'worklet';
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[(i + 1) % points.length];
+    area += x0 * y1 - x1 * y0;
+  }
+  return area;
+}
+
+function polygon(points: readonly Vec2[]): string {
+  'worklet';
+  let path = '';
+  for (let i = 0; i < points.length; i++) path += `${i === 0 ? 'M' : 'L'}${fixed(points[i][0])} ${fixed(points[i][1])}`;
+  return `${path}Z`;
+}
+
+/**
+ * A line `halfWidth` either side of a run of points, as a shape of its own, wound clockwise so it
+ * cuts through any shape it's drawn inside. Each corner is mitred, so the line keeps its width.
+ */
+function lineHole(points: readonly Vec2[], halfWidth: number): string {
+  'worklet';
+  const normal = (a: Vec2, b: Vec2): Vec2 => {
+    const length = Math.max(1e-6, Math.hypot(b[0] - a[0], b[1] - a[1]));
+    return [-(b[1] - a[1]) / length, (b[0] - a[0]) / length];
+  };
+  const left: Vec2[] = [];
+  const right: Vec2[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const before = normal(points[Math.max(0, i - 1)], points[Math.max(1, i)]);
+    const after = normal(points[Math.min(points.length - 2, i)], points[Math.min(points.length - 1, i + 1)]);
+    const mx = before[0] + after[0];
+    const my = before[1] + after[1];
+    const length = Math.max(1e-6, Math.hypot(mx, my));
+    // A sharp corner needs a longer mitre to keep the line as wide, but not without limit.
+    const reach = halfWidth / Math.max(0.4, (mx * before[0] + my * before[1]) / length);
+    left.push([points[i][0] + (mx / length) * reach, points[i][1] + (my / length) * reach]);
+    right.push([points[i][0] - (mx / length) * reach, points[i][1] - (my / length) * reach]);
+  }
+  const outline = [...left, ...right.reverse()];
+  if (signedArea(outline) < 0) outline.reverse();
+  return polygon(outline);
+}
+
+/**
+ * The head, and on a face turned toward the camera, the nose. That's where a plain head leaves it
+ * hard to tell which way the figure is facing, so the nose is drawn there as a line cut into the
+ * face (see `noseLine`), kept inside the head. Toward the profile, where the nose would stick out
+ * past the head's outline, the rest of the body already shows which way the figure faces, so the
+ * head is left plain. So is the back of the head.
+ */
+function headShape(view: Mat3, skeleton: Skeleton, head: Vec3): string {
+  'worklet';
+  const outline = disc(head, SKELETON.head, SKELETON.head);
+  if (turned(view, skeleton.facing)[2] <= 0) return outline;
+  const nose = noseOutline(view, skeleton);
+  let sticksOut = -Infinity;
+  for (let i = 0; i < nose.length; i++) sticksOut = Math.max(sticksOut, Math.hypot(nose[i][0] - head[0], nose[i][1] - head[1]) - SKELETON.head);
+  if (sticksOut > NOSE_STICKS_OUT) return outline;
+
+  const line = noseLine(view, skeleton, head);
+  if (line.length < 2) return outline;
+  let reach = 0;
+  for (let i = 0; i < line.length; i++) reach = Math.max(reach, Math.hypot(line[i][0] - head[0], line[i][1] - head[1]));
+  // Near the profile the line can reach a little past the edge of the head, so it's drawn
+  // smaller, toward the middle of the face, to fit.
+  const room = SKELETON.head - NOSE_LINE_INSET - NOSE_LINE / 2;
+  const scale = Math.min(1, room / Math.max(reach, 1e-6));
+  const fitted: Vec2[] = [];
+  for (let i = 0; i < line.length; i++) fitted.push([head[0] + (line[i][0] - head[0]) * scale, head[1] + (line[i][1] - head[1]) * scale]);
+  return outline + lineHole(fitted, NOSE_LINE / 2);
+}
+
+/**
+ * How close a limb comes to a point on screen, and how near the camera the limb is right there.
+ * The head is ordered against what's actually beside it, not a whole limb's average: a head
+ * dropping between the arms is behind the near arm, even when it's further forward than the hand.
+ */
+function nearestOnScreen(points: readonly Vec3[], to: Vec3): { gap: number; depth: number } {
+  'worklet';
+  let gap = Infinity;
+  let depth = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const lengthSquared = dx * dx + dy * dy;
+    const t = lengthSquared < 1e-6 ? 0 : Math.max(0, Math.min(1, ((to[0] - a[0]) * dx + (to[1] - a[1]) * dy) / lengthSquared));
+    const distance = Math.hypot(a[0] + dx * t - to[0], a[1] + dy * t - to[1]);
+    if (distance < gap) {
+      gap = distance;
+      depth = lerp(a[2], b[2], t);
+    }
+  }
+  return { gap, depth };
+}
+
 /** Draws the figure as the camera sees it. `view` comes from `viewOf`. */
 export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly Part[]): FigureFrame {
   'worklet';
@@ -589,19 +783,15 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
     capsule(rightArm[0], SHOULDER_RADIUS, leftArm[0], SHOULDER_RADIUS) +
     capsule(neckBase, NECK_RADIUS, head, NECK_RADIUS);
 
-  // The nose sticks out the way the figure is looking, and hides inside the head when that's at the camera.
-  const noseFrom = project(view, add(skeleton.head, scaled(skeleton.facing, SKELETON.head - 12)));
-  const noseTo = project(view, add(skeleton.head, scaled(skeleton.facing, SKELETON.head + 2)));
-  const headShape = disc(head, SKELETON.head, SKELETON.head) + capsule(noseFrom, 10, noseTo, 5);
 
   const torsoDepth = meanDepth(spine);
-  const parts: { part: Part; d: string; depth: number }[] = [
-    { part: 'leftLeg', d: limbShape(leftLeg, LEG_RADII), depth: meanDepth(leftLeg) },
-    { part: 'leftArm', d: limbShape(leftArm, ARM_RADII), depth: meanDepth(leftArm) },
-    { part: 'torso', d: torso, depth: torsoDepth },
-    { part: 'head', d: headShape, depth: head[2] + HEAD_BIAS },
-    { part: 'rightLeg', d: limbShape(rightLeg, LEG_RADII), depth: meanDepth(rightLeg) },
-    { part: 'rightArm', d: limbShape(rightArm, ARM_RADII), depth: meanDepth(rightArm) },
+  const headDepth = head[2] + HEAD_BIAS;
+  const parts: { part: Part; d: string; depth: number; points: Vec3[] }[] = [
+    { part: 'leftLeg', d: limbShape(leftLeg, LEG_RADII), depth: meanDepth(leftLeg), points: leftLeg },
+    { part: 'leftArm', d: limbShape(leftArm, ARM_RADII), depth: meanDepth(leftArm), points: leftArm },
+    { part: 'torso', d: torso, depth: torsoDepth, points: spine },
+    { part: 'rightLeg', d: limbShape(rightLeg, LEG_RADII), depth: meanDepth(rightLeg), points: rightLeg },
+    { part: 'rightArm', d: limbShape(rightArm, ARM_RADII), depth: meanDepth(rightArm), points: rightArm },
   ];
   // Furthest first. Parts at the same depth keep the order above, so nothing flickers.
   for (let i = 1; i < parts.length; i++) {
@@ -613,6 +803,26 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
     }
     parts[j + 1] = moving;
   }
+
+  // The head goes over everything it overlaps and is in front of right there, and under
+  // everything it overlaps and is behind. Parts it doesn't touch can go either side. If no place
+  // satisfies both, it falls back to its place by depth alone.
+  let lastBehind = -1;
+  let firstInFront = parts.length;
+  let byDepth = parts.length;
+  for (let i = 0; i < parts.length; i++) {
+    const { part, depth, points } = parts[i];
+    if (byDepth === parts.length && depth > headDepth) byDepth = i;
+    // The torso is the head's own body: the neck joins them, so they always touch, and the head
+    // gets the benefit of the doubt over it. A limb is measured against the head itself.
+    const torso = part === 'torso';
+    const near = torso ? { gap: 0, depth } : nearestOnScreen(points, head);
+    if (near.gap > HEAD_REACH) continue;
+    if (near.depth < (torso ? headDepth : head[2])) lastBehind = i;
+    else if (firstInFront === parts.length) firstInFront = i;
+  }
+  const at = lastBehind < firstInFront ? lastBehind + 1 : byDepth;
+  parts.splice(at, 0, { part: 'head', d: headShape(view, skeleton, head), depth: headDepth, points: [head] });
 
   const slots: FigureSlot[] = [];
   for (let i = 0; i < parts.length; i++) {

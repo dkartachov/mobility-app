@@ -166,6 +166,46 @@ describe('traceFigure', () => {
     expect(slots.filter((slot) => slot.accent).map((slot) => slot.part)).toEqual(['rightArm']);
   });
 
+  describe('the nose', () => {
+    /** The head's centre on screen, and the nose: the run of straight lines after the head's disc. */
+    const nose = (yaw: number, pitch = 10) => {
+      const view = viewOf({ yaw, pitch });
+      const d = traceFigure(skeleton, view).slots.find((slot) => slot.part === 'head')!.d;
+      const shape = d.slice(d.indexOf('Z') + 1);
+      const points = [...shape.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+      // Positive is clockwise on screen: a hole cut into the head, rather than a shape added to it.
+      let area = 0;
+      points.forEach(([x0, y0], i) => {
+        const [x1, y1] = points[(i + 1) % points.length];
+        area += x0 * y1 - x1 * y0;
+      });
+      const [cx, cy] = project(view, skeleton.head);
+      const reach = Math.max(...points.map(([x, y]) => Math.hypot(x - cx, y - cy)));
+      return { points, cut: area > 0, reach };
+    };
+
+    it('is a line cut into a face turned toward the camera, kept inside the head', () => {
+      for (const [yaw, pitch] of [
+        [90, 10],
+        [78, 40],
+      ]) {
+        const { points, cut, reach } = nose(yaw, pitch);
+        expect(points.length).toBeGreaterThan(4);
+        expect(cut).toBe(true);
+        expect(reach).toBeLessThan(SKELETON.head);
+      }
+    });
+
+    it('is left off in profile, where the body shows which way the figure faces', () => {
+      expect(nose(0).points).toEqual([]);
+      expect(nose(180).points).toEqual([]);
+    });
+
+    it('is left off the back of the head', () => {
+      expect(nose(270).points).toEqual([]);
+    });
+  });
+
   it('never writes a broken number into a path', () => {
     for (const camera of [{ yaw: 0, pitch: 0 }, { yaw: 90, pitch: 0 }, { yaw: 30, pitch: 90 }]) {
       const frame = traceFigure(solvePose({ ...STANDING, lean: 90 }), viewOf(camera));
@@ -262,6 +302,14 @@ describe('3D clips', () => {
         expect(leg[1][1]).toBeLessThan(16);
         expect(Math.abs(leg[1][0] - leg[0][0])).toBeLessThan(3);
       }
+    }
+  });
+
+  it('keeps the head behind the near arm as it drops between the arms in cat cow', () => {
+    const view = viewOf(CAT_COW_3D.camera);
+    for (const pose of samples(CAT_COW_3D)) {
+      const order = traceFigure(solvePose(pose), view).slots.map((slot) => slot.part);
+      expect(order.indexOf('head')).toBeLessThan(order.indexOf('rightArm'));
     }
   });
 
