@@ -12,14 +12,17 @@ import type { FigureClip } from '@/lib/figure-rig';
 import type { Clip3D } from '@/lib/rig3d';
 
 import {
-  HIP_EXTERNAL_ROTATION,
-  HIP_INTERNAL_ROTATION,
-  KNEE_TO_CHEST,
-  KNEE_TO_WALL,
-  SIT_AND_REACH,
-  STRAIGHT_LEG_RAISE,
-} from './exercise-animations';
-import { HIP_ABDUCTION_3D, OVERHEAD_REACH_3D, SHOULDER_ABDUCTION_3D, SHOULDER_EXTERNAL_ROTATION_3D } from './exercise-animations-3d';
+  HIP_ABDUCTION_3D,
+  HIP_EXTERNAL_ROTATION_3D,
+  HIP_INTERNAL_ROTATION_3D,
+  KNEE_TO_CHEST_3D,
+  KNEE_TO_WALL_3D,
+  OVERHEAD_REACH_3D,
+  SHOULDER_ABDUCTION_3D,
+  SHOULDER_EXTERNAL_ROTATION_3D,
+  SIT_AND_REACH_3D,
+  STRAIGHT_LEG_RAISE_3D,
+} from './exercise-animations-3d';
 import type { ScoreArea } from './mobility-score';
 
 export type Side = 'left' | 'right';
@@ -170,7 +173,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
       'Move the foot back a little at a time until it is as far as it can be with the knee still touching and the heel still down.',
     ],
     measurement: 'Distance from your big toe to the wall',
-    animation: KNEE_TO_WALL,
+    animation: KNEE_TO_WALL_3D,
     // Half centimetres, since a centimetre is a third of the spread between people.
     method: { kind: 'distance', min: 0, max: 20, step: 0.5 },
   },
@@ -253,7 +256,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     ],
     measurement: 'Angle of the shin from vertical',
     method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
-    animation: HIP_EXTERNAL_ROTATION,
+    animation: HIP_EXTERNAL_ROTATION_3D,
   },
   {
     id: 'hip-internal-rotation',
@@ -281,7 +284,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     ],
     measurement: 'Angle of the shin from vertical',
     method: { kind: 'tilt', startPosition: 'Shin hanging straight down', startAngle: 0 },
-    animation: HIP_INTERNAL_ROTATION,
+    animation: HIP_INTERNAL_ROTATION_3D,
   },
   {
     id: 'sit-and-reach',
@@ -308,7 +311,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     ],
     measurement: 'Fingertip distance past your toes, negative if you fall short, best of 3',
     method: { kind: 'distance', min: -30, max: 30 },
-    animation: SIT_AND_REACH,
+    animation: SIT_AND_REACH_3D,
   },
   {
     id: 'knee-to-chest',
@@ -337,7 +340,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     // Tilt follows the phone's angle to gravity, so it reads the thigh's angle on the side of the
     // thigh as well as on top. Above the knee, not across it, so bending the knee doesn't move it.
     method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
-    animation: KNEE_TO_CHEST,
+    animation: KNEE_TO_CHEST_3D,
   },
   {
     id: 'straight-leg-raise',
@@ -366,7 +369,7 @@ export const FLEXIBILITY_TESTS: FlexibilityTest[] = [
     measurement: 'Angle of the leg from the floor',
     // Same phone position as knee to chest. With the knee straight, the thigh's angle is the leg's.
     method: { kind: 'tilt', startPosition: 'Both legs straight on the floor', startAngle: 0 },
-    animation: STRAIGHT_LEG_RAISE,
+    animation: STRAIGHT_LEG_RAISE_3D,
   },
   {
     id: 'hip-abduction',

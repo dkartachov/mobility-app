@@ -27,6 +27,8 @@ const COLORS = {
   far: '#7DC4BA',
   shadow: '#0B3B36',
   accent: '#F08A4B',
+  strap: '#D9443B',
+  scenery: { light: '#C9DDD9', mid: '#B4CFCA', dark: '#A3C2BC' },
 };
 const OUTLINE = 4.5;
 
@@ -69,6 +71,9 @@ const frame = rig.frameAt({ ...clip, highlight: undefined }, stage.view, time);
 let body = `<rect x="-100000" y="-100000" width="200000" height="200000" fill="${COLORS.background}"/>`;
 body += `<path d="${stage.mat}" fill="${COLORS.mat}" stroke="${COLORS.mat}" stroke-width="10" stroke-linejoin="round"/>`;
 body += `<path d="${frame.shadow}" fill="${COLORS.shadow}" opacity="0.14"/>`;
+for (const face of stage.scenery) {
+  body += `<path d="${face.d}" fill="${COLORS.scenery[face.tone]}" stroke="${COLORS.scenery[face.tone]}" stroke-width="2" stroke-linejoin="round"/>`;
+}
 // The trail goes just under the part of the body it traces, as the app draws it.
 const trailed = rig.trailedPart(clip.trail);
 for (const slot of frame.slots) {
@@ -79,6 +84,9 @@ for (const slot of frame.slots) {
   body += slot.accent
     ? `<path d="${slot.d}" fill="${COLORS.accent}"/>`
     : `<path d="${slot.d}" fill="${COLORS.far}"/><path d="${slot.d}" fill="${COLORS.near}" fill-opacity="${slot.shade}"/>`;
+}
+if (frame.strap) {
+  body += `<path d="${frame.strap}" fill="none" stroke="${COLORS.strap}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>`;
 }
 const page = `<!doctype html><html><body style="margin:0;background:${COLORS.background}">
 <svg xmlns="http://www.w3.org/2000/svg" width="${SIZE.width}" height="${SIZE.height}" viewBox="${stage.viewBox}" style="display:block">${body}</svg>

@@ -110,9 +110,16 @@ export type Camera = {
   yaw: number;
   /** How far the camera is raised: 0 is level with the floor, 90 looks straight down. */
   pitch: number;
-  /** Frame the whole body, or move in on everything from the pelvis up. */
-  fit?: 'body' | 'upper';
+  /** Frame the whole body, or move in on everything from the pelvis up, or on the pelvis and legs. */
+  fit?: 'body' | 'upper' | 'lower';
 };
+
+/**
+ * Something in the room the figure uses, like a wall, a box or a table top: a block with its sides
+ * square to the room, from one corner to the opposite one. Blocks are drawn behind the figure, so
+ * pick a camera that looks past the figure at them rather than through them.
+ */
+export type Block = { from: Vec3; to: Vec3 };
 
 export type Clip3D = {
   view: '3d';
@@ -125,6 +132,9 @@ export type Clip3D = {
   highlight?: readonly Part[];
   /** Draws the path this hand or foot takes through the clip, just under its own limb, so the movement shows even in a still. */
   trail?: 'rightHand' | 'leftHand' | 'rightFoot' | 'leftFoot';
+  scenery?: readonly Block[];
+  /** A strap looped around the ball of this foot, with an end held in each hand. */
+  strap?: 'rightFoot' | 'leftFoot';
 };
 
 /** Where every joint is in the room. Limbs run from the body outward: root, middle joint, wrist or ankle, tip. */
@@ -157,6 +167,8 @@ export type FigureFrame = {
   /** The body's parts, furthest from the camera first, which is the order to draw them in. */
   slots: FigureSlot[];
   shadow: string;
+  /** The clip's strap as a line to stroke, drawn over the figure. Empty without one. */
+  strap: string;
 };
 
 /** The spine bends at this many places between the pelvis and the neck. */
@@ -223,6 +235,11 @@ function scaled(v: Vec3, by: number): Vec3 {
 function dot(a: Vec3, b: Vec3): number {
   'worklet';
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function cross(a: Vec3, b: Vec3): Vec3 {
+  'worklet';
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 export function distance(a: Vec3, b: Vec3): number {
@@ -830,8 +847,36 @@ function overTorso(points: readonly Vec3[], spine: readonly Vec3[], thickness: r
   return over;
 }
 
+/** How far along the foot from the ankle the ball is, where a strap loops around it. */
+const STRAP_ALONG_FOOT = 0.72;
+/** How far the strap sits from the middle of the foot: out to each side, and under the sole. */
+const STRAP_HALF_WIDTH = 11;
+const STRAP_UNDER_SOLE = 9;
+
+/**
+ * Where a strap around a foot runs in the room: from the middle of the right hand, down the right
+ * side of the foot, under the ball of it, and back up the left side to the left hand.
+ */
+export function strapPoints(skeleton: Skeleton, foot: NonNullable<Clip3D['strap']>): Vec3[] {
+  'worklet';
+  const leg = foot === 'rightFoot' ? skeleton.rightLeg : skeleton.leftLeg;
+  const along = unit(sub(leg[3], leg[2]), [1, 0, 0]);
+  const shin = unit(sub(leg[2], leg[1]), [0, -1, 0]);
+  // The sole faces the way the shin points, as near as a direction square to the foot can.
+  const sole = unit(sub(shin, scaled(along, dot(shin, along))), [0, -1, 0]);
+  let side = cross(along, sole);
+  if (dot(side, skeleton.spineRight[0]) < 0) side = scaled(side, -1);
+  const ball = add(add(leg[2], scaled(along, SKELETON.foot * STRAP_ALONG_FOOT)), scaled(sole, STRAP_UNDER_SOLE));
+  return [
+    lerpVec(skeleton.rightArm[2], skeleton.rightArm[3], 0.5),
+    add(ball, scaled(side, STRAP_HALF_WIDTH)),
+    add(ball, scaled(side, -STRAP_HALF_WIDTH)),
+    lerpVec(skeleton.leftArm[2], skeleton.leftArm[3], 0.5),
+  ];
+}
+
 /** Draws the figure as the camera sees it. `view` comes from `viewOf`. */
-export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly Part[]): FigureFrame {
+export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly Part[], strap?: Clip3D['strap']): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
     const out: Vec3[] = [];
@@ -945,10 +990,18 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
     under(skeleton.rightLeg[3], SHADOW.foot) +
     under(skeleton.leftLeg[3], SHADOW.foot);
 
-  return { slots, shadow };
+  let strapLine = '';
+  if (strap) {
+    const points = strapPoints(skeleton, strap);
+    for (let i = 0; i < points.length; i++) {
+      const point = project(view, points[i]);
+      strapLine += `${i === 0 ? 'M' : 'L'}${fixed(point[0])} ${fixed(point[1])}`;
+    }
+  }
+
+  return { slots, shadow, strap: strapLine };
 }
 
-/** The clip at a moment, drawn. */
 /**
  * The part of the body whose path a clip's `trail` traces. The trail is drawn just under that part,
  * so it shows over whatever is behind the movement, like the standing leg, and under the limb
@@ -963,9 +1016,10 @@ export function trailedPart(trail: Clip3D['trail']): Part | undefined {
   return undefined;
 }
 
+/** The clip at a moment, drawn. */
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
-  return traceFigure(solvePose(poseAt3(clip, timeMs)), view, clip.highlight);
+  return traceFigure(solvePose(poseAt3(clip, timeMs)), view, clip.highlight, clip.strap);
 }
 
 function duration(clip: Clip3D): number {
@@ -984,6 +1038,41 @@ const SAMPLE_MS = 50;
 const MAT_MARGIN = 55;
 const MAT_MIN_HALF_WIDTH = 70;
 
+/** One side of a block, as the camera sees it. Tops are lightest, and of the sides, the one turned more toward the camera. */
+export type SceneryFace = { d: string; tone: 'light' | 'mid' | 'dark' };
+
+/**
+ * The sides of a block: which four corners, the axis it faces along and which way. Corner `i` takes
+ * its x from `to` when bit 0 is set and from `from` otherwise, its y by bit 1 and its z by bit 2.
+ */
+const BLOCK_FACES = [
+  { corners: [2, 3, 7, 6], axis: 1, sign: 1 },
+  { corners: [0, 1, 5, 4], axis: 1, sign: -1 },
+  { corners: [1, 3, 7, 5], axis: 0, sign: 1 },
+  { corners: [0, 2, 6, 4], axis: 0, sign: -1 },
+  { corners: [4, 5, 7, 6], axis: 2, sign: 1 },
+  { corners: [0, 1, 3, 2], axis: 2, sign: -1 },
+] as const;
+
+/** The sides of each block that face the camera, the furthest block first. */
+function sceneryFaces(blocks: readonly Block[], view: Mat3): SceneryFace[] {
+  const depthOf = (block: Block) => project(view, lerpVec(block.from, block.to, 0.5))[2];
+  const faces: SceneryFace[] = [];
+  for (const block of [...blocks].sort((a, b) => depthOf(a) - depthOf(b))) {
+    const lo = [0, 1, 2].map((i) => Math.min(block.from[i], block.to[i]));
+    const hi = [0, 1, 2].map((i) => Math.max(block.from[i], block.to[i]));
+    const corners: Vec3[] = [];
+    for (let i = 0; i < 8; i++) corners.push(project(view, [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]]));
+    for (const face of BLOCK_FACES) {
+      // The bottom row of the view is how far along each of the room's axes points toward the camera.
+      if (view[6 + face.axis] * face.sign <= 1e-6) continue;
+      const tone = face.axis === 1 ? 'light' : Math.abs(view[6 + face.axis]) >= Math.abs(view[8 - face.axis]) ? 'mid' : 'dark';
+      faces.push({ d: polygon(face.corners.map((i) => [corners[i][0], corners[i][1]])), tone });
+    }
+  }
+  return faces;
+}
+
 export type Staging = {
   view: Mat3;
   viewBox: string;
@@ -991,6 +1080,8 @@ export type Staging = {
   mat: string;
   /** The path the clip's `trail` takes, or empty without one. */
   trail: string;
+  /** The clip's scenery, in the order to draw it, under the figure. */
+  scenery: SceneryFace[];
 };
 
 /**
@@ -1001,6 +1092,7 @@ export type Staging = {
 export function stageClip(clip: Clip3D): Staging {
   const view = viewOf(clip.camera);
   const upper = clip.camera.fit === 'upper';
+  const lower = clip.camera.fit === 'lower';
   let left = Infinity;
   let right = -Infinity;
   let top = Infinity;
@@ -1014,7 +1106,7 @@ export function stageClip(clip: Clip3D): Staging {
     const skeleton = solvePose(poseAt3(clip, (total * step) / steps));
     const body = [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm];
     const legs = [...skeleton.rightLeg, ...skeleton.leftLeg];
-    for (const joint of upper ? body : [...body, ...legs]) {
+    for (const joint of upper ? body : lower ? [skeleton.spine[0], ...legs] : [...body, ...legs]) {
       const [x, y] = project(view, joint);
       left = Math.min(left, x);
       right = Math.max(right, x);
@@ -1042,14 +1134,23 @@ export function stageClip(clip: Clip3D): Staging {
   else height = width / ASPECT;
   const viewBox = [(left + right - width) / 2, (top + bottom - height) / 2, width, height].map(fixed).join(' ');
 
-  const halfWidth = Math.max(MAT_MIN_HALF_WIDTH, Math.max(Math.abs(floor.minZ), Math.abs(floor.maxZ)) + MAT_MARGIN);
+  // The mat reaches past the figure, and at least as far as the edges of any scenery standing on it.
+  let halfWidth = Math.max(MAT_MIN_HALF_WIDTH, Math.max(Math.abs(floor.minZ), Math.abs(floor.maxZ)) + MAT_MARGIN);
+  let minX = floor.minX - MAT_MARGIN;
+  let maxX = floor.maxX + MAT_MARGIN;
+  for (const block of clip.scenery ?? []) {
+    if (Math.min(block.from[1], block.to[1]) > 0) continue;
+    minX = Math.min(minX, block.from[0], block.to[0]);
+    maxX = Math.max(maxX, block.from[0], block.to[0]);
+    halfWidth = Math.max(halfWidth, Math.abs(block.from[2]), Math.abs(block.to[2]));
+  }
   const corners: Vec3[] = [
-    [floor.minX - MAT_MARGIN, 0, -halfWidth],
-    [floor.maxX + MAT_MARGIN, 0, -halfWidth],
-    [floor.maxX + MAT_MARGIN, 0, halfWidth],
-    [floor.minX - MAT_MARGIN, 0, halfWidth],
+    [minX, 0, -halfWidth],
+    [maxX, 0, -halfWidth],
+    [maxX, 0, halfWidth],
+    [minX, 0, halfWidth],
   ];
   const mat = corners.map((corner, i) => `${i === 0 ? 'M' : 'L'}${fixed(project(view, corner)[0])} ${fixed(project(view, corner)[1])}`).join('') + 'Z';
 
-  return { view, viewBox, mat, trail };
+  return { view, viewBox, mat, trail, scenery: sceneryFaces(clip.scenery ?? [], view) };
 }

@@ -1,4 +1,4 @@
-import { SKELETON, type ArmPose, type Clip3D, type LegPose, type Pose3 } from '@/lib/rig3d';
+import { SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type LegPose, type Pose3, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -181,6 +181,274 @@ export const HIP_ABDUCTION_3D: Clip3D = {
     { ms: 1600, pose: HIP_ABDUCTION_OUT },
     { ms: 900, pose: HIP_ABDUCTION_OUT },
     { ms: 1600, pose: HIP_ABDUCTION_IN },
+  ],
+};
+
+// --- Knee to wall: lunging at a wall, the front knee drives forward to touch it with the heel down ---
+
+/** The front ankle is at 0, so the toes end about here. */
+const KTW_TOES = SKELETON.foot + 10;
+/** The toes sit this far from the wall: about 11 cm, the average result for adults (McBride 2026). */
+const KTW_WALL = KTW_TOES + 26;
+const KTW_FRONT_ANKLE: Vec3 = [0, ANKLE_Y, SKELETON.hip];
+/** The back foot is up on its toes, a stride behind. */
+const KTW_BACK_ANKLE: Vec3 = [-124, 32, -SKELETON.hip];
+
+/**
+ * The front shin tipped this far forward of upright over its planted foot and the thigh this far
+ * above level, which places the hips. The hands stay flat on the wall at chest height, elbows out,
+ * which keeps the arms above the legs the camera frames.
+ */
+const kneeToWallAt = (shin: number, thigh: number, lean: number): Pose3 => {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const knee = [SKELETON.shin * Math.sin(radians(shin)), ANKLE_Y + SKELETON.shin * Math.cos(radians(shin))];
+  return {
+    pelvis: [knee[0] - SKELETON.thigh * Math.cos(radians(thigh)), knee[1] + SKELETON.thigh * Math.sin(radians(thigh)), 0],
+    lean,
+    neck: { flex: -lean },
+    pins: {
+      rightFoot: { at: KTW_FRONT_ANKLE, toward: [1, 0, 0] },
+      leftFoot: { at: KTW_BACK_ANKLE, toward: [0.85, -0.53, 0], pole: [1, 0.3, 0] },
+      rightHand: { at: [KTW_WALL - 9, 300, 44], toward: [0, 1, 0], pole: [-0.3, -0.2, 1] },
+      leftHand: { at: [KTW_WALL - 9, 300, -44], toward: [0, 1, 0], pole: [-0.3, -0.2, -1] },
+    },
+  };
+};
+const KTW_BACK = kneeToWallAt(14, 62, 6);
+/** The knee is 12.5 thick in front of the joint, so this is where it meets the wall. */
+const KTW_SHIN_AT_WALL = (Math.asin((KTW_WALL - 12.5) / SKELETON.shin) * 180) / Math.PI;
+const KTW_TOUCHING = kneeToWallAt(KTW_SHIN_AT_WALL, 58, 9);
+
+export const KNEE_TO_WALL_3D: Clip3D = {
+  view: '3d',
+  // From the right and a little behind, which looks past the figure at the face of the wall the
+  // knee comes to, with the shin's tip forward flat on the screen.
+  camera: { yaw: -14, pitch: 8, fit: 'lower' },
+  highlight: ['rightLeg'],
+  scenery: [{ from: [KTW_WALL, 0, -130], to: [KTW_WALL + 24, 520, 130] }],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: KTW_BACK },
+    { ms: 400, pose: KTW_BACK },
+    { ms: 1300, pose: KTW_TOUCHING },
+    { ms: 800, pose: KTW_TOUCHING },
+    { ms: 1300, pose: KTW_BACK },
+  ],
+};
+
+// --- Seated hip rotation: on the edge of a table, the thigh stays put while the shin swings like a pendulum ---
+
+const TABLE_TOP = 150;
+/** The table stops short of the knees, so the shins hang free and a foot can tuck back under it. */
+const TABLE_EDGE = 68;
+const TABLE: Block[] = [
+  { from: [-120, TABLE_TOP - 14, -112], to: [TABLE_EDGE, TABLE_TOP, 112] },
+  ...([
+    [-112, -104],
+    [-112, 90],
+    [TABLE_EDGE - 22, -104],
+    [TABLE_EDGE - 22, 90],
+  ] as const).map(([x, z]): Block => ({ from: [x, 0, z], to: [x + 14, TABLE_TOP - 14, z + 14] })),
+];
+
+/**
+ * Sitting tall on the table with the thighs level and the hands on the table beside the hips. The
+ * right thigh is turned this far outward, which swings its foot in toward the other leg; negative
+ * turns it inward and the foot swings out. The left knee is bent this far.
+ */
+const seatedRotationAt = (rotate: number, leftKnee: number): Pose3 => ({
+  pelvis: [0, TABLE_TOP + 17, 0],
+  rightLeg: { flex: 90, abduct: 8, knee: 90, rotate },
+  leftLeg: { flex: 90, abduct: 8, knee: leftKnee },
+  pins: {
+    rightHand: { at: [-8, TABLE_TOP + WRIST_Y, 66], toward: [1, 0, 0.2] },
+    leftHand: { at: [-8, TABLE_TOP + WRIST_Y, -66], toward: [1, 0, -0.2] },
+  },
+});
+
+/** About the average result for adults, in both directions (Hallaçeli 2014). */
+const HIP_ROTATION = 42;
+
+const seatedRotation = (rotate: number, leftKnee: number): Clip3D => ({
+  view: '3d',
+  // From the front, where the shin's swing is flat on the screen, turned toward the moving leg and
+  // raised enough to see the table top the thighs rest on.
+  camera: { yaw: 70, pitch: 14 },
+  highlight: ['rightLeg'],
+  trail: 'rightFoot',
+  scenery: TABLE,
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: seatedRotationAt(0, leftKnee) },
+    { ms: 500, pose: seatedRotationAt(0, leftKnee) },
+    { ms: 1800, pose: seatedRotationAt(rotate, leftKnee) },
+    { ms: 1500, pose: seatedRotationAt(rotate, leftKnee) },
+    { ms: 1800, pose: seatedRotationAt(0, leftKnee) },
+  ],
+});
+
+/** The other foot tucks back under the table, out of the way of the one swinging in. */
+export const HIP_EXTERNAL_ROTATION_3D = seatedRotation(HIP_ROTATION, 125);
+export const HIP_INTERNAL_ROTATION_3D = seatedRotation(-HIP_ROTATION, 90);
+
+// --- Sit and reach: legs straight with the soles against a box, folding forward to reach along its top ---
+
+const SIT_PELVIS_Y = 21;
+/** How far the straight legs slope down from the hips to heels resting on the floor. */
+const SIT_LEG_DROP = (Math.asin((SIT_PELVIS_Y - ANKLE_Y) / (SKELETON.thigh + SKELETON.shin)) * 180) / Math.PI;
+/** The soles are flat against the near side of the box. */
+const BOX_X = 212;
+const BOX_TOP = 70;
+
+/**
+ * Sitting with the pelvis tipped and the spine rounded this far forward, the legs flat on the floor
+ * and the toes up. The hands are one on top of the other with the wrists at `hands`.
+ */
+const sitAndReachAt = (lean: number, flex: number, neck: number, hands: Vec3): Pose3 => {
+  // The ankles make up for the slope, so the soles are upright against the box.
+  const leg: LegPose = { flex: 90 - SIT_LEG_DROP + lean, ankle: SIT_LEG_DROP };
+  return {
+    pelvis: [0, SIT_PELVIS_Y, 0],
+    lean,
+    spine: { flex },
+    neck: { flex: neck },
+    rightLeg: leg,
+    leftLeg: leg,
+    pins: {
+      rightHand: { at: [hands[0], hands[1] + 3, 5], toward: [1, 0, -0.1], pole: [-0.3, -1, 1] },
+      leftHand: { at: [hands[0], hands[1], -5], toward: [1, 0, 0.1], pole: [-0.3, -1, -1] },
+    },
+  };
+};
+const SIT_REACH_UP = sitAndReachAt(-4, 14, 0, [128, 118, 0]);
+/** The fingertips end a little past the toes, about the average result for adults (Statistics Canada 2016–17). */
+const SIT_REACH_FOLDED = sitAndReachAt(8, 52, 12, [BOX_X - 6, BOX_TOP + 10, 0]);
+
+export const SIT_AND_REACH_3D: Clip3D = {
+  view: '3d',
+  // From the right and a little behind, which looks past the feet at the side of the box they press on.
+  camera: { yaw: -12, pitch: 12 },
+  highlight: ['rightLeg', 'leftLeg'],
+  trail: 'rightHand',
+  scenery: [{ from: [BOX_X, 0, -62], to: [BOX_X + 105, BOX_TOP, 62] }],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SIT_REACH_UP },
+    { ms: 400, pose: SIT_REACH_UP },
+    { ms: 1800, pose: SIT_REACH_FOLDED },
+    { ms: 2000, pose: SIT_REACH_FOLDED },
+    { ms: 1600, pose: SIT_REACH_UP },
+  ],
+};
+
+// --- Knee to chest: lying on the back, both hands pull one knee in while the other leg stays flat ---
+
+/** A straight leg lying on the floor: lowered from the hips to rest on its heel. */
+const LEG_FLAT: LegPose = { flex: -2.6 };
+const ARM_REST_Y = 14;
+
+/**
+ * The right thigh raised this far from the floor with the knee bent this far, and the hands clasped
+ * over the front of the shin just below the knee, elbows out to the sides.
+ */
+const kneeHeldAt = (flex: number, knee: number): Pose3 => {
+  const pose: Pose3 = { ...LYING_ON_BACK, rightLeg: { flex, knee }, leftLeg: LEG_FLAT };
+  const [, kneeAt, ankle] = solvePose(pose).rightLeg;
+  const along: Vec3 = [(ankle[0] - kneeAt[0]) / SKELETON.shin, (ankle[1] - kneeAt[1]) / SKELETON.shin, 0];
+  // Around the front of the shin: square to it, on the side away from the thigh.
+  const hold: Vec3 = [kneeAt[0] + along[0] * 16 - along[1] * 13, kneeAt[1] + along[1] * 16 + along[0] * 13, kneeAt[2]];
+  return {
+    ...pose,
+    pins: {
+      rightHand: { at: [hold[0] + 5, hold[1] + 1, hold[2] + 12], toward: [0, 0, -1], pole: [0.2, -0.6, 1] },
+      leftHand: { at: [hold[0], hold[1], hold[2] - 14], toward: [0, 0, 1], pole: [0.2, -0.6, -1] },
+    },
+  };
+};
+const KNEE_TO_CHEST_FLAT: Pose3 = {
+  ...LYING_ON_BACK,
+  rightLeg: LEG_FLAT,
+  leftLeg: LEG_FLAT,
+  pins: {
+    rightHand: { at: [20, ARM_REST_Y, 46], toward: [1, 0, 0], pole: [0.2, -0.6, 1] },
+    leftHand: { at: [20, ARM_REST_Y, -46], toward: [1, 0, 0], pole: [0.2, -0.6, -1] },
+  },
+};
+/** The knee comes up to meet the hands, which then pull it in. */
+const KNEE_TO_CHEST_HELD = kneeHeldAt(118, 128);
+/** About the average result for adults (Soucie 2011). */
+const KNEE_TO_CHEST_IN = kneeHeldAt(130, 135);
+
+export const KNEE_TO_CHEST_3D: Clip3D = {
+  view: '3d',
+  // From the side, turned toward the feet and raised, so the knee comes in over the body rather
+  // than in line with it and the leg left flat on the floor shows behind.
+  camera: { yaw: 24, pitch: 22 },
+  highlight: ['rightLeg'],
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: KNEE_TO_CHEST_FLAT },
+    { ms: 400, pose: KNEE_TO_CHEST_FLAT },
+    { ms: 1300, pose: KNEE_TO_CHEST_HELD, ease: 'in' },
+    { ms: 900, pose: KNEE_TO_CHEST_IN, ease: 'out' },
+    { ms: 1500, pose: KNEE_TO_CHEST_IN },
+    { ms: 900, pose: KNEE_TO_CHEST_HELD, ease: 'in' },
+    { ms: 1300, pose: KNEE_TO_CHEST_FLAT, ease: 'out' },
+  ],
+};
+
+// --- Straight leg raise: lying on the back, a strap around the foot pulls the straight leg up ---
+
+/** The right leg straight and raised this far from the floor, toes drawn back by the strap. */
+const legRaisedAt = (degrees: number): Pose3 => ({
+  ...LYING_ON_BACK,
+  rightLeg: { flex: degrees + LEG_FLAT.flex!, ankle: 8 },
+  leftLeg: LEG_FLAT,
+});
+
+/** The strap doesn't stretch, so the hands are always this far from the ball of the foot. */
+const STRAP_LENGTH = 205;
+
+/**
+ * Both hands on the strap, pulling from the foot toward `chest`. The strap stays the same length,
+ * so the hands come in to the chest as the leg rises.
+ */
+const strapHeldAt = (degrees: number, chest: Vec3): Pose3 => {
+  const pose = legRaisedAt(degrees);
+  const [, right, left] = strapPoints(solvePose(pose), 'rightFoot');
+  const ball: Vec3 = [(right[0] + left[0]) / 2, (right[1] + left[1]) / 2, (right[2] + left[2]) / 2];
+  const gap = Math.hypot(chest[0] - ball[0], chest[1] - ball[1], chest[2] - ball[2]);
+  const pull: Vec3 = [(chest[0] - ball[0]) / gap, (chest[1] - ball[1]) / gap, (chest[2] - ball[2]) / gap];
+  // The strap runs to the middle of each hand, half a hand past the wrist.
+  const reach = STRAP_LENGTH + SKELETON.hand / 2;
+  const wrist = (z: number): Vec3 => [ball[0] + pull[0] * reach, ball[1] + pull[1] * reach, ball[2] + pull[2] * reach + z];
+  const toward: Vec3 = [-pull[0], -pull[1], -pull[2]];
+  return {
+    ...pose,
+    pins: {
+      rightHand: { at: wrist(12), toward, pole: [0.3, -0.5, 1] },
+      leftHand: { at: wrist(-12), toward, pole: [0.3, -0.5, -1] },
+    },
+  };
+};
+const STRAP_DOWN = strapHeldAt(0, [-40, 70, 16]);
+/** About the average result for adults (Youdas 2005). */
+const STRAP_UP = strapHeldAt(72, [-110, 62, 16]);
+
+export const STRAIGHT_LEG_RAISE_3D: Clip3D = {
+  view: '3d',
+  // From the side and a little above, where the leg's swing up is flat on the screen.
+  camera: { yaw: 10, pitch: 16 },
+  highlight: ['rightLeg'],
+  trail: 'rightFoot',
+  strap: 'rightFoot',
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: STRAP_DOWN },
+    { ms: 400, pose: STRAP_DOWN },
+    { ms: 1700, pose: STRAP_UP },
+    { ms: 1500, pose: STRAP_UP },
+    { ms: 1700, pose: STRAP_DOWN },
   ],
 };
 

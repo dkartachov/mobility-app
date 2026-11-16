@@ -69,8 +69,10 @@ The old engine poses a flat figure in screen coordinates. Anything moving toward
 - **Poses are joint angles**, in anatomical terms: `rightArm: { elbow: 90, rotate: 65 }`, `spine: { flex: 70 }`, `rightLeg: { flex: 30, knee: 45 }`. Moving between keyframes turns joints, so hands and feet travel on arcs by themselves. The `Pose3` type in `rig3d.ts` documents every angle and its direction.
 - **Pins** hold a wrist or ankle at a spot in the room (hands and feet planted on the floor); the elbow or knee is solved so the bones keep their length. Pin a limb in every pose of a clip or in none.
 - **The room**: x points the way an unturned figure faces, y is up from the floor at 0, z is out to the figure's right. Lengths match the old scene (the head's radius is 30, a shin 100).
-- **The camera** is per clip: `yaw` 0 looks at the figure's right side, 90 at its front, 180 at its left; `pitch` 0 is level with the floor, 90 looks straight down. The frame is fitted to the whole movement, so the figure fills it; `fit: 'upper'` frames from the pelvis up.
+- **The camera** is per clip: `yaw` 0 looks at the figure's right side, 90 at its front, 180 at its left; `pitch` 0 is level with the floor, 90 looks straight down. The frame is fitted to the whole movement, so the figure fills it; `fit: 'upper'` frames from the pelvis up and `fit: 'lower'` the pelvis and legs (knee to wall, where the arms on the wall are left out of the frame).
 - **Draw order** is by depth every frame, and parts are shaded darker the nearer they are, with a background-colored outline so crossing limbs stay apart. The head is ordered against the part of a limb right beside it rather than the limb's average depth, so a head dropping between the arms (cat cow) stays behind the near arm. Limbs go over or under the torso the same way, by where they overlap it: the side of the body the shoulder or hip is on, unless part of the limb comes out clear of the torso's surface further out (an arm across the chest). Passing the middle of the torso isn't enough, or a far thigh lifting forward (marching) flips over the hips partway up. Averages put the high chest in front of a whole leg below it when the camera looks down, which tucked a leg swinging back behind the hips. Square to the camera (a figure seen straight from the front), arms go over the torso and legs under the hips. Turn the camera a little toward the arm or leg that moves if the still one should tuck behind its shoulder or hip, as the shoulder tests do. The head goes over the torso unless the neck points well away from the camera; by average depth, a body lying away from the camera (overhead reach) covered the head and the neck showed through it.
+- **Scenery** (`scenery`) is blocks with their sides square to the room, each from one corner to the opposite one: a wall, a box, a table top and its legs. They're drawn behind the figure, over the mat and the shadows, so pick a camera that looks past the figure at them, not through them. For a wall or box the figure faces, that means from a little behind (knee to wall and sit and reach use a negative `yaw`). Scenery doesn't change the frame, so a wall can run off the top of it; the mat reaches under anything standing on the floor.
+- **A strap** (`strap: 'rightFoot'`) loops around the ball of a foot with an end in each hand, drawn over the figure. Pin both hands, and keep them the same distance from the foot in every pose so the strap doesn't stretch (`strapHeldAt` in the clips file does this for the straight leg raise).
 - **Teaching cues**: `highlight` draws the parts the exercise is about in the accent color; `trail` draws the path one hand or foot takes as a dotted line, which helps for rotations and sweeps. It's drawn just under the limb making it, so it shows over the rest of the body behind that limb (the standing leg in leg swings).
 
 ### Rules we've settled on
@@ -103,7 +105,7 @@ Tip: the rig is plain TypeScript, so frames can be checked without a device. Imp
 
 These block some clips from moving over (see the list below):
 
-- bands and mini bands, dumbbells, and scenery (walls, tables, boxes)
+- stretchy bands and mini bands, and dumbbells
 - a camera that travels with the figure (inchworm)
 - the close-up hand view (finger tendon glides)
 - the breathing and the head trailing the body that the old engine adds to side views
@@ -121,21 +123,18 @@ Moved to the new engine:
 | Shoulder abduction | Flexibility test | `SHOULDER_ABDUCTION_3D` |
 | Hip abduction | Flexibility test | `HIP_ABDUCTION_3D` |
 | Overhead reach | Flexibility test | `OVERHEAD_REACH_3D` |
+| Knee to wall | Flexibility test | `KNEE_TO_WALL_3D` |
+| Hip external rotation | Flexibility test | `HIP_EXTERNAL_ROTATION_3D` |
+| Hip internal rotation | Flexibility test | `HIP_INTERNAL_ROTATION_3D` |
+| Sit and reach | Flexibility test | `SIT_AND_REACH_3D` |
+| Knee to chest | Flexibility test | `KNEE_TO_CHEST_3D` |
+| Straight leg raise | Flexibility test | `STRAIGHT_LEG_RAISE_3D` |
 | Marching | Warm-up | `MARCHING_3D` |
 | Leg swings | Library | `LEG_SWINGS_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-Flexibility tests (`src/data/mobility-tests.ts`):
-
-| Test | Clip | Needs |
-|---|---|---|
-| Knee to wall | `KNEE_TO_WALL` | scenery (wall) |
-| Hip external rotation | `HIP_EXTERNAL_ROTATION` | scenery (table) |
-| Hip internal rotation | `HIP_INTERNAL_ROTATION` | scenery (table) |
-| Sit and reach | `SIT_AND_REACH` | scenery (box) |
-| Knee to chest | `KNEE_TO_CHEST` | |
-| Straight leg raise | `STRAIGHT_LEG_RAISE` | band |
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have.
 
 Library (`src/data/exercises.ts`):
 
@@ -147,7 +146,7 @@ Library (`src/data/exercises.ts`):
 | Active pancake | `ACTIVE_PANCAKE` | |
 | Active straight leg raise | `ACTIVE_STRAIGHT_LEG_RAISE` | |
 | Ankle mobilization | `ANKLE_MOBILIZATION` | |
-| Back lying reverse pigeon | `BACK_LYING_REVERSE_PIGEON` | band |
+| Back lying reverse pigeon | `BACK_LYING_REVERSE_PIGEON` | |
 | Behind the back chest opener | `BEHIND_THE_BACK_CHEST_OPENER` | |
 | Belly down foot splay | `BELLY_DOWN_FOOT_SPLAY` | |
 | Blackburn | `BLACKBURN` | |
@@ -156,7 +155,7 @@ Library (`src/data/exercises.ts`):
 | Butterfly | `BUTTERFLY` | |
 | Cobra to prayer | `COBRA_TO_PRAYER` | |
 | Cossack squat | `COSSACK_SQUAT` | |
-| Couch stretch | `COUCH_STRETCH` | scenery (wall) |
+| Couch stretch | `COUCH_STRETCH` | |
 | Cow face arms | `COW_FACE_ARMS` | |
 | Cross-body shoulder stretch | `CROSS_BODY_SHOULDER_STRETCH` | |
 | Cuban rotation | `CUBAN_ROTATION` | dumbbells |
@@ -180,7 +179,7 @@ Library (`src/data/exercises.ts`):
 | Knight to hamstring | `KNIGHT_TO_HAMSTRING` | |
 | Lizard pose | `LIZARD_POSE` | |
 | Lying external rotation stretch | `LYING_EXTERNAL_ROTATION_STRETCH` | dumbbell |
-| Lying hamstring stretch | `LYING_HAMSTRING_STRETCH` | band |
+| Lying hamstring stretch | `LYING_HAMSTRING_STRETCH` | |
 | Lying knee hug | `LYING_KNEE_HUG` | |
 | Lying windshield wiper hold | `LYING_WINDSHIELD_WIPER_HOLD` | |
 | Manual extensor forearm stretch | `MANUAL_EXTENSOR_FOREARM_STRETCH` | |
@@ -199,7 +198,7 @@ Library (`src/data/exercises.ts`):
 | Reverse scorpion | `REVERSE_SCORPION` | |
 | Reverse tabletop | `REVERSE_TABLETOP` | |
 | Scap mobilization | `SCAP_MOBILIZATION` | |
-| Seated hip internal rotation | `SEATED_HIP_INTERNAL_ROTATION` | mini band, scenery (table) |
+| Seated hip internal rotation | `SEATED_HIP_INTERNAL_ROTATION` | mini band |
 | Seated pike stretch | `SEATED_PIKE_STRETCH` | |
 | Seated shoulder extension | `SEATED_SHOULDER_EXTENSION` | |
 | Seated straddle side bend | `SEATED_STRADDLE_SIDE_BEND` | |

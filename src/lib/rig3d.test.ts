@@ -2,11 +2,17 @@ import { EXERCISES } from '@/data/exercises';
 import {
   CAT_COW_3D,
   HIP_ABDUCTION_3D,
+  HIP_EXTERNAL_ROTATION_3D,
+  HIP_INTERNAL_ROTATION_3D,
+  KNEE_TO_CHEST_3D,
+  KNEE_TO_WALL_3D,
   LEG_SWINGS_3D,
   MARCHING_3D,
   OVERHEAD_REACH_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
+  SIT_AND_REACH_3D,
+  STRAIGHT_LEG_RAISE_3D,
 } from '@/data/exercise-animations-3d';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { MARCHING_EXERCISE } from '@/data/test-warmup';
@@ -19,6 +25,7 @@ import {
   solveJoint3,
   solvePose,
   stageClip,
+  strapPoints,
   traceFigure,
   trailedPart,
   viewOf,
@@ -260,6 +267,12 @@ describe('3D clips', () => {
       'shoulder-abduction',
       'overhead-reach',
       'hip-abduction',
+      'knee-to-wall',
+      'hip-external-rotation',
+      'hip-internal-rotation',
+      'sit-and-reach',
+      'knee-to-chest',
+      'straight-leg-raise',
       'leg-swings',
       'warmup-marching',
     ]));
@@ -314,7 +327,12 @@ describe('3D clips', () => {
       const [x, y, width, height] = stage.viewBox.split(' ').map(Number);
       expect(width / height).toBeCloseTo(16 / 9, 1);
       for (const skeleton of skeletons) {
-        const shown = clip.camera.fit === 'upper' ? [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm] : joints(skeleton);
+        const shown =
+          clip.camera.fit === 'upper'
+            ? [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm]
+            : clip.camera.fit === 'lower'
+              ? [skeleton.spine[0], ...skeleton.rightLeg, ...skeleton.leftLeg]
+              : joints(skeleton);
         for (const joint of shown) {
           const [sx, sy] = project(stage.view, joint);
           expect(sx).toBeGreaterThan(x + SKELETON.head);
@@ -412,6 +430,127 @@ describe('3D clips', () => {
       ...skeletons.map(({ rightLeg }) => (Math.atan2(rightLeg[2][2] - rightLeg[0][2], rightLeg[2][0] - rightLeg[0][0]) * 180) / Math.PI)
     );
     expect(widest).toBeCloseTo(40);
+  });
+
+  it('brings the front knee to the wall with the heel down in knee to wall', () => {
+    const wall = KNEE_TO_WALL_3D.scenery![0].from[0];
+    const skeletons = samples(KNEE_TO_WALL_3D).map(solvePose);
+    for (const { rightLeg, leftLeg, rightArm, leftArm } of skeletons) {
+      // The front foot stays flat, pointing at the wall, with the toes short of it.
+      expect(rightLeg[2][1]).toBeCloseTo(13);
+      expect(rightLeg[3][1]).toBeCloseTo(13);
+      expect(rightLeg[3][0]).toBeLessThan(wall - 20);
+      // Nothing goes into the wall: the knee is 12.5 thick in front of its joint.
+      expect(rightLeg[1][0]).toBeLessThanOrEqual(wall - 12.5 + 0.01);
+      for (const joint of [...rightArm, ...leftArm]) expect(joint[0]).toBeLessThan(wall);
+      // The back leg stays within reach of its foot rather than snapping straight.
+      expect(angleAt(leftLeg[0], leftLeg[1], leftLeg[2])).toBeLessThan(179);
+    }
+    const nearest = Math.max(...skeletons.map(({ rightLeg }) => rightLeg[1][0]));
+    expect(nearest).toBeCloseTo(wall - 12.5);
+    expect(skeletons[0].rightLeg[1][0]).toBeLessThan(wall - 40);
+  });
+
+  it.each([
+    ['external', HIP_EXTERNAL_ROTATION_3D, -1],
+    ['internal', HIP_INTERNAL_ROTATION_3D, 1],
+  ] as const)('swings the shin under a still, level thigh in seated hip %s rotation', (_, clip, direction) => {
+    const skeletons = samples(clip).map(solvePose);
+    const table = clip.scenery![0];
+    for (const { rightLeg, spine } of skeletons) {
+      expect(distance(rightLeg[1], skeletons[0].rightLeg[1])).toBeCloseTo(0);
+      expect(rightLeg[1][1]).toBeCloseTo(rightLeg[0][1]);
+      expect(angleAt(rightLeg[0], rightLeg[1], rightLeg[2])).toBeCloseTo(90);
+      // Sitting on the table, with the knees past its edge so the shins hang free.
+      expect(spine[0][1]).toBeGreaterThan(table.to[1]);
+      expect(rightLeg[1][0]).toBeGreaterThan(table.to[0]);
+    }
+    // It starts hanging straight down. External rotation swings the foot in toward the other leg
+    // (the figure's left, -z); internal swings it out.
+    expect(fromHanging(skeletons[0].rightLeg[1], skeletons[0].rightLeg[2])).toBeCloseTo(0);
+    const furthest = skeletons.reduce((a, b) => (fromHanging(b.rightLeg[1], b.rightLeg[2]) > fromHanging(a.rightLeg[1], a.rightLeg[2]) ? b : a));
+    expect(fromHanging(furthest.rightLeg[1], furthest.rightLeg[2])).toBeCloseTo(42);
+    expect(Math.sign(furthest.rightLeg[2][2] - furthest.rightLeg[1][2])).toBe(direction);
+  });
+
+  it('reaches along the top of the box with straight legs and the soles against it in sit and reach', () => {
+    const box = SIT_AND_REACH_3D.scenery![0];
+    const skeletons = samples(SIT_AND_REACH_3D).map(solvePose);
+    for (const { rightLeg, leftLeg, rightArm, leftArm } of skeletons) {
+      for (const leg of [rightLeg, leftLeg]) {
+        expect(angleAt(leg[0], leg[1], leg[2])).toBeCloseTo(180);
+        expect(leg[2][1]).toBeCloseTo(13);
+        // Toes straight up, with the heel (12.5 thick) on the side of the box.
+        expect(leg[3][0]).toBeCloseTo(leg[2][0]);
+        expect(leg[2][0] + 12.5).toBeCloseTo(box.from[0], 0);
+      }
+      // The hands never dip into the box.
+      for (const arm of [rightArm, leftArm]) if (arm[3][0] > box.from[0]) expect(arm[3][1]).toBeGreaterThan(box.to[1]);
+    }
+    const furthest = Math.max(...skeletons.map(({ rightArm }) => rightArm[3][0]));
+    expect(furthest).toBeGreaterThan(box.from[0]);
+    expect(furthest).toBeLessThan(box.from[0] + 30);
+    expect(skeletons[0].rightArm[3][0]).toBeLessThan(box.from[0] - 40);
+  });
+
+  it('pulls one knee to the chest while the other leg stays flat in knee to chest', () => {
+    const skeletons = samples(KNEE_TO_CHEST_3D).map(solvePose);
+    for (const { leftLeg, spine } of skeletons) {
+      expect(angleAt(leftLeg[0], leftLeg[1], leftLeg[2])).toBeCloseTo(180);
+      expect(leftLeg[2][1]).toBeLessThan(14);
+      for (const point of spine) expect(point[1]).toBeCloseTo(spine[0][1]);
+    }
+    // The thigh's angle from the floor, measured from lying flat toward the feet.
+    const thigh = ({ rightLeg }: Skeleton) => angleAt([rightLeg[0][0] + 1, rightLeg[0][1], rightLeg[0][2]], rightLeg[0], rightLeg[1]);
+    expect(thigh(skeletons[0])).toBeLessThan(3);
+    expect(Math.max(...skeletons.map(thigh))).toBeCloseTo(130);
+    // At the top both hands are on the shin, just below the knee.
+    const held = solvePose(KNEE_TO_CHEST_3D.keyframes[KNEE_TO_CHEST_3D.stillFrame].pose);
+    for (const arm of [held.rightArm, held.leftArm]) {
+      expect(distance(arm[2], held.rightLeg[1])).toBeLessThan(40);
+    }
+  });
+
+  it('raises a straight leg on a strap that keeps its length in straight leg raise', () => {
+    const skeletons = samples(STRAIGHT_LEG_RAISE_3D).map(solvePose);
+    for (const { rightLeg, leftLeg } of skeletons) {
+      for (const leg of [rightLeg, leftLeg]) expect(angleAt(leg[0], leg[1], leg[2])).toBeCloseTo(180);
+      expect(leftLeg[2][1]).toBeLessThan(14);
+      // Straight up, not out to the side.
+      expect(rightLeg[2][2]).toBeCloseTo(rightLeg[0][2]);
+    }
+    const raised = ({ rightLeg }: Skeleton) => (Math.atan2(rightLeg[2][1] - rightLeg[0][1], rightLeg[2][0] - rightLeg[0][0]) * 180) / Math.PI;
+    expect(raised(skeletons[0])).toBeLessThan(0);
+    expect(Math.max(...skeletons.map(raised))).toBeCloseTo(72 - 2.6);
+    // From each hand to its side of the foot, at the bottom and at the top.
+    const lengths = [0, STRAIGHT_LEG_RAISE_3D.stillFrame].map((frame) => {
+      const [rightHand, rightSide, leftSide, leftHand] = strapPoints(solvePose(STRAIGHT_LEG_RAISE_3D.keyframes[frame].pose), 'rightFoot');
+      return [distance(rightHand, rightSide), distance(leftHand, leftSide)];
+    });
+    expect(Math.abs(lengths[0][0] - lengths[1][0])).toBeLessThan(3);
+    expect(Math.abs(lengths[0][1] - lengths[1][1])).toBeLessThan(3);
+  });
+
+  it('draws a strap only for a clip that has one, from hand to foot and back', () => {
+    const frame = (clip: Clip3D) => traceFigure(solvePose(clip.keyframes[0].pose), viewOf(clip.camera), clip.highlight, clip.strap);
+    expect(frame(STRAIGHT_LEG_RAISE_3D).strap).toMatch(/^M[-\d. ]+(L[-\d. ]+){3}$/);
+    expect(frame(KNEE_TO_CHEST_3D).strap).toBe('');
+  });
+
+  it('draws the sides of scenery that face the camera, and puts the mat under it', () => {
+    expect(stageClip(CAT_COW_3D).scenery).toEqual([]);
+    // A block shows its top and two sides to a camera above and to one side of it.
+    const box = stageClip(SIT_AND_REACH_3D);
+    expect(box.scenery.map((face) => face.tone).sort()).toEqual(['dark', 'light', 'mid']);
+    for (const face of box.scenery) expect(face.d).toMatch(/^M[-\d. ]+(L[-\d. ]+){3}Z$/);
+    // The table is a top and four legs.
+    expect(stageClip(HIP_INTERNAL_ROTATION_3D).scenery).toHaveLength(15);
+    // The box stands on the mat: its far bottom corner is inside the mat's outline.
+    const { from, to } = SIT_AND_REACH_3D.scenery![0];
+    const corner = project(box.view, [to[0], 0, from[2]]);
+    const mat = [...box.mat.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    expect(corner[0]).toBeLessThanOrEqual(Math.max(...mat.map(([x]) => x)) + 0.1);
+    expect(corner[1]).toBeGreaterThanOrEqual(Math.min(...mat.map(([, y]) => y)) - 0.1);
   });
 
   it('lifts each thigh level in turn with the opposite arm forward when marching', () => {

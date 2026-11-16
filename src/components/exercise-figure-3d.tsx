@@ -17,6 +17,9 @@ const COLORS = {
   far: '#7DC4BA',
   shadow: '#0B3B36',
   accent: '#F08A4B',
+  strap: '#D9443B',
+  /** The sides of a piece of scenery: its top, then the side turned more toward the camera, then the other. */
+  scenery: { light: '#C9DDD9', mid: '#B4CFCA', dark: '#A3C2BC' },
 };
 
 /** How far the background shows around each part of the body, so limbs that cross stay apart. */
@@ -70,6 +73,7 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
 
   const frame = useDerivedValue(() => frameAt(clip, view, time.get()));
   const shadow = useAnimatedProps(() => ({ d: frame.get().shadow }));
+  const strap = useAnimatedProps(() => ({ d: frame.get().strap }));
 
   return (
     <View accessible accessibilityRole="image" accessibilityLabel="Animated demonstration" style={styles.scene}>
@@ -77,9 +81,14 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
         {/* Outlined in its own color, which rounds its corners and gives it an edge when the camera is level with the floor. */}
         <Path d={stage.mat} fill={COLORS.mat} stroke={COLORS.mat} strokeWidth={10} strokeLinejoin="round" />
         <AnimatedPath animatedProps={shadow} fill={COLORS.shadow} opacity={0.14} />
+        {/* Outlined in its own color, which closes the hairline gaps between the sides of a block. */}
+        {stage.scenery.map((face, i) => (
+          <Path key={i} d={face.d} fill={COLORS.scenery[face.tone]} stroke={COLORS.scenery[face.tone]} strokeWidth={2} strokeLinejoin="round" />
+        ))}
         {SLOTS.map((index) => (
           <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} />
         ))}
+        {clip.strap && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
       </Svg>
     </View>
   );
