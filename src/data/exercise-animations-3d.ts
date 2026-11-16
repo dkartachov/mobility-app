@@ -716,3 +716,140 @@ export const NINETY_TO_NINETY_ROTATIONS_3D: Clip3D = {
     { ms: 300, pose: ROTATIONS_RIGHT },
   ],
 };
+
+// --- Pancake: sitting with straight legs spread wide, folding forward between them from the hips ---
+
+/** How far each leg is out from straight ahead, which puts 100° between them. */
+const PANCAKE_SPREAD = 50;
+/** How far the spread legs slope down from the hips to heels resting on the floor. */
+const PANCAKE_LEG_DROP =
+  (Math.asin((SIT_PELVIS_Y - ANKLE_Y) / ((SKELETON.thigh + SKELETON.shin) * Math.cos((PANCAKE_SPREAD * Math.PI) / 180))) * 180) / Math.PI;
+/** At the bottom of the fold the pelvis has tipped this far forward and the back has rounded this far, which brings the chest down near the floor. */
+const PANCAKE_LEAN = 50;
+const PANCAKE_ROUNDING = 45;
+/** Sitting tall, the back is this close to straight. */
+const PANCAKE_TALL_ROUNDING = 6;
+/**
+ * The hands are on the floor between the legs, this far either side of the middle: close together
+ * in front of the hips sitting tall, and under the shoulders at the bottom of the fold. Sitting
+ * tall, an arm any further out runs right alongside its thigh from the camera, and the two clip.
+ */
+const PANCAKE_HANDS_TALL_Z = 8;
+const PANCAKE_HANDS_FOLDED_Z = 32;
+/** How far the wrists are from the shoulders, which leaves the elbows a little soft. */
+const PANCAKE_ARM_REACH = 0.96 * (SKELETON.upperArm + SKELETON.forearm);
+
+/**
+ * Folded this far forward, from 0, sitting tall, to 1. The pelvis tips and the back rounds after
+ * it, while the legs stay where they are on the floor, kneecaps and toes up.
+ */
+const pancakeBody = (fold: number): Pose3 => {
+  const lean = PANCAKE_LEAN * fold;
+  const leg: LegPose = { flex: 90 - PANCAKE_LEG_DROP + lean, abduct: PANCAKE_SPREAD };
+  return {
+    pelvis: [0, SIT_PELVIS_Y, 0],
+    lean,
+    spine: { flex: PANCAKE_TALL_ROUNDING + (PANCAKE_ROUNDING - PANCAKE_TALL_ROUNDING) * fold },
+    // The head lifts a little to look along the floor rather than hang.
+    neck: { flex: -15 * fold },
+    rightLeg: leg,
+    leftLeg: leg,
+  };
+};
+
+/**
+ * The right hand on the floor where the arm reaches out ahead of the shoulder with the body folded
+ * this far. The elbow points back sitting tall, clear of the thigh beside it, and out to the side
+ * at the bottom of the fold. The left hand mirrors it.
+ */
+const pancakeHand = (fold: number, side: 1 | -1): NonNullable<Pose3['pins']>['rightHand'] => {
+  const shoulder = solvePose(pancakeBody(fold)).rightArm[0];
+  const z = PANCAKE_HANDS_TALL_Z + (PANCAKE_HANDS_FOLDED_Z - PANCAKE_HANDS_TALL_Z) * fold;
+  const x = shoulder[0] + Math.sqrt(PANCAKE_ARM_REACH ** 2 - (shoulder[1] - WRIST_Y) ** 2 - (z - shoulder[2]) ** 2);
+  return { at: [x, WRIST_Y, side * z], toward: [1, 0, 0], pole: [-1 + 0.7 * fold, 0.2 * fold, side * (0.2 + 0.8 * fold)] };
+};
+
+/**
+ * The pancake folded this far, both hands on the floor between the legs. Each hand is where it
+ * would reach to at a fold of its own, no further than the body's, so one can stay behind while
+ * the other steps forward.
+ */
+const pancakeAt = (fold: number, rightHand = fold, leftHand = fold): Pose3 => ({
+  ...pancakeBody(fold),
+  pins: { rightHand: pancakeHand(rightHand, 1), leftHand: pancakeHand(leftHand, -1) },
+});
+const PANCAKE_TALL = pancakeAt(0);
+const PANCAKE_FOLDED = pancakeAt(1);
+
+const PANCAKE_WALK_MS = 3000;
+/** Each hand takes this many steps on the way down, the right one first. */
+const PANCAKE_STRIDES = 3;
+/** How many frames each step of a hand is drawn in. */
+const PANCAKE_STEP_FRAMES = 4;
+
+/**
+ * Walking the hands forward into the fold: the body sinks steadily while the hands take turns
+ * stepping out to where the arms reach. The body and each step ease in and out on their own, so
+ * the frames are placed along them rather than eased again.
+ */
+const pancakeWalk = (): Keyframe3[] => {
+  const eased = (t: number) => t * t * (3 - 2 * t);
+  const steps = 2 * PANCAKE_STRIDES;
+  /** The fold a hand reaches to once step `index` is done: the body's at that moment, and all the way for each hand's last step. */
+  const target = (index: number) => (index < 0 ? 0 : index >= steps - 2 ? 1 : eased((index + 1) / steps));
+  /** Where a hand is `at` this far through the walk, as the fold it reaches to. The right hand (`first` 0) takes the even steps. */
+  const hand = (at: number, first: 0 | 1) => {
+    const step = Math.min(steps - 1, Math.floor(at * steps));
+    const mine = step % 2 === first ? step : step - 1;
+    const reached = mine === step ? target(mine - 2) + (target(mine) - target(mine - 2)) * eased(at * steps - step) : target(mine);
+    // Never further than the arm reaches from where the body is now.
+    return Math.min(reached, eased(at));
+  };
+  const frames: Keyframe3[] = [];
+  const count = steps * PANCAKE_STEP_FRAMES;
+  for (let frame = 1; frame <= count; frame++) {
+    const at = frame / count;
+    frames.push({ ms: PANCAKE_WALK_MS / count, pose: pancakeAt(eased(at), hand(at, 0), hand(at, 1)), ease: 'none' });
+  }
+  return frames;
+};
+
+/** From the figure's right, a little in front and well above: the fold goes across the screen and both legs lie open on the floor, one toward the camera and one away. */
+const PANCAKE_CAMERA = { yaw: 20, pitch: 38 };
+
+export const PANCAKE_3D: Clip3D = {
+  view: '3d',
+  camera: PANCAKE_CAMERA,
+  highlight: ['rightLeg', 'leftLeg'],
+  // Folded, where the walk ends.
+  stillFrame: 1 + 2 * PANCAKE_STRIDES * PANCAKE_STEP_FRAMES,
+  keyframes: [
+    { ms: 0, pose: PANCAKE_TALL },
+    { ms: 500, pose: PANCAKE_TALL },
+    ...pancakeWalk(),
+    { ms: 3500, pose: PANCAKE_FOLDED },
+    { ms: 1800, pose: PANCAKE_TALL },
+  ],
+};
+
+// --- Active pancake: the pancake's fold, in and out without holding, deeper the second time ---
+
+const ACTIVE_PANCAKE_FIRST = pancakeAt(0.75);
+
+export const ACTIVE_PANCAKE_3D: Clip3D = {
+  view: '3d',
+  camera: PANCAKE_CAMERA,
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: 5,
+  keyframes: [
+    { ms: 0, pose: PANCAKE_TALL },
+    { ms: 1500, pose: ACTIVE_PANCAKE_FIRST },
+    { ms: 300, pose: ACTIVE_PANCAKE_FIRST },
+    { ms: 1400, pose: PANCAKE_TALL },
+    { ms: 300, pose: PANCAKE_TALL },
+    { ms: 1700, pose: PANCAKE_FOLDED },
+    { ms: 300, pose: PANCAKE_FOLDED },
+    { ms: 1600, pose: PANCAKE_TALL },
+    { ms: 300, pose: PANCAKE_TALL },
+  ],
+};

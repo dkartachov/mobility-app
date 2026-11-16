@@ -1,5 +1,6 @@
 import { EXERCISES } from '@/data/exercises';
 import {
+  ACTIVE_PANCAKE_3D,
   CAT_COW_3D,
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
@@ -12,6 +13,7 @@ import {
   NINETY_TO_NINETY_ROTATIONS_3D,
   NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
   OVERHEAD_REACH_3D,
+  PANCAKE_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
   SIT_AND_REACH_3D,
@@ -284,6 +286,8 @@ describe('3D clips', () => {
       '90-to-90',
       '90-to-90-rotations',
       '90-to-90-side-foot-lifts',
+      'pancake',
+      'active-pancake',
       'warmup-marching',
     ]));
   });
@@ -886,6 +890,83 @@ describe('3D clips', () => {
     for (const { rightArm, leftArm } of samples(clip).map(solvePose)) {
       for (const arm of [rightArm, leftArm]) expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(145);
     }
+  });
+
+  it('folds forward between straight legs spread wide on the floor, hands on the floor, in the pancake clips', () => {
+    for (const clip of [PANCAKE_3D, ACTIVE_PANCAKE_3D]) {
+      const skeletons = samples(clip).map(solvePose);
+      const tall = skeletons[0];
+      for (const { rightLeg, leftLeg, rightArm, leftArm } of skeletons) {
+        // The legs never move: straight, heels on the floor, the same on both sides.
+        [...rightLeg, ...leftLeg].forEach((joint, i) => expect(distance(joint, [...tall.rightLeg, ...tall.leftLeg][i])).toBeCloseTo(0));
+        for (const leg of [rightLeg, leftLeg]) {
+          expect(angleAt(leg[0], leg[1], leg[2])).toBeCloseTo(180);
+          expect(leg[2][1]).toBeCloseTo(13);
+          // Toes up.
+          expect(leg[3][1] - leg[2][1]).toBeGreaterThan(40);
+        }
+        rightLeg.forEach((joint, i) => expect(distance(joint, [leftLeg[i][0], leftLeg[i][1], -leftLeg[i][2]])).toBeCloseTo(0));
+        // Both hands stay on the floor between the legs, the arms short of locked out.
+        for (const arm of [rightArm, leftArm]) {
+          expect(arm[2][1]).toBeCloseTo(11);
+          expect(Math.abs(arm[2][2])).toBeLessThan(40);
+          expect(distance(arm[0], arm[2])).toBeLessThan(SKELETON.upperArm + SKELETON.forearm - 4);
+        }
+      }
+      // Spread wide: about 100° between the legs.
+      const between = angleAt(tall.rightLeg[2], tall.spine[0], tall.leftLeg[2]);
+      expect(between).toBeGreaterThan(90);
+      expect(between).toBeLessThan(110);
+      // Sitting tall, the chest is over the hips; folded, it's well forward and down near the floor, hands far ahead.
+      const folded = solvePose(clip.keyframes[clip.stillFrame].pose);
+      const chest = (skeleton: Skeleton) => skeleton.spine[skeleton.spine.length - 1];
+      expect(Math.abs(chest(tall)[0])).toBeLessThan(15);
+      expect(chest(tall)[1]).toBeGreaterThan(140);
+      expect(chest(folded)[0]).toBeGreaterThan(100);
+      expect(chest(folded)[1]).toBeLessThan(70);
+      expect(folded.rightArm[2][0] - tall.rightArm[2][0]).toBeGreaterThan(150);
+    }
+  });
+
+  it('never swaps the near arm and the near leg over each other in the pancake clips', () => {
+    // Sitting tall, the right arm comes down beside the right thigh from the camera. Close enough
+    // to touch it, the two changed places as the hands set off, and the arm clipped under the leg.
+    for (const clip of [PANCAKE_3D, ACTIVE_PANCAKE_3D]) {
+      const view = viewOf(clip.camera);
+      for (let t = 0; t <= durationOf(clip); t += 50) {
+        const order = frameAt(clip, view, t).slots.map((slot) => slot.part);
+        expect(order.indexOf('rightArm')).toBeLessThan(order.indexOf('rightLeg'));
+      }
+    }
+  });
+
+  it('walks the hands forward one at a time, the right one first, on the way into the pancake', () => {
+    const skeletons = samples(PANCAKE_3D).map(solvePose);
+    const lead = skeletons.map(({ rightArm, leftArm }) => rightArm[2][0] - leftArm[2][0]);
+    // Each hand gets ahead of the other in turn, and neither ever moves back on the way down.
+    expect(Math.max(...lead)).toBeGreaterThan(30);
+    expect(Math.min(...lead)).toBeLessThan(-15);
+    const start = skeletons[0];
+    const firstMoved = (arm: 'rightArm' | 'leftArm') => skeletons.findIndex((skeleton) => skeleton[arm][2][0] - start[arm][2][0] > 1);
+    expect(firstMoved('rightArm')).toBeLessThan(firstMoved('leftArm'));
+    const hold = PANCAKE_3D.stillFrame;
+    const down = PANCAKE_3D.keyframes.slice(0, hold + 1).map(({ pose }) => solvePose(pose));
+    for (let i = 1; i < down.length; i++) {
+      expect(down[i].rightArm[2][0]).toBeGreaterThanOrEqual(down[i - 1].rightArm[2][0] - 1e-6);
+      expect(down[i].leftArm[2][0]).toBeGreaterThanOrEqual(down[i - 1].leftArm[2][0] - 1e-6);
+    }
+    // They end side by side.
+    expect(down[hold].rightArm[2][0]).toBeCloseTo(down[hold].leftArm[2][0]);
+  });
+
+  it('goes deeper the second time in the active pancake', () => {
+    const heights = samples(ACTIVE_PANCAKE_3D).map((pose) => solvePose(pose).head[1]);
+    const half = Math.floor(heights.length / 2);
+    const first = Math.min(...heights.slice(0, half));
+    const second = Math.min(...heights.slice(half));
+    expect(second).toBeLessThan(first - 15);
+    // It sits back up tall in between.
+    expect(Math.max(...heights.slice(half - 10, half + 10))).toBeCloseTo(heights[0]);
   });
 
   it('traces the path of the hand a clip trails, and nothing otherwise', () => {

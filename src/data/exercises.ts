@@ -5,15 +5,16 @@ import type { ExerciseAnimation } from '@/lib/figure-rig';
 import type { ScoreArea } from './mobility-score';
 
 import {
+  ACTIVE_PANCAKE_3D,
   CAT_COW_3D,
   LEG_SWINGS_3D,
   NINETY_TO_NINETY_3D,
   NINETY_TO_NINETY_ROTATIONS_3D,
   NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
+  PANCAKE_3D,
 } from './exercise-animations-3d';
 
 import {
-  ACTIVE_PANCAKE,
   ACTIVE_STRAIGHT_LEG_RAISE,
   ANKLE_MOBILIZATION,
   BACK_LYING_REVERSE_PIGEON,
@@ -57,7 +58,6 @@ import {
   NECK_SIDE_STRETCH,
   OPEN_BOOK,
   OVERHEAD_TRICEPS_STRETCH,
-  PANCAKE,
   PEC_STRETCH_ON_THE_GROUND,
   PIGEON_STRETCH,
   PRAYER_POSE,
@@ -281,7 +281,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax and let your chest sink toward the floor',
     ],
     photo: require('@/assets/images/exercises/pancake.png'),
-    animation: PANCAKE,
+    animation: PANCAKE_3D,
   },
   {
     id: 'active-pancake',
@@ -296,7 +296,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep moving in and out of the stretch, going a little deeper each time',
     ],
     photo: require('@/assets/images/exercises/active-pancake.png'),
-    animation: ACTIVE_PANCAKE,
+    animation: ACTIVE_PANCAKE_3D,
     active: true,
     oneMinuteOnly: true,
   },
