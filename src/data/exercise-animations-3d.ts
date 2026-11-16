@@ -487,6 +487,36 @@ export const STRAIGHT_LEG_RAISE_3D: Clip3D = {
   ],
 };
 
+// --- Active straight leg raise: the same lift with no strap, the leg's own muscles raising it, arms by the sides ---
+
+/** The right leg straight and raised this far from the floor, the arms resting on the floor by the sides, palms down. */
+const activeLegRaisedAt = (degrees: number): Pose3 => ({
+  ...LYING_ON_BACK,
+  rightLeg: { flex: degrees + LEG_FLAT.flex! },
+  leftLeg: LEG_FLAT,
+  pins: KNEE_TO_CHEST_FLAT.pins,
+});
+const ACTIVE_LEG_DOWN = activeLegRaisedAt(0);
+/** A little short of where the strap takes it: a leg lifts less far by itself than it can be pulled. */
+const ACTIVE_LEG_UP = activeLegRaisedAt(65);
+
+export const ACTIVE_STRAIGHT_LEG_RAISE_3D: Clip3D = {
+  view: '3d',
+  // From the side and a little above, where the leg's swing up is flat on the screen.
+  camera: { yaw: 10, pitch: 16 },
+  highlight: ['rightLeg'],
+  trail: 'rightFoot',
+  stillFrame: 2,
+  // Up, a short hold at the top, and a slower way down, as the instructions ask.
+  keyframes: [
+    { ms: 0, pose: ACTIVE_LEG_DOWN },
+    { ms: 300, pose: ACTIVE_LEG_DOWN },
+    { ms: 1500, pose: ACTIVE_LEG_UP },
+    { ms: 500, pose: ACTIVE_LEG_UP },
+    { ms: 2200, pose: ACTIVE_LEG_DOWN },
+  ],
+};
+
 // --- Marching: standing tall, knees lifting to hip height in turn, arms swinging opposite ---
 
 const MARCH_STAND: Pose3 = STANDING;

@@ -6,6 +6,7 @@ import type { ScoreArea } from './mobility-score';
 
 import {
   ACTIVE_PANCAKE_3D,
+  ACTIVE_STRAIGHT_LEG_RAISE_3D,
   CAT_COW_3D,
   LEG_SWINGS_3D,
   NINETY_TO_NINETY_3D,
@@ -15,7 +16,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  ACTIVE_STRAIGHT_LEG_RAISE,
   ANKLE_MOBILIZATION,
   BACK_LYING_REVERSE_PIGEON,
   BEHIND_THE_BACK_CHEST_OPENER,
@@ -1079,7 +1079,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lower it slowly and keep repeating, then switch sides',
     ],
     photo: require('@/assets/images/exercises/active-straight-leg-raise.png'),
-    animation: ACTIVE_STRAIGHT_LEG_RAISE,
+    animation: ACTIVE_STRAIGHT_LEG_RAISE_3D,
     twoSided: true,
     active: true,
   },

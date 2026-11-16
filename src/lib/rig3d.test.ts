@@ -1,6 +1,7 @@
 import { EXERCISES } from '@/data/exercises';
 import {
   ACTIVE_PANCAKE_3D,
+  ACTIVE_STRAIGHT_LEG_RAISE_3D,
   CAT_COW_3D,
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
@@ -288,6 +289,7 @@ describe('3D clips', () => {
       '90-to-90-side-foot-lifts',
       'pancake',
       'active-pancake',
+      'active-straight-leg-raise',
       'warmup-marching',
     ]));
   });
@@ -553,6 +555,28 @@ describe('3D clips', () => {
     });
     expect(Math.abs(lengths[0][0] - lengths[1][0])).toBeLessThan(3);
     expect(Math.abs(lengths[0][1] - lengths[1][1])).toBeLessThan(3);
+  });
+
+  it('lifts a straight leg by itself in active straight leg raise, the rest of the body still on the floor', () => {
+    const skeletons = samples(ACTIVE_STRAIGHT_LEG_RAISE_3D).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightLeg, leftLeg, rightArm, leftArm, spine } of skeletons) {
+      for (const leg of [rightLeg, leftLeg]) expect(angleAt(leg[0], leg[1], leg[2])).toBeCloseTo(180);
+      expect(leftLeg[2][1]).toBeLessThan(14);
+      // Straight up, not out to the side.
+      expect(rightLeg[2][2]).toBeCloseTo(rightLeg[0][2]);
+      // No help from the hands: they stay on the floor by the sides, and the back stays flat.
+      expect(distance(rightArm[2], start.rightArm[2])).toBeCloseTo(0);
+      expect(distance(leftArm[2], start.leftArm[2])).toBeCloseTo(0);
+      for (const point of spine) expect(point[1]).toBeCloseTo(spine[0][1]);
+    }
+    const raised = ({ rightLeg }: Skeleton) => (Math.atan2(rightLeg[2][1] - rightLeg[0][1], rightLeg[2][0] - rightLeg[0][0]) * 180) / Math.PI;
+    expect(raised(start)).toBeLessThan(0);
+    expect(Math.max(...skeletons.map(raised))).toBeCloseTo(65 - 2.6);
+    expect(ACTIVE_STRAIGHT_LEG_RAISE_3D.strap).toBeUndefined();
+    // It comes down slower than it goes up.
+    const [, , up, , down] = ACTIVE_STRAIGHT_LEG_RAISE_3D.keyframes;
+    expect(down.ms).toBeGreaterThan(up.ms);
   });
 
   it('draws a strap only for a clip that has one, from hand to foot and back', () => {

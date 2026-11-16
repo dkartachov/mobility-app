@@ -138,16 +138,16 @@ Moved to the new engine:
 | 90 to 90 side foot lifts | Library | `NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D` |
 | Pancake | Library | `PANCAKE_3D` |
 | Active pancake | Library | `ACTIVE_PANCAKE_3D` |
+| Active straight leg raise | Library | `ACTIVE_STRAIGHT_LEG_RAISE_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it).
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise.
 
 Library (`src/data/exercises.ts`):
 
 | Exercise | Clip | Needs |
 |---|---|---|
-| Active straight leg raise | `ACTIVE_STRAIGHT_LEG_RAISE` | |
 | Ankle mobilization | `ANKLE_MOBILIZATION` | |
 | Back lying reverse pigeon | `BACK_LYING_REVERSE_PIGEON` | |
 | Behind the back chest opener | `BEHIND_THE_BACK_CHEST_OPENER` | |
