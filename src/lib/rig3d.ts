@@ -135,6 +135,30 @@ export type Clip3D = {
   scenery?: readonly Block[];
   /** A strap looped around the ball of this foot, with an end held in each hand. */
   strap?: 'rightFoot' | 'leftFoot';
+  /** The phone a test is measured with, held in a hand or strapped to a limb. */
+  phone?: PhoneMount;
+  /** A tape measure lying flat from one point to another, on the floor or the top of a block. */
+  tape?: { from: Vec3; to: Vec3 };
+  /** The test needs a second person, who isn't drawn: a badge says so instead. */
+  partner?: boolean;
+};
+
+/**
+ * Where the phone goes. Strapped to a limb, it lies on the bone's surface with its long side along
+ * the bone and a strap around both. Held, it's gripped in the hand, in line with the forearm.
+ */
+export type PhoneMount = {
+  limb: 'rightArm' | 'leftArm' | 'rightLeg' | 'leftLeg';
+  /** 0 the upper arm or thigh, 1 the forearm or shin, 2 held in the hand. */
+  bone: 0 | 1 | 2;
+  /** How far along the bone its middle sits, from 0 at the hip or shoulder end. Ignored in the hand. */
+  at?: number;
+  /**
+   * Which side of the limb its back rests on, and so which way the screen faces. The front of a
+   * leg is the kneecap's side; of an arm, the side the elbow folds toward. A straight limb takes
+   * its front from the body's.
+   */
+  face: 'front' | 'back' | 'outside' | 'inside';
 };
 
 /** Where every joint is in the room. Limbs run from the body outward: root, middle joint, wrist or ankle, tip. */
@@ -169,6 +193,19 @@ export type FigureFrame = {
   shadow: string;
   /** The clip's strap as a line to stroke, drawn over the figure. Empty without one. */
   strap: string;
+  /** The clip's phone, drawn with the limb it's on. Empty paths without one. */
+  phone: PhoneFrame;
+};
+
+export type PhoneFrame = {
+  part: Part | '';
+  /** The phone's outline, and its screen when the screen faces the camera. */
+  body: string;
+  screen: string;
+  /** The strap around the limb that holds it on, drawn over both. Empty for a phone held in the hand. */
+  band: string;
+  /** Whether the phone is on the near side of its limb, drawn over it, or the far side, under it. */
+  over: boolean;
 };
 
 /** The spine bends at this many places between the pelvis and the neck. */
@@ -875,6 +912,135 @@ export function strapPoints(skeleton: Skeleton, foot: NonNullable<Clip3D['strap'
   ];
 }
 
+/** A phone's size: about 15 by 7 by 1 cm, with a shin of 100 at about 40 cm. */
+export const PHONE = { length: 37, width: 18, depth: 3 };
+/** How far in from the phone's edge its screen starts. */
+const PHONE_BEZEL = 2;
+/** How far the strap around a limb reaches past the limb's edge, to show it wraps around. */
+const PHONE_BAND_OVERHANG = 2;
+/** How far past the wrist the middle of a phone held in the hand sits, gripped across its middle. */
+const PHONE_GRIP = SKELETON.hand * 0.6;
+
+/** `v` with the part along unit vector `along` taken out, at length 1, or `undefined` if almost nothing is left. */
+function squareTo(v: Vec3, along: Vec3): Vec3 | undefined {
+  'worklet';
+  const rest = sub(v, scaled(along, dot(v, along)));
+  return Math.hypot(rest[0], rest[1], rest[2]) < 0.2 ? undefined : unit(rest, [1, 0, 0]);
+}
+
+/**
+ * Where the phone is in the room: its middle, its long side, its short side, and the way its
+ * screen faces. All three directions are square to each other and of length 1.
+ */
+export function phonePlacement(skeleton: Skeleton, mount: PhoneMount): { center: Vec3; along: Vec3; across: Vec3; facing: Vec3 } {
+  'worklet';
+  const points = skeleton[mount.limb];
+  const isLeg = mount.limb === 'rightLeg' || mount.limb === 'leftLeg';
+  const side = mount.limb === 'rightArm' || mount.limb === 'rightLeg' ? 1 : -1;
+  // In the hand, the phone carries on from the forearm.
+  const bone = mount.bone === 2 ? 1 : mount.bone;
+  const along = unit(sub(points[bone + 1], points[bone]), [0, -1, 0]);
+  const other = bone === 0 ? unit(sub(points[2], points[1]), along) : unit(sub(points[1], points[0]), along);
+  // The front: away from the shin on a thigh, toward where the thigh points on a shin. An arm
+  // folds the other way, so its front is the side the elbow closes toward.
+  const bentToward = squareTo(other, along);
+  const sign = (isLeg ? (bone === 0 ? -1 : 1) : bone === 0 ? 1 : -1);
+  const last = skeleton.spine.length - 1;
+  const bodyFront = isLeg ? skeleton.spineFront[0] : skeleton.spineFront[last];
+  const bodyUp = unit(sub(skeleton.spine[last], skeleton.spine[0]), [0, 1, 0]);
+  const front =
+    (bentToward ? scaled(bentToward, sign) : undefined) ?? squareTo(bodyFront, along) ?? squareTo(bodyUp, along) ?? squareTo([1, 0, 0], along) ?? [0, 0, 1];
+  let outside = cross(along, front);
+  const bodyRight = isLeg ? skeleton.spineRight[0] : skeleton.spineRight[last];
+  if (dot(outside, bodyRight) * side < 0) outside = scaled(outside, -1);
+  const facing =
+    mount.face === 'front' ? front : mount.face === 'back' ? scaled(front, -1) : mount.face === 'outside' ? outside : scaled(outside, -1);
+  const across = cross(facing, along);
+
+  if (mount.bone === 2) {
+    return { center: add(points[2], scaled(along, PHONE_GRIP)), along, across, facing };
+  }
+  const t = mount.at ?? 0.5;
+  const radii = (isLeg ? LEG_RADII : ARM_RADII)[bone];
+  const radius = lerp(radii[0], radii[1], t);
+  const onBone = lerpVec(points[bone], points[bone + 1], t);
+  return { center: add(onBone, scaled(facing, radius + PHONE.depth / 2)), along, across, facing };
+}
+
+/** The convex outline around points on screen, counterclockwise. */
+function hull(points: readonly Vec2[]): Vec2[] {
+  'worklet';
+  const sorted = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const turn = (o: Vec2, a: Vec2, b: Vec2) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: Vec2[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    while (lower.length >= 2 && turn(lower[lower.length - 2], lower[lower.length - 1], sorted[i]) <= 0) lower.pop();
+    lower.push(sorted[i]);
+  }
+  const upper: Vec2[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    while (upper.length >= 2 && turn(upper[upper.length - 2], upper[upper.length - 1], sorted[i]) <= 0) upper.pop();
+    upper.push(sorted[i]);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+const NO_PHONE: PhoneFrame = { part: '', body: '', screen: '', band: '', over: true };
+
+/** The phone as the camera sees it: a thin slab, its screen, and the strap holding it to the limb. */
+function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefined): PhoneFrame {
+  'worklet';
+  if (!mount) return NO_PHONE;
+  const { center, along, across, facing } = phonePlacement(skeleton, mount);
+  const corner = (l: number, w: number, d: number): Vec3 =>
+    add(add(add(center, scaled(along, l * PHONE.length / 2)), scaled(across, w * PHONE.width / 2)), scaled(facing, d * PHONE.depth / 2));
+  const outline: Vec2[] = [];
+  for (let i = 0; i < 8; i++) {
+    const point = project(view, corner(i & 1 ? 1 : -1, i & 2 ? 1 : -1, i & 4 ? 1 : -1));
+    outline.push([point[0], point[1]]);
+  }
+  const towardCamera = turned(view, facing)[2];
+  let screen = '';
+  if (towardCamera > 0.05) {
+    const inset = (l: number, w: number): Vec2 => {
+      const point = project(
+        view,
+        add(add(add(center, scaled(along, l * (PHONE.length / 2 - PHONE_BEZEL))), scaled(across, w * (PHONE.width / 2 - PHONE_BEZEL))), scaled(facing, PHONE.depth / 2))
+      );
+      return [point[0], point[1]];
+    };
+    screen = polygon([inset(-1, -1), inset(1, -1), inset(1, 1), inset(-1, 1)]);
+  }
+
+  // The strap runs around the limb across the phone's middle: on screen, a bar across the limb
+  // through the bone, a little wider than the limb.
+  let band = '';
+  if (mount.bone !== 2) {
+    const isLeg = mount.limb === 'rightLeg' || mount.limb === 'leftLeg';
+    const t = mount.at ?? 0.5;
+    const radii = (isLeg ? LEG_RADII : ARM_RADII)[mount.bone];
+    const reach = lerp(radii[0], radii[1], t) + PHONE_BAND_OVERHANG;
+    const points = skeleton[mount.limb];
+    const a = project(view, points[mount.bone]);
+    const b = project(view, points[mount.bone + 1]);
+    const mid = lerpVec(a, b, t);
+    const length = Math.max(1e-6, Math.hypot(b[0] - a[0], b[1] - a[1]));
+    const nx = -(b[1] - a[1]) / length;
+    const ny = (b[0] - a[0]) / length;
+    band = `M${fixed(mid[0] + nx * reach)} ${fixed(mid[1] + ny * reach)}L${fixed(mid[0] - nx * reach)} ${fixed(mid[1] - ny * reach)}`;
+  }
+  return {
+    part: mount.limb,
+    body: polygon(hull(outline)),
+    screen,
+    band,
+    // In the hand it's gripped, so it shows over the hand whichever way it faces.
+    over: mount.bone === 2 || towardCamera > -0.15,
+  };
+}
+
 /** How close on screen two limbs' bones have to come for one to be drawn over the other: about a limb's thickness each. */
 const LIMB_OVERLAP = 2 * LIMB_RADIUS;
 
@@ -902,7 +1068,13 @@ function inFrontWhereCrossing(a: readonly Vec3[], b: readonly Vec3[]): boolean |
 }
 
 /** Draws the figure as the camera sees it. `view` comes from `viewOf`. */
-export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly Part[], strap?: Clip3D['strap']): FigureFrame {
+export function traceFigure(
+  skeleton: Skeleton,
+  view: Mat3,
+  highlight?: readonly Part[],
+  strap?: Clip3D['strap'],
+  phone?: PhoneMount
+): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
     const out: Vec3[] = [];
@@ -1036,7 +1208,7 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
     }
   }
 
-  return { slots, shadow, strap: strapLine };
+  return { slots, shadow, strap: strapLine, phone: phoneShape(skeleton, view, phone) };
 }
 
 /**
@@ -1056,7 +1228,7 @@ export function trailedPart(trail: Clip3D['trail']): Part | undefined {
 /** The clip at a moment, drawn. */
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
-  return traceFigure(solvePose(poseAt3(clip, timeMs)), view, clip.highlight, clip.strap);
+  return traceFigure(solvePose(poseAt3(clip, timeMs)), view, clip.highlight, clip.strap, clip.phone);
 }
 
 function duration(clip: Clip3D): number {
@@ -1150,7 +1322,40 @@ export type Staging = {
   trail: string;
   /** The clip's scenery, in the order to draw it, under the figure. */
   scenery: SceneryFace[];
+  /** The clip's tape measure: the strip, and its marks to stroke. Empty without one. */
+  tape: { strip: string; marks: string };
 };
+
+/** A tape measure's width, about 2.5 cm, drawn a little wider so it reads. */
+const TAPE_WIDTH = 9;
+/** A mark across the tape every this far, about 10 cm, every other one longer. */
+const TAPE_MARK_EVERY = 25;
+/** How high the tape sits above the surface it lies on, so it isn't lost in it. */
+const TAPE_LIFT = 0.5;
+
+/** A tape measure lying flat, as the camera sees it. */
+function tapeShape(tape: Clip3D['tape'], view: Mat3): Staging['tape'] {
+  if (!tape) return { strip: '', marks: '' };
+  const from: Vec3 = [tape.from[0], tape.from[1] + TAPE_LIFT, tape.from[2]];
+  const to: Vec3 = [tape.to[0], tape.to[1] + TAPE_LIFT, tape.to[2]];
+  const length = distance(from, to);
+  const along = unit(sub(to, from), [1, 0, 0]);
+  // Flat on the surface, so its width runs level, square to its length.
+  const across = unit(cross([0, 1, 0], along), [0, 0, 1]);
+  const at = (l: number, w: number): Vec2 => {
+    const point = project(view, add(add(from, scaled(along, l)), scaled(across, w)));
+    return [point[0], point[1]];
+  };
+  const half = TAPE_WIDTH / 2;
+  const strip = polygon([at(0, -half), at(length, -half), at(length, half), at(0, half)]);
+  let marks = '';
+  for (let i = 1; i * TAPE_MARK_EVERY < length; i++) {
+    const reach = i % 2 === 0 ? half : half * 0.2;
+    const [a, b] = [at(i * TAPE_MARK_EVERY, -half), at(i * TAPE_MARK_EVERY, reach)];
+    marks += `M${fixed(a[0])} ${fixed(a[1])}L${fixed(b[0])} ${fixed(b[1])}`;
+  }
+  return { strip, marks };
+}
 
 /**
  * Everything about a clip that doesn't change while it plays: the camera, the part of the room it
@@ -1194,6 +1399,17 @@ export function stageClip(clip: Clip3D): Staging {
     }
   }
 
+  // The tape measure lies outside the figure, so it's kept in the frame too.
+  if (clip.tape) {
+    for (const end of [clip.tape.from, clip.tape.to]) {
+      const [x, y] = project(view, end);
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+    }
+  }
+
   // The smallest 16:9 frame around everything, the floor under a whole body included.
   if (!upper) bottom = Math.max(bottom, project(view, [0, 0, 0])[1]);
   let width = right - left + 2 * FRAME_MARGIN;
@@ -1220,5 +1436,5 @@ export function stageClip(clip: Clip3D): Staging {
   ];
   const mat = corners.map((corner, i) => `${i === 0 ? 'M' : 'L'}${fixed(project(view, corner)[0])} ${fixed(project(view, corner)[1])}`).join('') + 'Z';
 
-  return { view, viewBox, mat, trail, scenery: sceneryFaces(clip.scenery ?? [], view) };
+  return { view, viewBox, mat, trail, scenery: sceneryFaces(clip.scenery ?? [], view), tape: tapeShape(clip.tape, view) };
 }

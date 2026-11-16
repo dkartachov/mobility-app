@@ -24,6 +24,8 @@ import {
   SKELETON,
   solveJoint3,
   solvePose,
+  PHONE,
+  phonePlacement,
   stageClip,
   strapPoints,
   traceFigure,
@@ -542,6 +544,113 @@ describe('3D clips', () => {
     const frame = (clip: Clip3D) => traceFigure(solvePose(clip.keyframes[0].pose), viewOf(clip.camera), clip.highlight, clip.strap);
     expect(frame(STRAIGHT_LEG_RAISE_3D).strap).toMatch(/^M[-\d. ]+(L[-\d. ]+){3}$/);
     expect(frame(KNEE_TO_CHEST_3D).strap).toBe('');
+  });
+
+  it('shows the tool each flexibility test is measured with, and a partner where one is needed', () => {
+    for (const test of FLEXIBILITY_TESTS) {
+      const clip = test.animation as Clip3D;
+      expect(clip.view).toBe('3d');
+      // A tape measure for a distance, the phone for an angle.
+      expect(clip.tape !== undefined).toBe(test.method.kind === 'distance');
+      expect(clip.phone !== undefined).toBe(test.method.kind !== 'distance');
+      expect(clip.partner === true).toBe(test.instructions.some((step) => /partner/i.test(step)));
+    }
+  });
+
+  it('holds the phone in the hand, in line with the forearm, for the shoulder tests', () => {
+    for (const clip of [SHOULDER_ABDUCTION_3D, SHOULDER_EXTERNAL_ROTATION_3D, OVERHEAD_REACH_3D]) {
+      for (const skeleton of samples(clip).map(solvePose)) {
+        const { center, along } = phonePlacement(skeleton, clip.phone!);
+        const [, elbow, wrist] = skeleton.rightArm;
+        const forearm = [(wrist[0] - elbow[0]) / SKELETON.forearm, (wrist[1] - elbow[1]) / SKELETON.forearm, (wrist[2] - elbow[2]) / SKELETON.forearm];
+        expect(along[0] * forearm[0] + along[1] * forearm[1] + along[2] * forearm[2]).toBeCloseTo(1);
+        // Gripped across its middle, so the hand is on it.
+        expect(distance(center, wrist)).toBeLessThan(SKELETON.hand);
+      }
+    }
+  });
+
+  it.each([
+    // Hip abduction: the front of the leg below the knee, which faces the ceiling lying down.
+    ['hip abduction', HIP_ABDUCTION_3D, 1, [0, 1, 0]],
+    // Knee to chest and the straight leg raise: the outside of the thigh above the knee.
+    ['knee to chest', KNEE_TO_CHEST_3D, 0, [0, 0, 1]],
+    ['straight leg raise', STRAIGHT_LEG_RAISE_3D, 0, [0, 0, 1]],
+  ] as const)('straps the phone to the side of the leg the instructions say in %s', (_, clip, bone, facing) => {
+    const mount = clip.phone!;
+    expect(mount.bone).toBe(bone);
+    for (const skeleton of samples(clip).map(solvePose)) {
+      const placed = phonePlacement(skeleton, mount);
+      expect(placed.facing[0] * facing[0] + placed.facing[1] * facing[1] + placed.facing[2] * facing[2]).toBeGreaterThan(0.95);
+      // Lying on the leg, its back just off the bone by the leg's thickness.
+      const leg = skeleton.rightLeg;
+      const onBone = [0, 1, 2].map((i) => leg[bone][i] + (leg[bone + 1][i] - leg[bone][i]) * mount.at!) as unknown as Vec3;
+      expect(distance(placed.center, onBone)).toBeGreaterThan(9 + PHONE.depth / 2);
+      expect(distance(placed.center, onBone)).toBeLessThan(16 + PHONE.depth / 2);
+    }
+    // Near the knee, on the bone the instructions name.
+    expect(bone === 0 ? mount.at! : 1 - mount.at!).toBeGreaterThan(0.7);
+  });
+
+  it('straps the phone along the front of the shin, turning with it, in the seated hip rotations', () => {
+    for (const clip of [HIP_EXTERNAL_ROTATION_3D, HIP_INTERNAL_ROTATION_3D]) {
+      const skeletons = samples(clip).map(solvePose);
+      // Hanging straight down at the start, the front of the shin faces ahead.
+      expect(phonePlacement(skeletons[0], clip.phone!).facing[0]).toBeGreaterThan(0.95);
+      for (const skeleton of skeletons) {
+        const { along } = phonePlacement(skeleton, clip.phone!);
+        const [, knee, ankle] = skeleton.rightLeg;
+        const shin = [(ankle[0] - knee[0]) / SKELETON.shin, (ankle[1] - knee[1]) / SKELETON.shin, (ankle[2] - knee[2]) / SKELETON.shin];
+        expect(along[0] * shin[0] + along[1] * shin[1] + along[2] * shin[2]).toBeCloseTo(1);
+      }
+    }
+  });
+
+  it('lays the tape from the wall back past the toes in knee to wall, and along the top of the box from its edge in sit and reach', () => {
+    const wall = KNEE_TO_WALL_3D.scenery![0].from[0];
+    const { from, to } = KNEE_TO_WALL_3D.tape!;
+    expect(from[0]).toBe(wall);
+    expect(from[1]).toBe(0);
+    const toes = solvePose(KNEE_TO_WALL_3D.keyframes[0].pose).rightLeg[3][0];
+    expect(to[0]).toBeLessThan(toes);
+    const box = SIT_AND_REACH_3D.scenery![0];
+    const tape = SIT_AND_REACH_3D.tape!;
+    expect(tape.from[0]).toBe(box.from[0]);
+    expect(tape.from[1]).toBe(box.to[1]);
+    expect(tape.to[0]).toBeGreaterThan(tape.from[0]);
+    expect(tape.to[0]).toBeLessThanOrEqual(box.to[0]);
+    // Drawn, with marks, and kept in the frame.
+    const stage = stageClip(KNEE_TO_WALL_3D);
+    expect(stage.tape.strip).toMatch(/^M[-\d. ]+(L[-\d. ]+){3}Z$/);
+    expect(stage.tape.marks).toMatch(/^(M[-\d. ]+L[-\d. ]+)+$/);
+    const [x, y, width, height] = stage.viewBox.split(' ').map(Number);
+    for (const end of [from, to]) {
+      const [sx, sy] = project(stage.view, end);
+      expect(sx).toBeGreaterThan(x);
+      expect(sx).toBeLessThan(x + width);
+      expect(sy).toBeGreaterThan(y);
+      expect(sy).toBeLessThan(y + height);
+    }
+    expect(stageClip(CAT_COW_3D).tape).toEqual({ strip: '', marks: '' });
+  });
+
+  it('draws the phone under its limb on the far side of it, over it on the near side, with the strap over both', () => {
+    const view = viewOf(STRAIGHT_LEG_RAISE_3D.camera);
+    const pose = STRAIGHT_LEG_RAISE_3D.keyframes[0].pose;
+    const near = traceFigure(solvePose(pose), view, undefined, undefined, STRAIGHT_LEG_RAISE_3D.phone).phone;
+    expect(near.part).toBe('rightLeg');
+    expect(near.over).toBe(true);
+    expect(near.screen).not.toBe('');
+    expect(near.band).toMatch(/^M[-\d. ]+L[-\d. ]+$/);
+    const far = traceFigure(solvePose(pose), view, undefined, undefined, { ...STRAIGHT_LEG_RAISE_3D.phone!, face: 'inside' }).phone;
+    expect(far.over).toBe(false);
+    expect(far.screen).toBe('');
+    // Held in the hand there's no strap, and the phone shows over the hand.
+    const held = traceFigure(solvePose(OVERHEAD_REACH_3D.keyframes[0].pose), viewOf(OVERHEAD_REACH_3D.camera), undefined, undefined, OVERHEAD_REACH_3D.phone).phone;
+    expect(held.band).toBe('');
+    expect(held.over).toBe(true);
+    for (const frame of [near, far, held]) expect(frame.body).not.toMatch(/NaN|Infinity|undefined/);
+    expect(traceFigure(solvePose(pose), view).phone.part).toBe('');
   });
 
   it('draws the sides of scenery that face the camera, and puts the mat under it', () => {

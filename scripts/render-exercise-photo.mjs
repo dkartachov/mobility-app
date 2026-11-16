@@ -29,6 +29,8 @@ const COLORS = {
   accent: '#F08A4B',
   strap: '#D9443B',
   scenery: { light: '#C9DDD9', mid: '#B4CFCA', dark: '#A3C2BC' },
+  phone: { body: '#22302E', screen: '#6F8F8A', band: '#3E4D4B' },
+  tape: { strip: '#E9C46A', marks: '#5B4A1E' },
 };
 const OUTLINE = 4.5;
 
@@ -74,16 +76,28 @@ body += `<path d="${frame.shadow}" fill="${COLORS.shadow}" opacity="0.14"/>`;
 for (const face of stage.scenery) {
   body += `<path d="${face.d}" fill="${COLORS.scenery[face.tone]}" stroke="${COLORS.scenery[face.tone]}" stroke-width="2" stroke-linejoin="round"/>`;
 }
-// The trail goes just under the part of the body it traces, as the app draws it.
+if (stage.tape.strip) {
+  body += `<path d="${stage.tape.strip}" fill="${COLORS.tape.strip}" stroke="${COLORS.tape.strip}" stroke-width="1" stroke-linejoin="round"/>`;
+  body += `<path d="${stage.tape.marks}" stroke="${COLORS.tape.marks}" stroke-width="1.5"/>`;
+}
+// The trail goes just under the part of the body it traces, and the phone with the part it's on,
+// as the app draws them.
 const trailed = rig.trailedPart(clip.trail);
+const { phone } = frame;
+const phoneSvg = `<path d="${phone.body}" fill="${COLORS.phone.body}" stroke="${COLORS.background}" stroke-width="2" stroke-linejoin="round"/><path d="${phone.screen}" fill="${COLORS.phone.screen}"/>`;
 for (const slot of frame.slots) {
   if (stage.trail && slot.part === trailed) {
     body += `<path d="${stage.trail}" fill="none" stroke="${COLORS.accent}" stroke-width="5" stroke-dasharray="2 12" stroke-linecap="round" opacity="0.8"/>`;
   }
+  if (phone.part === slot.part && !phone.over) body += phoneSvg;
   body += `<path d="${slot.d}" fill="none" stroke="${COLORS.background}" stroke-width="${2 * OUTLINE}" stroke-linejoin="round"/>`;
   body += slot.accent
     ? `<path d="${slot.d}" fill="${COLORS.accent}"/>`
     : `<path d="${slot.d}" fill="${COLORS.far}"/><path d="${slot.d}" fill="${COLORS.near}" fill-opacity="${slot.shade}"/>`;
+  if (phone.part === slot.part && phone.over) {
+    body += phoneSvg;
+    if (phone.band) body += `<path d="${phone.band}" fill="none" stroke="${COLORS.phone.band}" stroke-width="5" stroke-linecap="round"/>`;
+  }
 }
 if (frame.strap) {
   body += `<path d="${frame.strap}" fill="none" stroke="${COLORS.strap}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>`;

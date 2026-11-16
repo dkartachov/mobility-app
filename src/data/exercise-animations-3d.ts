@@ -71,6 +71,8 @@ export const SHOULDER_EXTERNAL_ROTATION_3D: Clip3D = {
   // From in front and above, where a turn around the upper arm is a sweep across the screen.
   camera: { yaw: 78, pitch: 40, fit: 'upper' },
   highlight: ['rightArm'],
+  // In the hand, in line with the forearm, the screen up.
+  phone: { limb: 'rightArm', bone: 2, face: 'front' },
   trail: 'rightHand',
   stillFrame: 2,
   keyframes: [
@@ -112,6 +114,8 @@ export const SHOULDER_ABDUCTION_3D: Clip3D = {
   // arm so it's the nearer one: it goes over the torso and the still arm tucks behind its shoulder.
   camera: { yaw: 78, pitch: 10, fit: 'upper' },
   highlight: ['rightArm'],
+  // In the hand, palm forward, the screen with it.
+  phone: { limb: 'rightArm', bone: 2, face: 'front' },
   trail: 'rightHand',
   stillFrame: 2,
   keyframes: [
@@ -144,6 +148,8 @@ export const OVERHEAD_REACH_3D: Clip3D = {
   // From the side and a little above, where the arm's arc from the ceiling to overhead is flat on the screen.
   camera: { yaw: 10, pitch: 18 },
   highlight: ['rightArm'],
+  // In the hand, in line with the arm, turned to the camera.
+  phone: { limb: 'rightArm', bone: 2, face: 'outside' },
   trail: 'rightHand',
   stillFrame: 2,
   keyframes: [
@@ -173,6 +179,8 @@ export const HIP_ABDUCTION_3D: Clip3D = {
   // From high above the right side, where the leg sweeps across the floor.
   camera: { yaw: 0, pitch: 65 },
   highlight: ['rightLeg'],
+  // Strapped to the front of the leg, just below the knee.
+  phone: { limb: 'rightLeg', bone: 1, at: 0.2, face: 'front' },
   trail: 'rightFoot',
   stillFrame: 2,
   keyframes: [
@@ -222,10 +230,14 @@ const KTW_TOUCHING = kneeToWallAt(KTW_SHIN_AT_WALL, 58, 9);
 export const KNEE_TO_WALL_3D: Clip3D = {
   view: '3d',
   // From the right and a little behind, which looks past the figure at the face of the wall the
-  // knee comes to, with the shin's tip forward flat on the screen.
-  camera: { yaw: -14, pitch: 8, fit: 'lower' },
+  // knee comes to, with the shin's tip forward flat on the screen. Raised enough to see the tape
+  // on the floor.
+  camera: { yaw: -14, pitch: 24, fit: 'lower' },
   highlight: ['rightLeg'],
   scenery: [{ from: [KTW_WALL, 0, -130], to: [KTW_WALL + 24, 520, 130] }],
+  // On the floor from the wall back along the front foot, on the side the camera sees, which
+  // measures from the big toe.
+  tape: { from: [KTW_WALL, 0, SKELETON.hip + 24], to: [-25, 0, SKELETON.hip + 24] },
   stillFrame: 2,
   keyframes: [
     { ms: 0, pose: KTW_BACK },
@@ -275,6 +287,10 @@ const seatedRotation = (rotate: number, leftKnee: number): Clip3D => ({
   // raised enough to see the table top the thighs rest on.
   camera: { yaw: 70, pitch: 14 },
   highlight: ['rightLeg'],
+  // Strapped along the front of the shin.
+  phone: { limb: 'rightLeg', bone: 1, at: 0.5, face: 'front' },
+  // A partner holds the knee and swings the foot.
+  partner: true,
   trail: 'rightFoot',
   scenery: TABLE,
   stillFrame: 2,
@@ -331,6 +347,8 @@ export const SIT_AND_REACH_3D: Clip3D = {
   highlight: ['rightLeg', 'leftLeg'],
   trail: 'rightHand',
   scenery: [{ from: [BOX_X, 0, -62], to: [BOX_X + 105, BOX_TOP, 62] }],
+  // Along the top of the box, 0 at the edge by the toes and running away.
+  tape: { from: [BOX_X, BOX_TOP, 0], to: [BOX_X + 100, BOX_TOP, 0] },
   stillFrame: 2,
   keyframes: [
     { ms: 0, pose: SIT_REACH_UP },
@@ -388,6 +406,8 @@ export const KNEE_TO_CHEST_3D: Clip3D = {
   // than in line with it and the leg left flat on the floor shows behind.
   camera: { yaw: 24, pitch: 22 },
   highlight: ['rightLeg'],
+  // Strapped to the outside of the thigh, just above the knee.
+  phone: { limb: 'rightLeg', bone: 0, at: 0.78, face: 'outside' },
   stillFrame: 4,
   // The knee comes up with the hands reaching either side of it, then the hands close in on the
   // shin and pull. Going straight from the floor to the shin would carry the near hand behind the
@@ -450,6 +470,8 @@ export const STRAIGHT_LEG_RAISE_3D: Clip3D = {
   highlight: ['rightLeg'],
   trail: 'rightFoot',
   strap: 'rightFoot',
+  // Strapped to the outside of the thigh, just above the knee.
+  phone: { limb: 'rightLeg', bone: 0, at: 0.78, face: 'outside' },
   stillFrame: 2,
   keyframes: [
     { ms: 0, pose: STRAP_DOWN },
