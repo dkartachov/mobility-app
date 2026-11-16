@@ -566,6 +566,11 @@ describe('3D clips', () => {
         expect(along[0] * forearm[0] + along[1] * forearm[1] + along[2] * forearm[2]).toBeCloseTo(1);
         // Gripped across its middle, so the hand is on it.
         expect(distance(center, wrist)).toBeLessThan(SKELETON.hand);
+        // Resting against the palm, clear of the middle of the hand rather than through it.
+        const tip = skeleton.rightArm[3];
+        const t = Math.max(0, Math.min(1, [0, 1, 2].reduce((sum, i) => sum + (center[i] - wrist[i]) * (tip[i] - wrist[i]), 0) / SKELETON.hand ** 2));
+        const nearest = [0, 1, 2].map((i) => wrist[i] + (tip[i] - wrist[i]) * t) as unknown as Vec3;
+        expect(distance(center, nearest)).toBeGreaterThanOrEqual(9.5 + PHONE.depth / 2 - 0.01);
       }
     }
   });

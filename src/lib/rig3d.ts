@@ -145,7 +145,8 @@ export type Clip3D = {
 
 /**
  * Where the phone goes. Strapped to a limb, it lies on the bone's surface with its long side along
- * the bone and a strap around both. Held, it's gripped in the hand, in line with the forearm.
+ * the bone and a strap around both. Held, its back rests against the palm, in line with the forearm,
+ * and the `face` it's on is the palm's: on the far side of the hand, the fingers wrap over it.
  */
 export type PhoneMount = {
   limb: 'rightArm' | 'leftArm' | 'rightLeg' | 'leftLeg';
@@ -958,7 +959,10 @@ export function phonePlacement(skeleton: Skeleton, mount: PhoneMount): { center:
   const across = cross(facing, along);
 
   if (mount.bone === 2) {
-    return { center: add(points[2], scaled(along, PHONE_GRIP)), along, across, facing };
+    // Its back rests against the palm, which faces the way the screen does, so it sits that far out
+    // from the middle of the hand.
+    const palm = (ARM_RADII[2][0] + ARM_RADII[2][1]) / 2;
+    return { center: add(add(points[2], scaled(along, PHONE_GRIP)), scaled(facing, palm + PHONE.depth / 2)), along, across, facing };
   }
   const t = mount.at ?? 0.5;
   const radii = (isLeg ? LEG_RADII : ARM_RADII)[bone];
@@ -1036,8 +1040,8 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
     body: polygon(hull(outline)),
     screen,
     band,
-    // In the hand it's gripped, so it shows over the hand whichever way it faces.
-    over: mount.bone === 2 || towardCamera > -0.15,
+    // Held in the hand, the fingers wrap over it from the side away from the screen.
+    over: towardCamera > -0.15,
   };
 }
 
