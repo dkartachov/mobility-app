@@ -21,7 +21,8 @@ const COLORS = {
   strap: '#D9443B',
   /** The sides of a piece of scenery: its top, then the side turned more toward the camera, then the other. */
   scenery: { light: '#C9DDD9', mid: '#B4CFCA', dark: '#A3C2BC' },
-  phone: { body: '#22302E', screen: '#6F8F8A', band: '#3E4D4B' },
+  /** The screen is lit like an old LCD, with the reading in dark segments on it. */
+  phone: { body: '#22302E', screen: '#8FB5AE', reading: '#13211F', band: '#3E4D4B' },
   tape: { strip: '#E9C46A', marks: '#5B4A1E' },
   badge: { background: '#FFFFFF', text: '#0B3B36' },
 };
@@ -34,7 +35,8 @@ const SLOTS = [0, 1, 2, 3, 4, 5];
 
 /**
  * The clip's phone, if it's on this slot's part right now: under the limb when it's on the far
- * side of it, or over it, with the strap that holds it on over both.
+ * side of it, or over it. The strap that holds it on goes over the limb and behind the phone, like
+ * an armband, so it doesn't hide the reading.
  */
 function PhoneLayer({ frame, index, over }: { frame: SharedValue<FigureFrame>; index: number; over: boolean }) {
   const shown = (f: FigureFrame) => {
@@ -49,15 +51,20 @@ function PhoneLayer({ frame, index, over }: { frame: SharedValue<FigureFrame>; i
     const f = frame.get();
     return { d: shown(f) ? f.phone.screen : '' };
   });
+  const reading = useAnimatedProps(() => {
+    const f = frame.get();
+    return { d: shown(f) ? f.phone.reading : '' };
+  });
   const band = useAnimatedProps(() => {
     const f = frame.get();
     return { d: over && f.phone.part === f.slots[index].part ? f.phone.band : '' };
   });
   return (
     <>
+      {over && <AnimatedPath animatedProps={band} fill="none" stroke={COLORS.phone.band} strokeWidth={5} strokeLinecap="round" />}
       <AnimatedPath animatedProps={body} fill={COLORS.phone.body} stroke={COLORS.background} strokeWidth={2} strokeLinejoin="round" />
       <AnimatedPath animatedProps={screen} fill={COLORS.phone.screen} />
-      {over && <AnimatedPath animatedProps={band} fill="none" stroke={COLORS.phone.band} strokeWidth={5} strokeLinecap="round" />}
+      <AnimatedPath animatedProps={reading} fill="none" stroke={COLORS.phone.reading} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
     </>
   );
 }

@@ -19,6 +19,7 @@ import { MARCHING_EXERCISE } from '@/data/test-warmup';
 
 import {
   distance,
+  frameAt,
   poseAt3,
   project,
   SKELETON,
@@ -26,6 +27,7 @@ import {
   solvePose,
   PHONE,
   phonePlacement,
+  phoneReading,
   stageClip,
   strapPoints,
   traceFigure,
@@ -666,6 +668,41 @@ describe('3D clips', () => {
       expect(sy).toBeLessThan(y + height);
     }
     expect(stageClip(CAT_COW_3D).tape).toEqual({ strip: '', marks: '' });
+  });
+
+  it.each([
+    // Each test's phone reads the angle the test measures, at the clip's held pose.
+    ['shoulder abduction', SHOULDER_ABDUCTION_3D, 0, 160],
+    ['shoulder external rotation', SHOULDER_EXTERNAL_ROTATION_3D, 0, 65],
+    ['overhead reach', OVERHEAD_REACH_3D, 90, 165],
+    ['hip abduction', HIP_ABDUCTION_3D, 0, 40],
+    ['hip external rotation', HIP_EXTERNAL_ROTATION_3D, 0, 42],
+    ['hip internal rotation', HIP_INTERNAL_ROTATION_3D, 0, 42],
+    ['straight leg raise', STRAIGHT_LEG_RAISE_3D, 0, 72],
+    // The thigh starts lying a little below level, with the heel on the floor.
+    ['knee to chest', KNEE_TO_CHEST_3D, 0, 132.6],
+  ] as const)('reads the angle the %s test measures on the phone', (_, clip, start, held) => {
+    expect(phoneReading(clip, solvePose(clip.keyframes[0].pose))).toBeCloseTo(start);
+    expect(phoneReading(clip, solvePose(clip.keyframes[clip.stillFrame].pose))).toBeCloseTo(held, 0);
+  });
+
+  it('writes the reading on the screen while it faces the camera, and nothing otherwise', () => {
+    const clip = SHOULDER_EXTERNAL_ROTATION_3D;
+    const view = viewOf(clip.camera);
+    const digits = (t: number) => frameAt(clip, view, t).phone;
+    // Turned out, the screen faces the camera: 65 is two digits of segments and the degree sign.
+    const out = digits(500 + 1500);
+    expect(out.screen).not.toBe('');
+    expect(out.reading).toMatch(/^(M[-\d. ]+(L[-\d. ]+)+Z?)+$/);
+    expect(out.reading).not.toMatch(/NaN|Infinity|undefined/);
+    // 6 has six segments and 5 five, each its own line, then the degree sign's square.
+    expect(out.reading.match(/M/g)).toHaveLength(6 + 5 + 1);
+    // Pointing ahead at the start, the screen faces away: no screen, no reading.
+    expect(digits(0).screen).toBe('');
+    expect(digits(0).reading).toBe('');
+    // Without a reading, the screen is blank.
+    const skeleton = solvePose(clip.keyframes[2].pose);
+    expect(traceFigure(skeleton, view, undefined, undefined, clip.phone).phone.reading).toBe('');
   });
 
   it('draws the phone under its limb on the far side of it, over it on the near side, with the strap over both', () => {

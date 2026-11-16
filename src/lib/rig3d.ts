@@ -160,6 +160,12 @@ export type PhoneMount = {
    * its front from the body's.
    */
   face: 'front' | 'back' | 'outside' | 'inside';
+  /**
+   * What the screen reads in the clip's first pose, in degrees. It counts up from there by how far
+   * the phone turns, as the test measures it: 90 for overhead reach, which starts with the arm
+   * pointing at the ceiling. 0 when not set.
+   */
+  startReading?: number;
 };
 
 /** Where every joint is in the room. Limbs run from the body outward: root, middle joint, wrist or ankle, tip. */
@@ -203,8 +209,10 @@ export type PhoneFrame = {
   /** The phone's outline, and its screen when the screen faces the camera. */
   body: string;
   screen: string;
-  /** The strap around the limb that holds it on, drawn over both. Empty for a phone held in the hand. */
+  /** The strap around the limb that holds it on, over the limb and behind the phone. Empty for a phone held in the hand. */
   band: string;
+  /** The reading on the screen, as lines to stroke. Empty when the screen faces away. */
+  reading: string;
   /** Whether the phone is on the near side of its limb, drawn over it, or the far side, under it. */
   over: boolean;
 };
@@ -991,10 +999,84 @@ function hull(points: readonly Vec2[]): Vec2[] {
   return lower.concat(upper);
 }
 
-const NO_PHONE: PhoneFrame = { part: '', body: '', screen: '', band: '', over: true };
+const NO_PHONE: PhoneFrame = { part: '', body: '', screen: '', band: '', over: true, reading: '' };
+
+/**
+ * The lit segments of each digit on a seven-segment display: a top, b top right, c bottom right,
+ * d bottom, e bottom left, f top left, g middle.
+ */
+const DIGIT_SEGMENTS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
+/** Each segment's ends, across the digit and up it, both from 0 to 1. */
+const SEGMENT_ENDS: Record<string, readonly [number, number, number, number]> = {
+  a: [0, 1, 1, 1],
+  b: [1, 1, 1, 0.5],
+  c: [1, 0.5, 1, 0],
+  d: [0, 0, 1, 0],
+  e: [0, 0, 0, 0.5],
+  f: [0, 0.5, 0, 1],
+  g: [0, 0.5, 1, 0.5],
+};
+/**
+ * A digit's width and the gap after it, and the degree sign's size, as parts of a digit's height.
+ * Three digits and the sign then fill the screen's length.
+ */
+const READOUT = { digit: 0.55, gap: 0.2, degree: 0.28, margin: 1.2 };
+
+/**
+ * The reading as seven-segment digits and a degree sign, laid on the screen so they follow its
+ * perspective, as large as the screen fits for three digits. They read along the phone's length:
+ * left to right when it lies across the screen, and bottom to top when it stands up it.
+ */
+function readingShape(view: Mat3, center: Vec3, along: Vec3, across: Vec3, facing: Vec3, degrees: number): string {
+  'worklet';
+  const text = `${Math.round(Math.max(0, degrees))}`;
+  const length = PHONE.length - 2 * PHONE_BEZEL - 2 * READOUT.margin;
+  const width = PHONE.width - 2 * PHONE_BEZEL - 2 * READOUT.margin;
+  const height = Math.min(width, length / (3 * (READOUT.digit + READOUT.gap) + READOUT.degree));
+  // Which way along the phone the digits run. Turning them end for end keeps them unmirrored.
+  const [ax, ay] = project(view, along);
+  const flip = Math.abs(ax) > 0.4 * Math.hypot(ax, ay) ? Math.sign(ax) : ay < 0 ? 1 : -1;
+  const right = scaled(along, flip);
+  const up = scaled(across, flip);
+  const surface = add(center, scaled(facing, PHONE.depth / 2 + 0.1));
+  const total = text.length * (READOUT.digit + READOUT.gap) * height + READOUT.degree * height;
+  const at = (x: number, y: number): string => {
+    const point = project(view, add(add(surface, scaled(right, x - total / 2)), scaled(up, y - height / 2)));
+    return `${fixed(point[0])} ${fixed(point[1])}`;
+  };
+  let path = '';
+  for (let i = 0; i < text.length; i++) {
+    const left = i * (READOUT.digit + READOUT.gap) * height;
+    const lit = DIGIT_SEGMENTS[text.charCodeAt(i) - 48];
+    for (let s = 0; s < lit.length; s++) {
+      const [x0, y0, x1, y1] = SEGMENT_ENDS[lit[s]];
+      const w = READOUT.digit * height;
+      path += `M${at(left + x0 * w, y0 * height)}L${at(left + x1 * w, y1 * height)}`;
+    }
+  }
+  // The degree sign: a small square at the top after the digits.
+  const left = text.length * (READOUT.digit + READOUT.gap) * height;
+  const size = READOUT.degree * height;
+  path += `M${at(left, height)}L${at(left + size, height)}L${at(left + size, height - size)}L${at(left, height - size)}Z`;
+  return path;
+}
+
+/**
+ * What the phone reads at a moment in the clip: how far its long side has turned since the clip's
+ * first pose, from its `startReading`. That's how the test measures, so a 90° elbow reads 90.
+ */
+export function phoneReading(clip: Clip3D, skeleton: Skeleton): number {
+  'worklet';
+  const mount = clip.phone;
+  if (!mount) return 0;
+  const now = phonePlacement(skeleton, mount).along;
+  const start = phonePlacement(solvePose(clip.keyframes[0].pose), mount).along;
+  const cos = Math.max(-1, Math.min(1, dot(now, start)));
+  return (mount.startReading ?? 0) + (Math.acos(cos) * 180) / Math.PI;
+}
 
 /** The phone as the camera sees it: a thin slab, its screen, and the strap holding it to the limb. */
-function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefined): PhoneFrame {
+function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefined, degrees?: number): PhoneFrame {
   'worklet';
   if (!mount) return NO_PHONE;
   const { center, along, across, facing } = phonePlacement(skeleton, mount);
@@ -1007,6 +1089,7 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
   }
   const towardCamera = turned(view, facing)[2];
   let screen = '';
+  let reading = '';
   if (towardCamera > 0.05) {
     const inset = (l: number, w: number): Vec2 => {
       const point = project(
@@ -1016,6 +1099,7 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
       return [point[0], point[1]];
     };
     screen = polygon([inset(-1, -1), inset(1, -1), inset(1, 1), inset(-1, 1)]);
+    if (degrees !== undefined) reading = readingShape(view, center, along, across, facing, degrees);
   }
 
   // The strap runs around the limb across the phone's middle: on screen, a bar across the limb
@@ -1043,6 +1127,7 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
     // Held in the hand, the fingers wrap over it from the side away from the screen.
     // Exactly side-on, the phone sits beside the limb on screen, so changing sides there doesn't show.
     over: towardCamera > 0,
+    reading,
   };
 }
 
@@ -1078,7 +1163,9 @@ export function traceFigure(
   view: Mat3,
   highlight?: readonly Part[],
   strap?: Clip3D['strap'],
-  phone?: PhoneMount
+  phone?: PhoneMount,
+  /** What the phone's screen reads, see `phoneReading`. Without it the screen is blank. */
+  reading?: number
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -1213,7 +1300,7 @@ export function traceFigure(
     }
   }
 
-  return { slots, shadow, strap: strapLine, phone: phoneShape(skeleton, view, phone) };
+  return { slots, shadow, strap: strapLine, phone: phoneShape(skeleton, view, phone, reading) };
 }
 
 /**
@@ -1233,7 +1320,8 @@ export function trailedPart(trail: Clip3D['trail']): Part | undefined {
 /** The clip at a moment, drawn. */
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
-  return traceFigure(solvePose(poseAt3(clip, timeMs)), view, clip.highlight, clip.strap, clip.phone);
+  const skeleton = solvePose(poseAt3(clip, timeMs));
+  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined);
 }
 
 function duration(clip: Clip3D): number {

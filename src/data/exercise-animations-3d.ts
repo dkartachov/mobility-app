@@ -154,7 +154,7 @@ export const OVERHEAD_REACH_3D: Clip3D = {
   camera: { yaw: 10, pitch: 18 },
   highlight: ['leftArm'],
   // In the hand, in line with the arm, the screen facing in toward the body.
-  phone: { limb: 'leftArm', bone: 2, face: 'inside' },
+  phone: { limb: 'leftArm', bone: 2, face: 'inside', startReading: 90 },
   trail: 'leftHand',
   stillFrame: 2,
   keyframes: [
