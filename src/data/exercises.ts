@@ -8,7 +8,9 @@ import {
   ACTIVE_PANCAKE_3D,
   ACTIVE_STRAIGHT_LEG_RAISE_3D,
   ANKLE_MOBILIZATION_3D,
+  BACK_LYING_REVERSE_PIGEON_3D,
   BEHIND_THE_BACK_CHEST_OPENER_3D,
+  BELLY_DOWN_FOOT_SPLAY_3D,
   CAT_COW_3D,
   LEG_SWINGS_3D,
   NINETY_TO_NINETY_3D,
@@ -18,8 +20,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  BACK_LYING_REVERSE_PIGEON,
-  BELLY_DOWN_FOOT_SPLAY,
   BLACKBURN,
   BOTTOM_SQUAT,
   BOTTOM_SQUAT_ROTATION,
@@ -1209,7 +1209,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax and let gravity lower your shins, and hold',
     ],
     photo: require('@/assets/images/exercises/belly-down-foot-splay.png'),
-    animation: BELLY_DOWN_FOOT_SPLAY,
+    animation: BELLY_DOWN_FOOT_SPLAY_3D,
   },
   {
     id: 'lying-windshield-wiper-hold',
@@ -1241,7 +1241,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Let the thigh rotate inward and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/back-lying-reverse-pigeon.png'),
-    animation: BACK_LYING_REVERSE_PIGEON,
+    animation: BACK_LYING_REVERSE_PIGEON_3D,
     twoSided: true,
   },
   {

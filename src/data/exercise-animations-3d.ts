@@ -1007,3 +1007,113 @@ export const BEHIND_THE_BACK_CHEST_OPENER_3D: Clip3D = {
     ...alongArc(1600, CHEST_OPENER_STEPS, (t) => chestOpener(1 - t)),
   ],
 };
+
+// --- Back lying reverse pigeon: lying on the back, knee held over the hip at 90°, a strap pulls the foot out to the side ---
+
+const REVERSE_PIGEON_STRAP = { foot: 'rightFoot', hand: 'rightHand' } as const;
+/** The strap doesn't stretch, so the hand is always this far from the ball of the foot. */
+const REVERSE_PIGEON_STRAP_LENGTH = 170;
+/** The most the thigh turns inward: about the average result for adults (Hallaçeli 2014). */
+const REVERSE_PIGEON_TURN = HIP_ROTATION;
+
+/**
+ * The right thigh straight up over the hip and the knee at 90°, so the shin is level, with the
+ * thigh turned this far inward, which swings the foot out to the side. The right hand holds both
+ * ends of the strap and pulls from the foot toward `pull`, out beside the ribs.
+ */
+const reversePigeonAt = (degrees: number, pull: Vec3): Pose3 => {
+  const pose: Pose3 = {
+    ...LYING_ON_BACK,
+    rightLeg: { flex: 90, knee: 90, rotate: -degrees },
+    leftLeg: LEG_FLAT,
+    leftArm: { abduct: 25 },
+  };
+  // The middle of the foot where the strap loops around it, which is the same wherever the hand is.
+  const loop = strapPoints(solvePose(pose), REVERSE_PIGEON_STRAP);
+  const [right, left] = [loop[1], loop[loop.length - 2]];
+  const ball: Vec3 = [(right[0] + left[0]) / 2, (right[1] + left[1]) / 2, (right[2] + left[2]) / 2];
+  const gap = Math.hypot(pull[0] - ball[0], pull[1] - ball[1], pull[2] - ball[2]);
+  const toHand: Vec3 = [(pull[0] - ball[0]) / gap, (pull[1] - ball[1]) / gap, (pull[2] - ball[2]) / gap];
+  // The strap runs to the middle of the hand, half a hand past the wrist.
+  const reach = REVERSE_PIGEON_STRAP_LENGTH + SKELETON.hand / 2;
+  return {
+    ...pose,
+    pins: {
+      rightHand: {
+        at: [ball[0] + toHand[0] * reach, ball[1] + toHand[1] * reach, ball[2] + toHand[2] * reach],
+        toward: [-toHand[0], -toHand[1], -toHand[2]],
+        pole: [0, -0.3, 1],
+      },
+    },
+  };
+};
+/** This far into the turn, from 0, the shin pointing straight down the body, to 1. The hand draws out and up toward the shoulder as the foot comes around. */
+const reversePigeon = (t: number): Pose3 => reversePigeonAt(REVERSE_PIGEON_TURN * t, [-60 - 10 * t, 40 - 5 * t, 120 + 30 * t]);
+const REVERSE_PIGEON_IN = reversePigeon(0);
+const REVERSE_PIGEON_OUT = reversePigeon(1);
+const REVERSE_PIGEON_STEPS = 8;
+
+export const BACK_LYING_REVERSE_PIGEON_3D: Clip3D = {
+  view: '3d',
+  // From almost straight above, looking down the raised thigh, where the shin swings out over the
+  // floor like the hand of a clock.
+  camera: { yaw: 0, pitch: 75 },
+  highlight: ['rightLeg'],
+  trail: 'rightFoot',
+  strap: REVERSE_PIGEON_STRAP,
+  stillFrame: 1 + REVERSE_PIGEON_STEPS,
+  keyframes: [
+    { ms: 0, pose: REVERSE_PIGEON_IN },
+    { ms: 500, pose: REVERSE_PIGEON_IN },
+    ...alongArc(2000, REVERSE_PIGEON_STEPS, reversePigeon),
+    { ms: 3500, pose: REVERSE_PIGEON_OUT },
+    ...alongArc(2000, REVERSE_PIGEON_STEPS, (t) => reversePigeon(1 - t)),
+  ],
+};
+
+// --- Belly down foot splay: lying face down with the knees at 90°, the feet fall out to the sides ---
+
+const PRONE_PELVIS_Y = 22;
+/** How far the thighs slope down from the hips to knees resting on the floor. */
+const PRONE_THIGH_DROP = (Math.asin((PRONE_PELVIS_Y - ANKLE_Y) / SKELETON.thigh) * 180) / Math.PI;
+
+/**
+ * Face down with the head toward +x, the hands on the floor either side of the head and the elbows
+ * out. The knees are bent to 90°, a little apart as if around a pillow, and both thighs are turned
+ * this far inward, which lets the feet fall out to the sides.
+ */
+const footSplayAt = (degrees: number): Pose3 => {
+  const leg: LegPose = { flex: PRONE_THIGH_DROP, abduct: 3, knee: 90, rotate: -degrees };
+  return {
+    pelvis: [0, PRONE_PELVIS_Y, 0],
+    lean: 90,
+    neck: { flex: -10 },
+    rightLeg: leg,
+    leftLeg: leg,
+    pins: {
+      rightHand: { at: [172, WRIST_Y, 78], toward: [1, 0, -0.3], pole: [-0.3, 0, 1] },
+      leftHand: { at: [172, WRIST_Y, -78], toward: [1, 0, 0.3], pole: [-0.3, 0, -1] },
+    },
+  };
+};
+const FOOT_SPLAY_UP = footSplayAt(0);
+/** About the average result for adults (Hallaçeli 2014). */
+const FOOT_SPLAY_OUT = footSplayAt(HIP_ROTATION);
+
+export const BELLY_DOWN_FOOT_SPLAY_3D: Clip3D = {
+  view: '3d',
+  // From in front of the head and well above, a little to the right: thighs, shins and feet run
+  // on up the screen one after the other, none hiding the next, and the shins fall apart across
+  // it. From behind the feet, each foot lies over its own shin, the thighs come at the camera as
+  // stumps, and the neck shows through the head. No trail: both feet move.
+  camera: { yaw: 75, pitch: 50 },
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: FOOT_SPLAY_UP },
+    { ms: 500, pose: FOOT_SPLAY_UP },
+    { ms: 2000, pose: FOOT_SPLAY_OUT },
+    { ms: 3500, pose: FOOT_SPLAY_OUT },
+    { ms: 1800, pose: FOOT_SPLAY_UP },
+  ],
+};

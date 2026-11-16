@@ -139,8 +139,11 @@ export type Clip3D = {
    */
   over?: readonly Part[];
   scenery?: readonly Block[];
-  /** A strap looped around the ball of this foot, with an end held in each hand. */
-  strap?: 'rightFoot' | 'leftFoot';
+  /**
+   * A strap looped around the ball of this foot, with an end held in each hand. With a `hand`, that
+   * one hand holds both ends, which is how a foot is pulled out to the side.
+   */
+  strap?: 'rightFoot' | 'leftFoot' | { foot: 'rightFoot' | 'leftFoot'; hand: 'rightHand' | 'leftHand' };
   /** The phone a test is measured with, held in a hand or strapped to a limb. */
   phone?: PhoneMount;
   /** A tape measure lying flat from one point to another, on the floor or the top of a block. */
@@ -904,13 +907,29 @@ const STRAP_ALONG_FOOT = 0.72;
 /** How far the strap sits from the middle of the foot: out to each side, and under the sole. */
 const STRAP_HALF_WIDTH = 11;
 const STRAP_UNDER_SOLE = 9;
+/**
+ * A strap looped around a foot in one hand keeps this far from the middle of the foot: past the
+ * foot's edge by half the strap's own width, so it's drawn around the foot and not over it.
+ */
+const STRAP_LOOP_RADIUS = 17;
+/** How many straight pieces the half circle around the foot is drawn in. */
+const STRAP_LOOP_STEPS = 8;
 
 /**
  * Where a strap around a foot runs in the room: from the middle of the right hand, down the right
- * side of the foot, under the ball of it, and back up the left side to the left hand.
+ * side of the foot, under the ball of it, and back up the left side to the left hand. Held in one
+ * hand, it's a loop: from the hand to one side of the foot, in a half circle around the side away
+ * from the hand, whichever that is as the foot turns, and back from the other side to the same
+ * hand. The half circle stands clear of the foot, so the strap goes around it rather than across
+ * it. The points after the first and before the last are where it starts and ends, level with the
+ * middle of the foot.
  */
-export function strapPoints(skeleton: Skeleton, foot: NonNullable<Clip3D['strap']>): Vec3[] {
+export function strapPoints(skeleton: Skeleton, strap: NonNullable<Clip3D['strap']>): Vec3[] {
   'worklet';
+  const foot = typeof strap === 'string' ? strap : strap.foot;
+  const hand = typeof strap === 'string' ? undefined : strap.hand;
+  const rightEnd = hand === 'leftHand' ? skeleton.leftArm : skeleton.rightArm;
+  const leftEnd = hand === 'rightHand' ? skeleton.rightArm : skeleton.leftArm;
   const leg = foot === 'rightFoot' ? skeleton.rightLeg : skeleton.leftLeg;
   const along = unit(sub(leg[3], leg[2]), [1, 0, 0]);
   const shin = unit(sub(leg[2], leg[1]), [0, -1, 0]);
@@ -918,12 +937,27 @@ export function strapPoints(skeleton: Skeleton, foot: NonNullable<Clip3D['strap'
   const sole = unit(sub(shin, scaled(along, dot(shin, along))), [0, -1, 0]);
   let side = cross(along, sole);
   if (dot(side, skeleton.spineRight[0]) < 0) side = scaled(side, -1);
+  if (hand) {
+    const held = lerpVec(rightEnd[2], rightEnd[3], 0.5);
+    const middle = add(leg[2], scaled(along, SKELETON.foot * STRAP_ALONG_FOOT));
+    // The way to the hand, as near as a direction square to the foot can be, and across the foot from there.
+    const toHand = sub(held, middle);
+    const pull = unit(sub(toHand, scaled(along, dot(toHand, along))), sole);
+    const across = cross(along, pull);
+    const points: Vec3[] = [held];
+    for (let step = 0; step <= STRAP_LOOP_STEPS; step++) {
+      const angle = (step / STRAP_LOOP_STEPS - 0.5) * Math.PI;
+      points.push(add(middle, add(scaled(across, -STRAP_LOOP_RADIUS * Math.sin(angle)), scaled(pull, -STRAP_LOOP_RADIUS * Math.cos(angle)))));
+    }
+    points.push(held);
+    return points;
+  }
   const ball = add(add(leg[2], scaled(along, SKELETON.foot * STRAP_ALONG_FOOT)), scaled(sole, STRAP_UNDER_SOLE));
   return [
-    lerpVec(skeleton.rightArm[2], skeleton.rightArm[3], 0.5),
+    lerpVec(rightEnd[2], rightEnd[3], 0.5),
     add(ball, scaled(side, STRAP_HALF_WIDTH)),
     add(ball, scaled(side, -STRAP_HALF_WIDTH)),
-    lerpVec(skeleton.leftArm[2], skeleton.leftArm[3], 0.5),
+    lerpVec(leftEnd[2], leftEnd[3], 0.5),
   ];
 }
 
