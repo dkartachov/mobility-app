@@ -401,7 +401,7 @@ const KNEE_TO_CHEST_FLAT: Pose3 = {
 /** The knee comes up to meet the hands, which then pull it in. */
 const KNEE_TO_CHEST_HELD = kneeHeldAt(118, 128);
 /** The knee up where the hands will take it, with the hands open either side of it, ready to close in from the sides. */
-const KNEE_TO_CHEST_LIFTED = kneeHeldAt(118, 128, 26);
+const KNEE_TO_CHEST_LIFTED = kneeHeldAt(118, 128, 16);
 /** About the average result for adults (Soucie 2011). */
 const KNEE_TO_CHEST_IN = kneeHeldAt(130, 135);
 
@@ -414,18 +414,18 @@ export const KNEE_TO_CHEST_3D: Clip3D = {
   // Strapped to the outside of the thigh, just above the knee.
   phone: { limb: 'rightLeg', bone: 0, at: 0.78, face: 'outside' },
   stillFrame: 4,
-  // The knee comes up with the hands reaching either side of it, then the hands close in on the
+  // The knee comes up with the hands reaching either side of it, then the hands snap shut on the
   // shin and pull. Going straight from the floor to the shin would carry the near hand behind the
   // thigh. Letting go goes the same way back.
   keyframes: [
     { ms: 0, pose: KNEE_TO_CHEST_FLAT },
     { ms: 400, pose: KNEE_TO_CHEST_FLAT },
     { ms: 1000, pose: KNEE_TO_CHEST_LIFTED },
-    { ms: 500, pose: KNEE_TO_CHEST_HELD, ease: 'in' },
-    { ms: 900, pose: KNEE_TO_CHEST_IN, ease: 'out' },
+    { ms: 250, pose: KNEE_TO_CHEST_HELD },
+    { ms: 1000, pose: KNEE_TO_CHEST_IN },
     { ms: 1500, pose: KNEE_TO_CHEST_IN },
-    { ms: 900, pose: KNEE_TO_CHEST_HELD, ease: 'in' },
-    { ms: 500, pose: KNEE_TO_CHEST_LIFTED, ease: 'out' },
+    { ms: 1000, pose: KNEE_TO_CHEST_HELD },
+    { ms: 250, pose: KNEE_TO_CHEST_LIFTED },
     { ms: 1000, pose: KNEE_TO_CHEST_FLAT },
   ],
 };
