@@ -875,6 +875,32 @@ export function strapPoints(skeleton: Skeleton, foot: NonNullable<Clip3D['strap'
   ];
 }
 
+/** How close on screen two limbs' bones have to come for one to be drawn over the other: about a limb's thickness each. */
+const LIMB_OVERLAP = 2 * LIMB_RADIUS;
+
+/**
+ * Whether limb `a` is in front of limb `b` where they overlap on screen, or `undefined` when they
+ * don't overlap. Average depth is no guide here either: hands holding a raised shin are nearer
+ * than the shin right there, though the whole leg, lifted toward a camera above it, is nearer on
+ * average than the arm lying along the floor.
+ */
+function inFrontWhereCrossing(a: readonly Vec3[], b: readonly Vec3[]): boolean | undefined {
+  'worklet';
+  let gap = LIMB_OVERLAP;
+  let front: boolean | undefined;
+  for (let i = 1; i < a.length; i++) {
+    for (let step = 0; step <= BONE_STEPS; step++) {
+      const point = lerpVec(a[i - 1], a[i], step / BONE_STEPS);
+      const near = nearestOnScreen(b, point);
+      if (near.gap < gap) {
+        gap = near.gap;
+        front = point[2] > near.depth;
+      }
+    }
+  }
+  return front;
+}
+
 /** Draws the figure as the camera sees it. `view` comes from `viewOf`. */
 export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly Part[], strap?: Clip3D['strap']): FigureFrame {
   'worklet';
@@ -927,6 +953,17 @@ export function traceFigure(skeleton: Skeleton, view: Mat3, highlight?: readonly
     const moving = parts[i];
     let j = i - 1;
     while (j >= 0 && (parts[j].layer > moving.layer || (parts[j].layer === moving.layer && parts[j].depth > moving.depth))) {
+      parts[j + 1] = parts[j];
+      j--;
+    }
+    parts[j + 1] = moving;
+  }
+  // Two limbs on the same side of the torso that overlap go by which is in front where they do.
+  for (let i = 1; i < parts.length; i++) {
+    const moving = parts[i];
+    if (moving.part === 'torso') continue;
+    let j = i - 1;
+    while (j >= 0 && parts[j].layer === moving.layer && parts[j].part !== 'torso' && inFrontWhereCrossing(parts[j].points, moving.points) === true) {
       parts[j + 1] = parts[j];
       j--;
     }
@@ -1054,11 +1091,42 @@ const BLOCK_FACES = [
   { corners: [0, 1, 3, 2], axis: 2, sign: -1 },
 ] as const;
 
+/**
+ * Blocks in the order to draw them. Two blocks that don't overlap have a gap between them along at
+ * least one of the room's axes, and the one on the side away from the camera along it goes first.
+ * Distance to their middles gets this wrong for a table: seen from above, its front legs' middles
+ * are nearer than the top's, but the top covers them.
+ */
+function paintOrder(blocks: readonly Block[], view: Mat3): Block[] {
+  const lo = (block: Block, axis: number) => Math.min(block.from[axis], block.to[axis]);
+  const hi = (block: Block, axis: number) => Math.max(block.from[axis], block.to[axis]);
+  /** Whether `a` has to be drawn before `b`. */
+  const behind = (a: Block, b: Block) => {
+    for (let axis = 0; axis < 3; axis++) {
+      // How far along this axis points toward the camera.
+      const toward = view[6 + axis];
+      if (Math.abs(toward) < 1e-6) continue;
+      if (hi(a, axis) <= lo(b, axis) + 1e-6 && toward > 0) return true;
+      if (lo(a, axis) >= hi(b, axis) - 1e-6 && toward < 0) return true;
+    }
+    return false;
+  };
+  const depthOf = (block: Block) => project(view, lerpVec(block.from, block.to, 0.5))[2];
+  const left = [...blocks];
+  const order: Block[] = [];
+  while (left.length > 0) {
+    // Whichever block nothing left has to be drawn before; failing that, the furthest by its middle.
+    let next = left.findIndex((block) => !left.some((other) => other !== block && behind(other, block)));
+    if (next < 0) next = left.reduce((best, block, i) => (depthOf(block) < depthOf(left[best]) ? i : best), 0);
+    order.push(left.splice(next, 1)[0]);
+  }
+  return order;
+}
+
 /** The sides of each block that face the camera, the furthest block first. */
 function sceneryFaces(blocks: readonly Block[], view: Mat3): SceneryFace[] {
-  const depthOf = (block: Block) => project(view, lerpVec(block.from, block.to, 0.5))[2];
   const faces: SceneryFace[] = [];
-  for (const block of [...blocks].sort((a, b) => depthOf(a) - depthOf(b))) {
+  for (const block of paintOrder(blocks, view)) {
     const lo = [0, 1, 2].map((i) => Math.min(block.from[i], block.to[i]));
     const hi = [0, 1, 2].map((i) => Math.max(block.from[i], block.to[i]));
     const corners: Vec3[] = [];

@@ -349,9 +349,10 @@ const ARM_REST_Y = 14;
 
 /**
  * The right thigh raised this far from the floor with the knee bent this far, and the hands clasped
- * over the front of the shin just below the knee, elbows out to the sides.
+ * over the front of the shin just below the knee, elbows out to the sides. `open` holds the hands
+ * that far out to either side of the shin instead.
  */
-const kneeHeldAt = (flex: number, knee: number): Pose3 => {
+const kneeHeldAt = (flex: number, knee: number, open = 0): Pose3 => {
   const pose: Pose3 = { ...LYING_ON_BACK, rightLeg: { flex, knee }, leftLeg: LEG_FLAT };
   const [, kneeAt, ankle] = solvePose(pose).rightLeg;
   const along: Vec3 = [(ankle[0] - kneeAt[0]) / SKELETON.shin, (ankle[1] - kneeAt[1]) / SKELETON.shin, 0];
@@ -360,8 +361,8 @@ const kneeHeldAt = (flex: number, knee: number): Pose3 => {
   return {
     ...pose,
     pins: {
-      rightHand: { at: [hold[0] + 5, hold[1] + 1, hold[2] + 12], toward: [0, 0, -1], pole: [0.2, -0.6, 1] },
-      leftHand: { at: [hold[0], hold[1], hold[2] - 14], toward: [0, 0, 1], pole: [0.2, -0.6, -1] },
+      rightHand: { at: [hold[0] + 5, hold[1] + 1, hold[2] + 12 + open], toward: [0, 0, -1], pole: [0.2, -0.6, 1] },
+      leftHand: { at: [hold[0], hold[1], hold[2] - 14 - open], toward: [0, 0, 1], pole: [0.2, -0.6, -1] },
     },
   };
 };
@@ -376,6 +377,8 @@ const KNEE_TO_CHEST_FLAT: Pose3 = {
 };
 /** The knee comes up to meet the hands, which then pull it in. */
 const KNEE_TO_CHEST_HELD = kneeHeldAt(118, 128);
+/** The knee up where the hands will take it, with the hands open either side of it, ready to close in from the sides. */
+const KNEE_TO_CHEST_LIFTED = kneeHeldAt(118, 128, 26);
 /** About the average result for adults (Soucie 2011). */
 const KNEE_TO_CHEST_IN = kneeHeldAt(130, 135);
 
@@ -385,15 +388,20 @@ export const KNEE_TO_CHEST_3D: Clip3D = {
   // than in line with it and the leg left flat on the floor shows behind.
   camera: { yaw: 24, pitch: 22 },
   highlight: ['rightLeg'],
-  stillFrame: 3,
+  stillFrame: 4,
+  // The knee comes up with the hands reaching either side of it, then the hands close in on the
+  // shin and pull. Going straight from the floor to the shin would carry the near hand behind the
+  // thigh. Letting go goes the same way back.
   keyframes: [
     { ms: 0, pose: KNEE_TO_CHEST_FLAT },
     { ms: 400, pose: KNEE_TO_CHEST_FLAT },
-    { ms: 1300, pose: KNEE_TO_CHEST_HELD, ease: 'in' },
+    { ms: 1000, pose: KNEE_TO_CHEST_LIFTED },
+    { ms: 500, pose: KNEE_TO_CHEST_HELD, ease: 'in' },
     { ms: 900, pose: KNEE_TO_CHEST_IN, ease: 'out' },
     { ms: 1500, pose: KNEE_TO_CHEST_IN },
     { ms: 900, pose: KNEE_TO_CHEST_HELD, ease: 'in' },
-    { ms: 1300, pose: KNEE_TO_CHEST_FLAT, ease: 'out' },
+    { ms: 500, pose: KNEE_TO_CHEST_LIFTED, ease: 'out' },
+    { ms: 1000, pose: KNEE_TO_CHEST_FLAT },
   ],
 };
 

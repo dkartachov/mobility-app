@@ -504,6 +504,13 @@ describe('3D clips', () => {
     const thigh = ({ rightLeg }: Skeleton) => angleAt([rightLeg[0][0] + 1, rightLeg[0][1], rightLeg[0][2]], rightLeg[0], rightLeg[1]);
     expect(thigh(skeletons[0])).toBeLessThan(3);
     expect(Math.max(...skeletons.map(thigh))).toBeCloseTo(130);
+    // The near arm is drawn over the leg it holds all the way through, and never moves through the
+    // thigh on the way to the knee.
+    const view = viewOf(KNEE_TO_CHEST_3D.camera);
+    for (const skeleton of skeletons) {
+      const order = traceFigure(skeleton, view).slots.map((slot) => slot.part);
+      expect(order.indexOf('rightArm')).toBeGreaterThan(order.indexOf('rightLeg'));
+    }
     // At the top both hands are on the shin, just below the knee.
     const held = solvePose(KNEE_TO_CHEST_3D.keyframes[KNEE_TO_CHEST_3D.stillFrame].pose);
     for (const arm of [held.rightArm, held.leftArm]) {
@@ -543,8 +550,13 @@ describe('3D clips', () => {
     const box = stageClip(SIT_AND_REACH_3D);
     expect(box.scenery.map((face) => face.tone).sort()).toEqual(['dark', 'light', 'mid']);
     for (const face of box.scenery) expect(face.d).toMatch(/^M[-\d. ]+(L[-\d. ]+){3}Z$/);
-    // The table is a top and four legs.
-    expect(stageClip(HIP_INTERNAL_ROTATION_3D).scenery).toHaveLength(15);
+    // The table is a top and four legs, and the top is drawn last, over the tops of the front legs,
+    // though their middles are nearer the camera than the top's.
+    const table = stageClip(HIP_INTERNAL_ROTATION_3D).scenery;
+    expect(table).toHaveLength(15);
+    // The last three sides drawn are the top's: as wide on screen as the table, where a leg is narrow.
+    const across = table.slice(-3).flatMap((face) => [...face.d.matchAll(/[ML](-?[\d.]+) /g)].map((m) => Number(m[1])));
+    expect(Math.max(...across) - Math.min(...across)).toBeGreaterThan(150);
     // The box stands on the mat: its far bottom corner is inside the mat's outline.
     const { from, to } = SIT_AND_REACH_3D.scenery![0];
     const corner = project(box.view, [to[0], 0, from[2]]);
