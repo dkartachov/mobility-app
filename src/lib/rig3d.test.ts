@@ -570,6 +570,19 @@ describe('3D clips', () => {
     }
   });
 
+  it('stands the phone on its edge, thumb to the ceiling, through shoulder external rotation', () => {
+    for (const skeleton of samples(SHOULDER_EXTERNAL_ROTATION_3D).map(solvePose)) {
+      const { across, facing, center } = phonePlacement(skeleton, SHOULDER_EXTERNAL_ROTATION_3D.phone!);
+      // Its short side upright and its screen level, toward the body.
+      expect(Math.abs(across[1])).toBeCloseTo(1);
+      expect(facing[1]).toBeCloseTo(0);
+      const [, elbow] = skeleton.rightArm;
+      const toBody = [skeleton.spine[3][0] - elbow[0], 0, skeleton.spine[3][2] - elbow[2]];
+      expect(facing[0] * toBody[0] + facing[2] * toBody[2]).toBeGreaterThan(-1e-6);
+      expect(center[1]).toBeCloseTo(elbow[1]);
+    }
+  });
+
   it.each([
     // Hip abduction: the front of the leg below the knee, which faces the ceiling lying down.
     ['hip abduction', HIP_ABDUCTION_3D, 1, [0, 1, 0]],

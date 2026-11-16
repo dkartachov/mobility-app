@@ -71,8 +71,9 @@ export const SHOULDER_EXTERNAL_ROTATION_3D: Clip3D = {
   // From in front and above, where a turn around the upper arm is a sweep across the screen.
   camera: { yaw: 78, pitch: 40, fit: 'upper' },
   highlight: ['rightArm'],
-  // In the hand, in line with the forearm, the screen up.
-  phone: { limb: 'rightArm', bone: 2, face: 'front' },
+  // In the palm, in line with the forearm with the thumb toward the ceiling, so the phone stands on
+  // its edge with the screen toward the body.
+  phone: { limb: 'rightArm', bone: 2, face: 'inside' },
   trail: 'rightHand',
   stillFrame: 2,
   keyframes: [
