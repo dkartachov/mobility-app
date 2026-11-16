@@ -37,7 +37,10 @@ const SLOTS = [0, 1, 2, 3, 4, 5];
  * side of it, or over it, with the strap that holds it on over both.
  */
 function PhoneLayer({ frame, index, over }: { frame: SharedValue<FigureFrame>; index: number; over: boolean }) {
-  const shown = (f: FigureFrame) => f.phone.part === f.slots[index].part && f.phone.over === over;
+  const shown = (f: FigureFrame) => {
+    'worklet';
+    return f.phone.part === f.slots[index].part && f.phone.over === over;
+  };
   const body = useAnimatedProps(() => {
     const f = frame.get();
     return { d: shown(f) ? f.phone.body : '' };
