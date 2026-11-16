@@ -4,7 +4,13 @@ import type { ExerciseAnimation } from '@/lib/figure-rig';
 
 import type { ScoreArea } from './mobility-score';
 
-import { CAT_COW_3D, LEG_SWINGS_3D } from './exercise-animations-3d';
+import {
+  CAT_COW_3D,
+  LEG_SWINGS_3D,
+  NINETY_TO_NINETY_3D,
+  NINETY_TO_NINETY_ROTATIONS_3D,
+  NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
+} from './exercise-animations-3d';
 
 import {
   ACTIVE_PANCAKE,
@@ -49,9 +55,6 @@ import {
   MANUAL_EXTENSOR_FOREARM_STRETCH,
   MANUAL_FLEXOR_FOREARM_STRETCH,
   NECK_SIDE_STRETCH,
-  NINETY_TO_NINETY,
-  NINETY_TO_NINETY_ROTATIONS,
-  NINETY_TO_NINETY_SIDE_FOOT_LIFTS,
   OPEN_BOOK,
   OVERHEAD_TRICEPS_STRETCH,
   PANCAKE,
@@ -153,7 +156,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/90-to-90.png'),
-    animation: NINETY_TO_NINETY,
+    animation: NINETY_TO_NINETY_3D,
     twoSided: true,
   },
   {
@@ -772,7 +775,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Bring them back up and over to the other side, and keep alternating',
     ],
     photo: require('@/assets/images/exercises/90-to-90-rotations.png'),
-    animation: NINETY_TO_NINETY_ROTATIONS,
+    animation: NINETY_TO_NINETY_ROTATIONS_3D,
     active: true,
     oneMinuteOnly: true,
   },
@@ -1324,7 +1327,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lower it slowly and keep repeating, then switch sides. Sit on a cushion to make it easier',
     ],
     photo: require('@/assets/images/exercises/90-to-90-side-foot-lifts.png'),
-    animation: NINETY_TO_NINETY_SIDE_FOOT_LIFTS,
+    animation: NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
     twoSided: true,
     active: true,
   },

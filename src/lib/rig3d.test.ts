@@ -8,6 +8,9 @@ import {
   KNEE_TO_WALL_3D,
   LEG_SWINGS_3D,
   MARCHING_3D,
+  NINETY_TO_NINETY_3D,
+  NINETY_TO_NINETY_ROTATIONS_3D,
+  NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
   OVERHEAD_REACH_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
@@ -278,6 +281,9 @@ describe('3D clips', () => {
       'knee-to-chest',
       'straight-leg-raise',
       'leg-swings',
+      '90-to-90',
+      '90-to-90-rotations',
+      '90-to-90-side-foot-lifts',
       'warmup-marching',
     ]));
   });
@@ -781,9 +787,111 @@ describe('3D clips', () => {
     }
   });
 
+  it('keeps both knees at 90° with the thighs square to each other, flat on the floor, in the 90 to 90 clips', () => {
+    for (const clip of [NINETY_TO_NINETY_3D, NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D]) {
+      for (const { rightLeg, leftLeg } of samples(clip).map(solvePose)) {
+        expect(angleAt(rightLeg[0], rightLeg[1], rightLeg[2])).toBeCloseTo(90);
+        expect(angleAt(leftLeg[0], leftLeg[1], leftLeg[2])).toBeCloseTo(90);
+        // One thigh ahead and one out to the side.
+        expect(angleAt([rightLeg[1][0], rightLeg[1][1], leftLeg[0][2]], leftLeg[0], leftLeg[1])).toBeCloseTo(90, 0);
+        expect(rightLeg[1][0] - rightLeg[0][0]).toBeGreaterThan(95);
+        expect(leftLeg[0][2] - leftLeg[1][2]).toBeGreaterThan(95);
+        // Both knees and the front shin rest on the floor.
+        for (const joint of [rightLeg[1], rightLeg[2], leftLeg[1]]) expect(joint[1]).toBeCloseTo(13);
+      }
+    }
+  });
+
+  it('folds from the hips over the front shin while the legs stay where they are in 90 to 90', () => {
+    const skeletons = samples(NINETY_TO_NINETY_3D).map(solvePose);
+    for (const { rightLeg, leftLeg } of skeletons) {
+      [...rightLeg, ...leftLeg].forEach((joint, i) => expect(distance(joint, [...skeletons[0].rightLeg, ...skeletons[0].leftLeg][i])).toBeCloseTo(0));
+    }
+    const tall = solvePose(NINETY_TO_NINETY_3D.keyframes[0].pose);
+    const folded = solvePose(NINETY_TO_NINETY_3D.keyframes[NINETY_TO_NINETY_3D.stillFrame].pose);
+    const shin = folded.rightLeg[2][0];
+    // Sitting tall, the chest is behind the front shin; folded, it's over it, lower, with the hands on the floor past it.
+    expect(tall.spine[tall.spine.length - 1][0]).toBeLessThan(shin - 60);
+    expect(folded.spine[folded.spine.length - 1][0]).toBeGreaterThan(shin);
+    expect(folded.head[1]).toBeLessThan(tall.head[1] - 60);
+    for (const arm of [folded.rightArm, folded.leftArm]) {
+      expect(arm[2][0]).toBeGreaterThan(shin + 50);
+      expect(arm[2][1]).toBeLessThan(15);
+    }
+  });
+
+  it('lifts the back foot with its knee down and everything else still in 90 to 90 side foot lifts', () => {
+    const skeletons = samples(NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D).map(solvePose);
+    const first = skeletons[0];
+    for (const { spine, rightLeg, leftLeg } of skeletons) {
+      spine.forEach((point, i) => expect(distance(point, first.spine[i])).toBeCloseTo(0));
+      rightLeg.forEach((joint, i) => expect(distance(joint, first.rightLeg[i])).toBeCloseTo(0));
+      expect(distance(leftLeg[1], first.leftLeg[1])).toBeCloseTo(0);
+    }
+    const height = skeletons.map(({ leftLeg }) => leftLeg[2][1]);
+    expect(Math.min(...height)).toBeCloseTo(13);
+    expect(Math.max(...height)).toBeGreaterThan(45);
+    expect(trailedPart(NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D.trail)).toBe('leftLeg');
+    // A hand rests on top of each thigh, partway along it.
+    for (const [arm, leg] of [[first.rightArm, first.rightLeg], [first.leftArm, first.leftLeg]]) {
+      const along = distance(arm[2], leg[0]) / SKELETON.thigh;
+      expect(along).toBeGreaterThan(0.3);
+      expect(along).toBeLessThan(0.8);
+      expect(arm[2][1] - leg[1][1]).toBeGreaterThan(15);
+      expect(arm[2][1] - leg[1][1]).toBeLessThan(30);
+    }
+  });
+
+  it('drops both knees to one side and then the other, feet planted and chest ahead, in 90 to 90 rotations', () => {
+    const clip = NINETY_TO_NINETY_ROTATIONS_3D;
+    const right = solvePose(clip.keyframes[0].pose);
+    // The clip is a sweep to the left, a pause, a sweep back and a pause, so the left is just before halfway.
+    const half = durationOf(clip) / 2;
+    const left = solvePose(poseAt3(clip, half - 100));
+    // The feet are set wider than the hips.
+    expect(right.rightLeg[2][2] - right.leftLeg[2][2]).toBeGreaterThan(3 * SKELETON.hip);
+    // The knees don't go over together: the leg on the side they're going to, which opens outward,
+    // lifts first, and is well up while the other has barely started.
+    const toLeft = solvePose(poseAt3(clip, 700));
+    expect(toLeft.leftLeg[1][1]).toBeGreaterThan(toLeft.rightLeg[1][1] + 40);
+    const toRight = solvePose(poseAt3(clip, half + 700));
+    expect(toRight.rightLeg[1][1]).toBeGreaterThan(toRight.leftLeg[1][1] + 40);
+    // Both come up and over on the way: each knee passes high.
+    const all = samples(clip).map(solvePose);
+    expect(Math.max(...all.map(({ rightLeg }) => rightLeg[1][1]))).toBeGreaterThan(80);
+    expect(Math.max(...all.map(({ leftLeg }) => leftLeg[1][1]))).toBeGreaterThan(80);
+    // To the right: the right leg opens out onto the floor and the left knee turns in after it, past the middle.
+    expect(right.rightLeg[1][1]).toBeLessThan(20);
+    expect(right.rightLeg[1][2]).toBeGreaterThan(right.rightLeg[2][2]);
+    expect(right.leftLeg[1][1]).toBeLessThan(40);
+    expect(right.leftLeg[1][2]).toBeGreaterThan(0);
+    // The other side is the mirror image.
+    right.rightLeg.forEach((joint, i) => expect(distance(joint, [left.leftLeg[i][0], left.leftLeg[i][1], -left.leftLeg[i][2]])).toBeCloseTo(0));
+    right.leftLeg.forEach((joint, i) => expect(distance(joint, [left.rightLeg[i][0], left.rightLeg[i][1], -left.rightLeg[i][2]])).toBeCloseTo(0));
+    for (const { rightLeg, leftLeg, spineFront, spine } of samples(clip).map(solvePose)) {
+      // Knees stay bent near 90°, and the chest keeps facing ahead while the pelvis rolls under it.
+      for (const leg of [rightLeg, leftLeg]) {
+        expect(angleAt(leg[0], leg[1], leg[2])).toBeGreaterThan(80);
+        expect(angleAt(leg[0], leg[1], leg[2])).toBeLessThan(100);
+      }
+      expect(Math.abs(spineFront[spine.length - 1][2])).toBeLessThan(0.05);
+    }
+    // Both legs are drawn over the hips all the way through, and the arms propping the body up stay close to straight.
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 50) {
+      const order = frameAt(clip, view, t).slots.map((slot) => slot.part);
+      expect(order.indexOf('rightLeg')).toBeGreaterThan(order.indexOf('torso'));
+      expect(order.indexOf('leftLeg')).toBeGreaterThan(order.indexOf('torso'));
+    }
+    for (const { rightArm, leftArm } of samples(clip).map(solvePose)) {
+      for (const arm of [rightArm, leftArm]) expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(145);
+    }
+  });
+
   it('traces the path of the hand a clip trails, and nothing otherwise', () => {
     expect(stageClip(SHOULDER_EXTERNAL_ROTATION_3D).trail).toMatch(/^M[-\d. ]+(L[-\d. ]+)+$/);
     expect(stageClip(CAT_COW_3D).trail).toBe('');
+    expect(stageClip(NINETY_TO_NINETY_ROTATIONS_3D).trail).toBe('');
   });
 
   it('draws a trail just under the limb that makes it, over the standing leg in leg swings', () => {

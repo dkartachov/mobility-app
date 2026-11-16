@@ -1,4 +1,4 @@
-import { SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type LegPose, type Pose3, type Vec3 } from '@/lib/rig3d';
+import { SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pose3, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -546,5 +546,173 @@ export const LEG_SWINGS_3D: Clip3D = {
     { ms: 700, pose: LEG_SWING_FORWARD, ease: 'out' },
     { ms: 700, pose: LEG_SWING_PASSING, ease: 'in' },
     { ms: 700, pose: LEG_SWING_BACK, ease: 'out' },
+  ],
+};
+
+// --- The 90 to 90: sitting with both knees at 90°, the front shin across the body and the back thigh out to the side ---
+
+/** How high the hips sit off the floor, and how far a thigh slopes down from them to a knee resting on it. */
+const NINETY_PELVIS_Y = 21;
+const NINETY_THIGH_DROP = (Math.asin((NINETY_PELVIS_Y - ANKLE_Y) / SKELETON.thigh) * 180) / Math.PI;
+
+/**
+ * The legs of the 90 to 90, lying on the floor whatever the pelvis's `lean`. The right leg is in
+ * front: its thigh points ahead and is turned out so the shin lies across the body. The left thigh
+ * points out to the side with its shin back along the floor. `lift` turns the left thigh inward,
+ * which raises its foot with the knee as the pivot.
+ */
+const ninetyLegs = (lean: number, lift = 0): Pick<Pose3, 'rightLeg' | 'leftLeg'> => ({
+  rightLeg: { flex: 90 - NINETY_THIGH_DROP + lean, rotate: 90, knee: 90 },
+  leftLeg: { flex: lean, abduct: 90 - NINETY_THIGH_DROP, rotate: -lift, knee: 90, ankle: -50 },
+});
+
+/** Sitting tall, one hand on the floor outside the front knee and the other resting on the front shin. */
+const NINETY_TALL: Pose3 = {
+  pelvis: [0, NINETY_PELVIS_Y, 0],
+  lean: 6,
+  spine: { flex: 8 },
+  ...ninetyLegs(6),
+  pins: {
+    rightHand: { at: [40, WRIST_Y, 72], toward: [1, 0, 0.2], pole: [-1, 0, 0.6] },
+    leftHand: { at: [88, 34, -50], toward: [1, -0.3, 0], pole: [-0.3, -0.3, -1] },
+  },
+};
+/** Hinged forward from the hips over the front shin, back long, the hands on the floor past it. */
+const NINETY_FOLDED: Pose3 = {
+  pelvis: [0, NINETY_PELVIS_Y, 0],
+  lean: 48,
+  spine: { flex: 24 },
+  neck: { flex: -25 },
+  ...ninetyLegs(48),
+  pins: {
+    rightHand: { at: [215, WRIST_Y, 46], toward: [1, 0, 0], pole: [0, 0.1, 1] },
+    leftHand: { at: [215, WRIST_Y, -46], toward: [1, 0, 0], pole: [0, 0.1, -1] },
+  },
+};
+
+export const NINETY_TO_NINETY_3D: Clip3D = {
+  view: '3d',
+  // From the front on the back leg's side and above, where both legs' right angles lie open on the
+  // floor and the fold over the front shin goes across the screen.
+  camera: { yaw: 145, pitch: 26 },
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: NINETY_TALL },
+    { ms: 500, pose: NINETY_TALL },
+    { ms: 1800, pose: NINETY_FOLDED },
+    { ms: 3500, pose: NINETY_FOLDED },
+    { ms: 1800, pose: NINETY_TALL },
+  ],
+};
+
+// --- 90 to 90 side foot lifts: in the 90 to 90, the back foot lifts off the floor with its knee down ---
+
+/** Sitting tall and square to the front leg, leaning in just enough to rest a hand on each thigh, the back foot lifted this far. */
+const sideFootAt = (lift: number): Pose3 => ({
+  pelvis: [0, NINETY_PELVIS_Y, 0],
+  lean: 8,
+  spine: { flex: 8 },
+  ...ninetyLegs(8, lift),
+  pins: {
+    rightHand: { at: [52, 38, 17], toward: [1, -0.12, 0], pole: [-0.6, 0, 1] },
+    leftHand: { at: [6, 38, -54], toward: [0, -0.12, -1], pole: [-0.6, 0, -1] },
+  },
+});
+const SIDE_FOOT_DOWN = sideFootAt(0);
+const SIDE_FOOT_LIFTED = sideFootAt(24);
+
+export const NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D: Clip3D = {
+  view: '3d',
+  // From the back leg's side, a little in front and above: the back shin is nearest and its lift
+  // is up the screen, with the front leg's right angle still showing beyond.
+  camera: { yaw: 135, pitch: 25 },
+  highlight: ['leftLeg'],
+  trail: 'leftFoot',
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SIDE_FOOT_DOWN },
+    { ms: 500, pose: SIDE_FOOT_DOWN },
+    { ms: 1000, pose: SIDE_FOOT_LIFTED },
+    { ms: 600, pose: SIDE_FOOT_LIFTED },
+    { ms: 1400, pose: SIDE_FOOT_DOWN },
+  ],
+};
+
+// --- 90 to 90 rotations: leaning back on the hands with the feet planted wide, both knees drop to one side and then the other, one leading ---
+
+/** The heels stay where they are while the knees go over. */
+const ROTATIONS_FOOT_X = 130;
+const ROTATIONS_FOOT_Z = 70;
+
+/**
+ * Each knee dropped this far to the figure's right, from -1, all the way to the left, to 1, with 0
+ * pointing at the ceiling. The pelvis rolls with the knees and the spine turns back, so the chest
+ * stays facing ahead.
+ */
+const rotationsAt = (right: number, left: number): Pose3 => {
+  const side = (right + left) / 2;
+  // A leg dropping to its own side opens out onto the floor; dropping across, it turns in toward it.
+  const knee = (leg: 1 | -1, to: number): Vec3 => (to * leg > 0 ? [-0.2 * Math.abs(to), 1 - Math.abs(to), to] : [0, 1 - 0.8 * Math.abs(to), to]);
+  const toes = (leg: 1 | -1, to: number): Vec3 =>
+    to * leg > 0 ? [1 - 0.5 * Math.abs(to), 0.2 * Math.abs(to), 0.85 * to] : [1 - 0.15 * Math.abs(to), 0.1 * Math.abs(to), 0.5 * to];
+  return {
+    pelvis: [0, NINETY_PELVIS_Y, 0],
+    lean: -25,
+    turn: -5 * side,
+    spine: { twist: 5 * side },
+    neck: { flex: 20 },
+    pins: {
+      // Set wide behind the hips, far enough back that the arms are close to straight.
+      rightHand: { at: [-110, WRIST_Y, 84], toward: [-1, 0, 0.5], pole: [-1, 0, 0.3] },
+      leftHand: { at: [-110, WRIST_Y, -84], toward: [-1, 0, -0.5], pole: [-1, 0, -0.3] },
+      rightFoot: { at: [ROTATIONS_FOOT_X, ANKLE_Y, ROTATIONS_FOOT_Z], toward: toes(1, right), pole: knee(1, right) },
+      leftFoot: { at: [ROTATIONS_FOOT_X, ANKLE_Y, -ROTATIONS_FOOT_Z], toward: toes(-1, left), pole: knee(-1, left) },
+    },
+  };
+};
+const ROTATIONS_RIGHT = rotationsAt(1, 1);
+const ROTATIONS_LEFT = rotationsAt(-1, -1);
+
+const ROTATIONS_SWEEP_MS = 2200;
+const ROTATIONS_SWEEP_STEPS = 10;
+/** The part of a sweep each leg takes: the leading leg is done this far through, and the other starts this far in. */
+const ROTATIONS_LEAD_ENDS = 0.78;
+const ROTATIONS_FOLLOW_STARTS = 0.22;
+
+/**
+ * The knees going over to one side (1 the figure's right, -1 its left) from the other. They don't
+ * go together: the leg on the side they're going to, which opens outward, lifts first, and the
+ * other follows it over. Each leg eases in and out of its own part of the sweep, so the frames in
+ * between are placed along it rather than eased again.
+ */
+const rotationsSweep = (to: 1 | -1): Keyframe3[] => {
+  const eased = (t: number) => t * t * (3 - 2 * t);
+  const frames: Keyframe3[] = [];
+  for (let step = 1; step <= ROTATIONS_SWEEP_STEPS; step++) {
+    const t = step / ROTATIONS_SWEEP_STEPS;
+    const lead = -to + 2 * to * eased(Math.min(1, t / ROTATIONS_LEAD_ENDS));
+    const follow = -to + 2 * to * eased(Math.max(0, (t - ROTATIONS_FOLLOW_STARTS) / (1 - ROTATIONS_FOLLOW_STARTS)));
+    frames.push({ ms: ROTATIONS_SWEEP_MS / ROTATIONS_SWEEP_STEPS, pose: to === 1 ? rotationsAt(lead, follow) : rotationsAt(follow, lead), ease: 'none' });
+  }
+  return frames;
+};
+
+export const NINETY_TO_NINETY_ROTATIONS_3D: Clip3D = {
+  view: '3d',
+  // From the front and above, where the knees sweep from side to side across the screen.
+  camera: { yaw: 80, pitch: 32 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The thighs come off the front of the hips toward the camera, so the legs stay over them.
+  over: ['rightLeg', 'leftLeg'],
+  // No trail: each knee's path from out on the floor, up, and in across the body is lopsided from
+  // here, and one knee's doesn't show that both go over.
+  stillFrame: 0,
+  keyframes: [
+    { ms: 0, pose: ROTATIONS_RIGHT },
+    ...rotationsSweep(-1),
+    { ms: 300, pose: ROTATIONS_LEFT },
+    ...rotationsSweep(1),
+    { ms: 300, pose: ROTATIONS_RIGHT },
   ],
 };

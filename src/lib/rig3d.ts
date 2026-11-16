@@ -132,6 +132,12 @@ export type Clip3D = {
   highlight?: readonly Part[];
   /** Draws the path this hand or foot takes through the clip, just under its own limb, so the movement shows even in a still. */
   trail?: 'rightHand' | 'leftHand' | 'rightFoot' | 'leftFoot';
+  /**
+   * Limbs drawn over the torso all the way through, whatever their depth says. For legs that come
+   * off the front of the hips toward the camera, like a figure sitting back seen from the front:
+   * a thigh lying out to the side there never comes clear of the hips, and would go under them.
+   */
+  over?: readonly Part[];
   scenery?: readonly Block[];
   /** A strap looped around the ball of this foot, with an end held in each hand. */
   strap?: 'rightFoot' | 'leftFoot';
@@ -1165,7 +1171,9 @@ export function traceFigure(
   strap?: Clip3D['strap'],
   phone?: PhoneMount,
   /** What the phone's screen reads, see `phoneReading`. Without it the screen is blank. */
-  reading?: number
+  reading?: number,
+  /** Limbs to draw over the torso regardless, see `Clip3D.over`. */
+  forcedOver?: readonly Part[]
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -1201,7 +1209,7 @@ export function traceFigure(
   // Each limb is under the torso (0) or over it (2), by where the two overlap on screen.
   const limb = (part: Part, points: Vec3[], isLeg: boolean) => {
     const depth = meanDepth(points);
-    const over = overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg);
+    const over = (forcedOver ? forcedOver.includes(part) : false) || overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg);
     return { part, d: limbShape(points, isLeg ? LEG_RADII : ARM_RADII), depth, points, layer: over ? 2 : 0 };
   };
   const parts: { part: Part; d: string; depth: number; points: Vec3[]; layer: number }[] = [
@@ -1321,7 +1329,7 @@ export function trailedPart(trail: Clip3D['trail']): Part | undefined {
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
   const skeleton = solvePose(poseAt3(clip, timeMs));
-  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined);
+  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over);
 }
 
 function duration(clip: Clip3D): number {
