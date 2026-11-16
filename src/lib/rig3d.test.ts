@@ -404,14 +404,17 @@ describe('3D clips', () => {
 
   it('lowers a straight arm from the ceiling to overhead, back flat on the floor, in overhead reach', () => {
     const skeletons = samples(OVERHEAD_REACH_3D).map(solvePose);
-    for (const { rightArm, spine } of skeletons) {
-      expect(angleAt(rightArm[0], rightArm[1], rightArm[2])).toBeCloseTo(180);
+    // The arm away from the camera, so the phone's screen, facing in toward the body, faces it.
+    expect(OVERHEAD_REACH_3D.highlight).toEqual(['leftArm']);
+    expect(OVERHEAD_REACH_3D.phone).toMatchObject({ limb: 'leftArm', face: 'inside' });
+    for (const { leftArm, spine } of skeletons) {
+      expect(angleAt(leftArm[0], leftArm[1], leftArm[2])).toBeCloseTo(180);
       // Straight overhead, never out to the side.
-      expect(rightArm[2][2]).toBeCloseTo(rightArm[0][2]);
+      expect(leftArm[2][2]).toBeCloseTo(leftArm[0][2]);
       for (const point of spine) expect(point[1]).toBeCloseTo(spine[0][1]);
     }
     // Measured from the arm by the side, which lying down points at the feet.
-    const shoulderAngle = ({ rightArm }: Skeleton) => angleAt([rightArm[0][0] + 1, rightArm[0][1], rightArm[0][2]], rightArm[0], rightArm[2]);
+    const shoulderAngle = ({ leftArm }: Skeleton) => angleAt([leftArm[0][0] + 1, leftArm[0][1], leftArm[0][2]], leftArm[0], leftArm[2]);
     expect(shoulderAngle(skeletons[0])).toBeCloseTo(90);
     expect(Math.max(...skeletons.map(shoulderAngle))).toBeCloseTo(165);
     // The head lies beyond the shoulders, away from the camera, and still goes over the neck.
@@ -559,15 +562,16 @@ describe('3D clips', () => {
 
   it('holds the phone in the hand, in line with the forearm, for the shoulder tests', () => {
     for (const clip of [SHOULDER_ABDUCTION_3D, SHOULDER_EXTERNAL_ROTATION_3D, OVERHEAD_REACH_3D]) {
+      const arm = clip.phone!.limb as 'rightArm' | 'leftArm';
       for (const skeleton of samples(clip).map(solvePose)) {
         const { center, along } = phonePlacement(skeleton, clip.phone!);
-        const [, elbow, wrist] = skeleton.rightArm;
+        const [, elbow, wrist] = skeleton[arm];
         const forearm = [(wrist[0] - elbow[0]) / SKELETON.forearm, (wrist[1] - elbow[1]) / SKELETON.forearm, (wrist[2] - elbow[2]) / SKELETON.forearm];
         expect(along[0] * forearm[0] + along[1] * forearm[1] + along[2] * forearm[2]).toBeCloseTo(1);
         // Gripped across its middle, so the hand is on it.
         expect(distance(center, wrist)).toBeLessThan(SKELETON.hand);
         // Resting against the palm, clear of the middle of the hand rather than through it.
-        const tip = skeleton.rightArm[3];
+        const tip = skeleton[arm][3];
         const t = Math.max(0, Math.min(1, [0, 1, 2].reduce((sum, i) => sum + (center[i] - wrist[i]) * (tip[i] - wrist[i]), 0) / SKELETON.hand ** 2));
         const nearest = [0, 1, 2].map((i) => wrist[i] + (tip[i] - wrist[i]) * t) as unknown as Vec3;
         expect(distance(center, nearest)).toBeGreaterThanOrEqual(9.5 + PHONE.depth / 2 - 0.01);

@@ -130,11 +130,15 @@ export const SHOULDER_ABDUCTION_3D: Clip3D = {
 
 // --- Overhead reach: lying on the back with knees bent, a straight arm lowers from the ceiling to overhead ---
 
-/** Knees bent with the feet flat on the floor, the right arm straight and raised this far from by the side. */
+/**
+ * Knees bent with the feet flat on the floor, the left arm straight and raised this far from by the
+ * side. It's the arm away from the camera, so the phone's screen, facing in toward the body, faces
+ * the camera.
+ */
 const overheadAt = (degrees: number): Pose3 => ({
   ...LYING_ON_BACK,
-  rightArm: { flex: degrees },
-  leftArm: { abduct: 10 },
+  leftArm: { flex: degrees },
+  rightArm: { abduct: 10 },
   pins: {
     rightFoot: { at: [125, ANKLE_Y, 18], toward: [1, 0, 0] },
     leftFoot: { at: [125, ANKLE_Y, -18], toward: [1, 0, 0] },
@@ -148,10 +152,10 @@ export const OVERHEAD_REACH_3D: Clip3D = {
   view: '3d',
   // From the side and a little above, where the arm's arc from the ceiling to overhead is flat on the screen.
   camera: { yaw: 10, pitch: 18 },
-  highlight: ['rightArm'],
-  // In the hand, in line with the arm, turned to the camera.
-  phone: { limb: 'rightArm', bone: 2, face: 'outside' },
-  trail: 'rightHand',
+  highlight: ['leftArm'],
+  // In the hand, in line with the arm, the screen facing in toward the body.
+  phone: { limb: 'leftArm', bone: 2, face: 'inside' },
+  trail: 'leftHand',
   stillFrame: 2,
   keyframes: [
     { ms: 0, pose: OVERHEAD_UP },
