@@ -586,6 +586,18 @@ describe('3D clips', () => {
       expect(facing[0] * toBody[0] + facing[2] * toBody[2]).toBeGreaterThan(-1e-6);
       expect(center[1]).toBeCloseTo(elbow[1]);
     }
+    // Behind the hand while the screen is turned away, and over it only once the screen faces the
+    // camera: side-on, where it changes sides, it's beside the hand on screen, so it doesn't jump.
+    const view = viewOf(SHOULDER_EXTERNAL_ROTATION_3D.camera);
+    const sides = samples(SHOULDER_EXTERNAL_ROTATION_3D).map((pose) => {
+      const skeleton = solvePose(pose);
+      const toward = project(view, phonePlacement(skeleton, SHOULDER_EXTERNAL_ROTATION_3D.phone!).facing)[2];
+      const { over } = traceFigure(skeleton, view, undefined, undefined, SHOULDER_EXTERNAL_ROTATION_3D.phone).phone;
+      expect(over).toBe(toward > 0);
+      return over;
+    });
+    expect(sides[0]).toBe(false);
+    expect(sides).toContain(true);
   });
 
   it.each([

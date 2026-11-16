@@ -1041,7 +1041,8 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
     screen,
     band,
     // Held in the hand, the fingers wrap over it from the side away from the screen.
-    over: towardCamera > -0.15,
+    // Exactly side-on, the phone sits beside the limb on screen, so changing sides there doesn't show.
+    over: towardCamera > 0,
   };
 }
 
