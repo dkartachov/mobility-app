@@ -883,3 +883,127 @@ export const ACTIVE_PANCAKE_3D: Clip3D = {
     { ms: 300, pose: PANCAKE_TALL },
   ],
 };
+
+/**
+ * A move drawn in this many frames, each the pose `at` that far through it, from 0 to 1. For moves
+ * where pinned hands or the pelvis travel on an arc: going straight between two keyframes cuts
+ * across it, which bends a straight arm or slides a planted knee partway. The move eases in and out
+ * as a whole, so the frames are placed along it rather than eased again.
+ */
+const alongArc = (ms: number, steps: number, at: (t: number) => Pose3): Keyframe3[] => {
+  const frames: Keyframe3[] = [];
+  for (let step = 1; step <= steps; step++) {
+    const t = step / steps;
+    frames.push({ ms: ms / steps, pose: at(t * t * (3 - 2 * t)), ease: 'none' });
+  }
+  return frames;
+};
+
+// --- Ankle mobilization: half kneeling, the front knee drives forward over the toes with the heel down ---
+
+/** The back knee rests on the floor here and the body pivots over it; its shin and the top of its foot lie flat behind. */
+const ANKLE_MOB_BACK_KNEE: Vec3 = [-95, ANKLE_Y, -SKELETON.hip];
+const ANKLE_MOB_FRONT_ANKLE: Vec3 = [0, ANKLE_Y, SKELETON.hip];
+
+/**
+ * The front shin tipped this far forward of upright over its planted foot. Both knees stay where
+ * that puts them, the back one on the floor, so the hips are a thigh's length from each: they sink
+ * and travel forward as the knee drives over the toes. The hands rest on the waist, elbows out and
+ * back, clear of the legs.
+ */
+const ankleMobilizationAt = (shin: number, lean: number): Pose3 => {
+  const tip = (shin * Math.PI) / 180;
+  const front = [SKELETON.shin * Math.sin(tip), ANKLE_Y + SKELETON.shin * Math.cos(tip)];
+  const back = [ANKLE_MOB_BACK_KNEE[0], ANKLE_MOB_BACK_KNEE[1]];
+  const gap = Math.hypot(front[0] - back[0], front[1] - back[1]);
+  const rise = Math.sqrt(SKELETON.thigh ** 2 - (gap / 2) ** 2);
+  const pelvis: Vec3 = [
+    (front[0] + back[0]) / 2 - (rise * (front[1] - back[1])) / gap,
+    (front[1] + back[1]) / 2 + (rise * (front[0] - back[0])) / gap,
+    0,
+  ];
+  return {
+    pelvis,
+    lean,
+    neck: { flex: -lean },
+    pins: {
+      rightFoot: { at: ANKLE_MOB_FRONT_ANKLE, toward: [1, 0, 0] },
+      leftFoot: { at: [ANKLE_MOB_BACK_KNEE[0] - SKELETON.shin, ANKLE_Y, -SKELETON.hip], toward: [-1, 0, 0], pole: [1, -1, 0] },
+      rightHand: { at: [pelvis[0] + 4, pelvis[1] + 49, 30], toward: [1, -0.5, 0], pole: [-1, 0, 1] },
+      leftHand: { at: [pelvis[0] + 4, pelvis[1] + 49, -30], toward: [1, -0.5, 0], pole: [-1, 0, -1] },
+    },
+  };
+};
+/** Kneeling tall, the front shin is close to upright; driven forward, the knee is well past the toes, about as far as an ankle bends with the heel still down. */
+const ANKLE_MOB_SHIN = [5, 40];
+/** This far into the knee's drive forward, from 0 to 1. The body leans in a little with it. */
+const ankleMobilization = (t: number): Pose3 => ankleMobilizationAt(ANKLE_MOB_SHIN[0] + (ANKLE_MOB_SHIN[1] - ANKLE_MOB_SHIN[0]) * t, 3 + 5 * t);
+const ANKLE_MOB_BACK = ankleMobilization(0);
+const ANKLE_MOB_FORWARD = ankleMobilization(1);
+const ANKLE_MOB_STEPS = 6;
+
+export const ANKLE_MOBILIZATION_3D: Clip3D = {
+  view: '3d',
+  // From the front leg's side, a little in front and above, where the shin's tip forward is flat on
+  // the screen and the back leg shows behind.
+  camera: { yaw: 15, pitch: 12 },
+  highlight: ['rightLeg'],
+  stillFrame: ANKLE_MOB_STEPS,
+  // Rocking in and out without settling at either end.
+  keyframes: [
+    { ms: 0, pose: ANKLE_MOB_BACK },
+    ...alongArc(1200, ANKLE_MOB_STEPS, ankleMobilization),
+    { ms: 300, pose: ANKLE_MOB_FORWARD },
+    ...alongArc(1200, ANKLE_MOB_STEPS, (t) => ankleMobilization(1 - t)),
+    { ms: 300, pose: ANKLE_MOB_BACK },
+  ],
+};
+
+// --- Behind the back chest opener: standing with the hands linked behind, the straight arms lift away from the back ---
+
+/** The wrists sit this far either side of the middle of the back, so the hands overlap. */
+const CHEST_OPENER_HANDS_Z = 4;
+
+/**
+ * Standing tall with the hands linked behind the back, the arms straight and lifted this far back
+ * from hanging. The back arches this far, which lifts the chest as the arms come up.
+ */
+const chestOpenerAt = (degrees: number, arch: number): Pose3 => {
+  const body: Pose3 = { ...STANDING, spine: { flex: -arch }, neck: { flex: arch / 2 } };
+  const shoulder = solvePose(body).rightArm[0];
+  // A hair short of full reach, so the arms stay straight without the elbows locking.
+  const length = 0.999 * (SKELETON.upperArm + SKELETON.forearm);
+  // What's left of the arm's length once it has come in from the shoulder to the middle of the back.
+  const inPlane = Math.sqrt(length ** 2 - (shoulder[2] - CHEST_OPENER_HANDS_Z) ** 2);
+  const back = (degrees * Math.PI) / 180;
+  const wrist = (side: 1 | -1): Vec3 => [shoulder[0] - inPlane * Math.sin(back), shoulder[1] - inPlane * Math.cos(back), side * CHEST_OPENER_HANDS_Z];
+  return {
+    ...body,
+    pins: {
+      rightHand: { at: wrist(1), pole: [-0.6, 0, 1] },
+      leftHand: { at: wrist(-1), pole: [-0.6, 0, -1] },
+    },
+  };
+};
+/** This far into the lift, from 0, the linked hands resting against the back, to 1. */
+const chestOpener = (t: number): Pose3 => chestOpenerAt(10 + 40 * t, 8 * t);
+const CHEST_OPENER_LINKED = chestOpener(0);
+const CHEST_OPENER_LIFTED = chestOpener(1);
+const CHEST_OPENER_STEPS = 8;
+
+export const BEHIND_THE_BACK_CHEST_OPENER_3D: Clip3D = {
+  view: '3d',
+  // From the right and a little behind, where the lift away from the back goes across the screen
+  // and both arms show coming in to the linked hands.
+  camera: { yaw: -25, pitch: 10 },
+  highlight: ['rightArm', 'leftArm'],
+  trail: 'rightHand',
+  stillFrame: 1 + CHEST_OPENER_STEPS,
+  keyframes: [
+    { ms: 0, pose: CHEST_OPENER_LINKED },
+    { ms: 500, pose: CHEST_OPENER_LINKED },
+    ...alongArc(1800, CHEST_OPENER_STEPS, chestOpener),
+    { ms: 3500, pose: CHEST_OPENER_LIFTED },
+    ...alongArc(1600, CHEST_OPENER_STEPS, (t) => chestOpener(1 - t)),
+  ],
+};

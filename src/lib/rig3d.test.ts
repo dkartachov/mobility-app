@@ -2,6 +2,8 @@ import { EXERCISES } from '@/data/exercises';
 import {
   ACTIVE_PANCAKE_3D,
   ACTIVE_STRAIGHT_LEG_RAISE_3D,
+  ANKLE_MOBILIZATION_3D,
+  BEHIND_THE_BACK_CHEST_OPENER_3D,
   CAT_COW_3D,
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
@@ -290,6 +292,8 @@ describe('3D clips', () => {
       'pancake',
       'active-pancake',
       'active-straight-leg-raise',
+      'ankle-mobilization',
+      'behind-the-back-chest-opener',
       'warmup-marching',
     ]));
   });
@@ -577,6 +581,47 @@ describe('3D clips', () => {
     // It comes down slower than it goes up.
     const [, , up, , down] = ACTIVE_STRAIGHT_LEG_RAISE_3D.keyframes;
     expect(down.ms).toBeGreaterThan(up.ms);
+  });
+
+  it('drives the front knee over the toes with the heel down and the back knee on the floor in ankle mobilization', () => {
+    const skeletons = samples(ANKLE_MOBILIZATION_3D).map(solvePose);
+    const start = skeletons[0];
+    // How far the front shin tips forward of upright.
+    const shin = ({ rightLeg }: Skeleton) => (Math.atan2(rightLeg[1][0] - rightLeg[2][0], rightLeg[1][1] - rightLeg[2][1]) * 180) / Math.PI;
+    for (const skeleton of skeletons) {
+      const { rightLeg, leftLeg } = skeleton;
+      // The front foot stays flat where it is, heel down.
+      expect(distance(rightLeg[2], start.rightLeg[2])).toBeCloseTo(0);
+      expect(rightLeg[3][1]).toBeCloseTo(rightLeg[2][1]);
+      // The back knee stays put on the floor, the shin flat behind it.
+      expect(distance(leftLeg[1], start.leftLeg[1])).toBeLessThan(1);
+      expect(leftLeg[1][1]).toBeLessThan(14);
+      expect(leftLeg[2][1]).toBeLessThan(14);
+      // The knee tracks over the foot, not in or out.
+      expect(rightLeg[1][2]).toBeCloseTo(rightLeg[2][2], 0);
+    }
+    expect(shin(start)).toBeCloseTo(5, 0);
+    expect(Math.max(...skeletons.map(shin))).toBeCloseTo(40, 0);
+    // At the bottom the knee is past the toes.
+    const forward = solvePose(ANKLE_MOBILIZATION_3D.keyframes[ANKLE_MOBILIZATION_3D.stillFrame].pose);
+    expect(forward.rightLeg[1][0]).toBeGreaterThan(forward.rightLeg[3][0]);
+  });
+
+  it('lifts straight arms away from the back with the hands linked in behind the back chest opener', () => {
+    const skeletons = samples(BEHIND_THE_BACK_CHEST_OPENER_3D).map(solvePose);
+    // How far an arm is lifted back from hanging.
+    const lifted = ({ rightArm }: Skeleton) => (Math.atan2(rightArm[0][0] - rightArm[2][0], rightArm[0][1] - rightArm[2][1]) * 180) / Math.PI;
+    for (const { rightArm, leftArm, rightLeg, leftLeg } of skeletons) {
+      // Linked: the wrists stay together behind the middle of the back.
+      expect(distance(rightArm[2], leftArm[2])).toBeLessThan(10);
+      expect(rightArm[2][0]).toBeLessThan(0);
+      for (const arm of [rightArm, leftArm]) expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(170);
+      // Standing tall throughout.
+      for (const leg of [rightLeg, leftLeg]) expect(angleAt(leg[0], leg[1], leg[2])).toBeCloseTo(180);
+    }
+    expect(lifted(skeletons[0])).toBeLessThan(15);
+    expect(Math.max(...skeletons.map(lifted))).toBeGreaterThan(45);
+    expect(Math.max(...skeletons.map(lifted))).toBeLessThan(55);
   });
 
   it('draws a strap only for a clip that has one, from hand to foot and back', () => {

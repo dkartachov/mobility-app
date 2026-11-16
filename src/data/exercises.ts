@@ -7,6 +7,8 @@ import type { ScoreArea } from './mobility-score';
 import {
   ACTIVE_PANCAKE_3D,
   ACTIVE_STRAIGHT_LEG_RAISE_3D,
+  ANKLE_MOBILIZATION_3D,
+  BEHIND_THE_BACK_CHEST_OPENER_3D,
   CAT_COW_3D,
   LEG_SWINGS_3D,
   NINETY_TO_NINETY_3D,
@@ -16,9 +18,7 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  ANKLE_MOBILIZATION,
   BACK_LYING_REVERSE_PIGEON,
-  BEHIND_THE_BACK_CHEST_OPENER,
   BELLY_DOWN_FOOT_SPLAY,
   BLACKBURN,
   BOTTOM_SQUAT,
@@ -587,7 +587,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Bring it back and keep rocking back and forth, then switch sides',
     ],
     photo: require('@/assets/images/exercises/ankle-mobilization.png'),
-    animation: ANKLE_MOBILIZATION,
+    animation: ANKLE_MOBILIZATION_3D,
     twoSided: true,
     active: true,
   },
@@ -902,7 +902,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lift your hands away from your back and hold',
     ],
     photo: require('@/assets/images/exercises/behind-the-back-chest-opener.png'),
-    animation: BEHIND_THE_BACK_CHEST_OPENER,
+    animation: BEHIND_THE_BACK_CHEST_OPENER_3D,
   },
   {
     id: 'hip-circles',

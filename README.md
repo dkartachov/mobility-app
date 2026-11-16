@@ -139,18 +139,18 @@ Moved to the new engine:
 | Pancake | Library | `PANCAKE_3D` |
 | Active pancake | Library | `ACTIVE_PANCAKE_3D` |
 | Active straight leg raise | Library | `ACTIVE_STRAIGHT_LEG_RAISE_3D` |
+| Ankle mobilization | Library | `ANKLE_MOBILIZATION_3D` |
+| Behind the back chest opener | Library | `BEHIND_THE_BACK_CHEST_OPENER_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise.
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization and the behind the back chest opener.
 
 Library (`src/data/exercises.ts`):
 
 | Exercise | Clip | Needs |
 |---|---|---|
-| Ankle mobilization | `ANKLE_MOBILIZATION` | |
 | Back lying reverse pigeon | `BACK_LYING_REVERSE_PIGEON` | |
-| Behind the back chest opener | `BEHIND_THE_BACK_CHEST_OPENER` | |
 | Belly down foot splay | `BELLY_DOWN_FOOT_SPLAY` | |
 | Blackburn | `BLACKBURN` | |
 | Bottom squat | `BOTTOM_SQUAT` | |
