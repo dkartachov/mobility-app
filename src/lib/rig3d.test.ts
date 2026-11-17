@@ -6,7 +6,9 @@ import {
   BACK_LYING_REVERSE_PIGEON_3D,
   BEHIND_THE_BACK_CHEST_OPENER_3D,
   BELLY_DOWN_FOOT_SPLAY_3D,
+  BOTTOM_SQUAT_ROTATION_3D,
   CAT_COW_3D,
+  COSSACK_SQUAT_3D,
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
   HIP_INTERNAL_ROTATION_3D,
@@ -19,6 +21,7 @@ import {
   NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
   OVERHEAD_REACH_3D,
   PANCAKE_3D,
+  RESTING_COSSACK_SQUAT_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
   SIT_AND_REACH_3D,
@@ -92,6 +95,33 @@ function angleAt(a: Vec3, b: Vec3, c: Vec3): number {
 /** How far a limb from `root` to `end` is turned from pointing straight down, in degrees. */
 function fromHanging(root: Vec3, end: Vec3): number {
   return angleAt([root[0], root[1] - 1, root[2]], root, end);
+}
+
+/** How far a shin or a spine from `base` up to `top` is tipped from upright, in degrees. */
+function tipped(base: Vec3, top: Vec3): number {
+  return angleAt([base[0], base[1] + 1, base[2]], base, top);
+}
+
+/** How far apart the middles of two limbs have to be for them not to touch. */
+const LIMB_CLEAR = 20;
+
+/** How far apart two projected points are on screen. */
+function onScreen(a: Vec3, b: Vec3): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
+}
+
+/** The order the body's parts are drawn in, at every moment of a clip. A clip whose parts never swap has one. */
+function drawOrders(clip: Clip3D): string[] {
+  const view = viewOf(clip.camera);
+  const orders: string[] = [];
+  for (let t = 0; t <= durationOf(clip); t += 10) {
+    orders.push(
+      frameAt(clip, view, t)
+        .slots.map((slot) => (slot.hand ? `${slot.part} hand` : slot.part))
+        .join(' ')
+    );
+  }
+  return orders;
 }
 
 describe('solveJoint3', () => {
@@ -309,6 +339,9 @@ describe('3D clips', () => {
       'behind-the-back-chest-opener',
       'back-lying-reverse-pigeon',
       'belly-down-foot-splay',
+      'bottom-squat-rotation',
+      'cossack-squat',
+      'resting-cossack-squat',
       'warmup-marching',
     ]));
   });
@@ -706,6 +739,189 @@ describe('3D clips', () => {
     expect(apart(start)).toBeCloseTo(start.rightLeg[1][2] - start.leftLeg[1][2]);
     expect(apart(fallen)).toBeGreaterThan(apart(start) + 2 * SKELETON.shin * Math.sin((40 * Math.PI) / 180));
     expect(fallen.rightLeg[2][1]).toBeLessThan(start.rightLeg[2][1] - 20);
+  });
+
+  it('keeps one hand on the floor while the other arm reaches for the ceiling and the chest turns to it, each side in turn, in bottom squat rotation', () => {
+    const skeletons = samples(BOTTOM_SQUAT_ROTATION_3D).map(solvePose);
+    const start = skeletons[0];
+    const planted = (skeleton: Skeleton, arm: 'rightArm' | 'leftArm') => distance(skeleton[arm][2], start[arm][2]) < 0.01;
+    for (const skeleton of skeletons) {
+      // The squat itself doesn't move.
+      expect(distance(skeleton.spine[0], start.spine[0])).toBeCloseTo(0);
+      [...skeleton.rightLeg, ...skeleton.leftLeg].forEach((joint, i) => expect(distance(joint, [...start.rightLeg, ...start.leftLeg][i])).toBeCloseTo(0));
+      expect(planted(skeleton, 'rightArm') || planted(skeleton, 'leftArm')).toBe(true);
+    }
+    // A deep squat, heels down, with both hands flat on the floor between the feet to begin with.
+    expect(start.spine[0][1]).toBeLessThan(start.rightLeg[1][1] - 20);
+    expect(start.rightLeg[3][1]).toBeCloseTo(start.rightLeg[2][1]);
+    for (const arm of [start.rightArm, start.leftArm]) {
+      expect(arm[2][1]).toBeCloseTo(11);
+      expect(arm[3][1]).toBeCloseTo(11);
+      expect(Math.abs(arm[2][2])).toBeLessThan(Math.abs(start.rightLeg[2][2]));
+    }
+
+    const highest = (arm: 'rightArm' | 'leftArm') => skeletons.reduce((best, skeleton, i) => (skeleton[arm][3][1] > skeletons[best][arm][3][1] ? i : best), 0);
+    for (const [arm, other, side] of [['rightArm', 'leftArm', 1], ['leftArm', 'rightArm', -1]] as const) {
+      const up = skeletons[highest(arm)];
+      // A straight arm, pointing at the ceiling.
+      expect(angleAt(up[arm][0], up[arm][1], up[arm][2])).toBeGreaterThan(170);
+      expect(fromHanging(up[arm][0], up[arm][2])).toBeGreaterThan(165);
+      expect(planted(up, other)).toBe(true);
+      // The chest has turned toward the raised arm, whose shoulder is now behind and above the other, and the head with it.
+      expect(up[arm][0][0]).toBeLessThan(up[other][0][0] - 25);
+      expect(up[arm][0][1]).toBeGreaterThan(up[other][0][1] + 15);
+      expect(up.facing[2] * side).toBeGreaterThan(0.2);
+    }
+    expect(highest('rightArm')).toBeLessThan(highest('leftArm'));
+  });
+
+  it('never swaps one part of the body over another partway through a squat clip', () => {
+    // The Cossack squats keep one order from start to finish.
+    for (const clip of [COSSACK_SQUAT_3D, RESTING_COSSACK_SQUAT_3D]) {
+      expect(new Set(drawOrders(clip)).size).toBe(1);
+    }
+    // In the rotation the two arms, side by side on the floor, are the only parts that trade
+    // places, and both stay over the legs and the torso, under the head.
+    for (const order of drawOrders(BOTTOM_SQUAT_ROTATION_3D)) {
+      expect(order.replace('rightArm leftArm', 'leftArm rightArm')).toBe('torso leftLeg rightLeg leftArm rightArm head');
+    }
+  });
+
+  it('keeps the arms clear of the legs where they are not meant to touch in the squat clips', () => {
+    // The head is never near enough to a hand for the two to be drawn over each other.
+    for (const clip of [COSSACK_SQUAT_3D, RESTING_COSSACK_SQUAT_3D]) {
+      const view = viewOf(clip.camera);
+      for (const skeleton of samples(clip).map(solvePose)) {
+        const head = project(view, skeleton.head);
+        for (const arm of [skeleton.rightArm, skeleton.leftArm]) {
+          for (const joint of [arm[2], arm[3]]) expect(onScreen(head, project(view, joint))).toBeGreaterThan(SKELETON.head + LIMB_CLEAR);
+        }
+      }
+    }
+    // Reaching forward in the Cossack squats, the elbows and hands stay well above the knees.
+    for (const clip of [COSSACK_SQUAT_3D, RESTING_COSSACK_SQUAT_3D]) {
+      for (const { rightArm, leftArm, rightLeg, leftLeg } of samples(clip).map(solvePose)) {
+        for (const arm of [rightArm, leftArm]) {
+          for (const leg of [rightLeg, leftLeg]) {
+            expect(distance(arm[1], leg[1])).toBeGreaterThan(2 * LIMB_CLEAR);
+            expect(distance(arm[2], leg[1])).toBeGreaterThan(2 * LIMB_CLEAR);
+          }
+        }
+      }
+    }
+  });
+
+  it('pushes the clasped hands out in front as the hips sink in the Cossack squats, and draws them back in on the way up', () => {
+    // How far the hands are out in front of the chest.
+    const reach = ({ rightArm, spine }: Skeleton) => rightArm[2][0] - spine[spine.length - 1][0];
+    for (const clip of [COSSACK_SQUAT_3D, RESTING_COSSACK_SQUAT_3D]) {
+      const view = viewOf(clip.camera);
+      const skeletons = samples(clip).map(solvePose);
+      for (const { rightArm, leftArm, rightLeg, leftLeg } of skeletons) {
+        // Clasped: the wrists stay together, with the elbows bent.
+        expect(distance(rightArm[2], leftArm[2])).toBeLessThan(15);
+        for (const arm of [rightArm, leftArm]) {
+          expect(angleAt(arm[0], arm[1], arm[2])).toBeLessThan(165);
+          // On screen, no part of an arm comes near enough to a leg to be drawn over it.
+          const [elbow, wrist, tip] = [project(view, arm[1]), project(view, arm[2]), project(view, arm[3])];
+          for (const leg of [rightLeg, leftLeg]) {
+            for (const joint of leg.map((point) => project(view, point))) {
+              for (const point of [elbow, wrist, tip]) expect(onScreen(point, joint)).toBeGreaterThan(LIMB_CLEAR + 5);
+            }
+          }
+        }
+      }
+      const reaches = skeletons.map(reach);
+      const bottom = reach(solvePose(clip.keyframes[clip.stillFrame].pose));
+      expect(bottom).toBeCloseTo(Math.max(...reaches), 0);
+      expect(bottom - Math.min(...reaches)).toBeGreaterThan(25);
+    }
+    // Standing, before the resting squat, they're tucked in closest of all.
+    expect(reach(solvePose(RESTING_COSSACK_SQUAT_3D.keyframes[0].pose))).toBeLessThan(Math.min(...samples(COSSACK_SQUAT_3D).map(solvePose).map(reach)) - 10);
+  });
+
+  it('shows the nose all the way through the bottom squat rotation', () => {
+    const view = viewOf(BOTTOM_SQUAT_ROTATION_3D.camera);
+    for (const skeleton of samples(BOTTOM_SQUAT_ROTATION_3D).map(solvePose)) {
+      const head = traceFigure(skeleton, view).slots.find((slot) => slot.part === 'head');
+      // The head's circle, and the line of the nose cut into it.
+      expect(head?.d.split('Z').filter((piece) => piece !== '')).toHaveLength(2);
+    }
+  });
+
+  it('puts one limb behind another when a clip says so, but only on the same side of the torso', () => {
+    const view = viewOf({ yaw: 90, pitch: 0 });
+    // Standing, seen from the front: the legs are under the hips and the arms over the torso.
+    const standing = solvePose(STANDING);
+    const order = (skeleton: Skeleton, behind: Clip3D['behind']) =>
+      traceFigure(skeleton, view, undefined, undefined, undefined, undefined, undefined, behind).slots.map((slot) => slot.part);
+    expect(order(standing, [['rightArm', 'rightLeg']])).toEqual(order(standing, undefined));
+    // Both arms are over the torso, so either can be put behind the other.
+    const plain = order(standing, undefined);
+    const swapped = order(standing, [[plain.indexOf('rightArm') > plain.indexOf('leftArm') ? 'rightArm' : 'leftArm', plain.indexOf('rightArm') > plain.indexOf('leftArm') ? 'leftArm' : 'rightArm']]);
+    expect(swapped.indexOf('rightArm') < swapped.indexOf('leftArm')).toBe(plain.indexOf('rightArm') > plain.indexOf('leftArm'));
+    expect(swapped.indexOf('torso')).toBe(plain.indexOf('torso'));
+  });
+
+  it('shifts from one bent leg to the other through the bottom, heel down on one side and toes up on the other, in cossack squat', () => {
+    const clip = COSSACK_SQUAT_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const overRight = skeletons[0];
+    const overLeft = solvePose(clip.keyframes[clip.stillFrame].pose);
+    for (const { rightLeg, leftLeg, spine } of skeletons) {
+      // The heels stay where they are, and the hips stay low the whole way across.
+      expect(distance(rightLeg[2], overRight.rightLeg[2])).toBeCloseTo(0);
+      expect(distance(leftLeg[2], overRight.leftLeg[2])).toBeCloseTo(0);
+      expect(spine[0][1]).toBeLessThan(100);
+    }
+    // Feet wide apart.
+    expect(overRight.rightLeg[2][2] - overRight.leftLeg[2][2]).toBeGreaterThan(SKELETON.thigh + SKELETON.shin);
+    for (const [skeleton, bent, straight] of [[overRight, 'rightLeg', 'leftLeg'], [overLeft, 'leftLeg', 'rightLeg']] as const) {
+      // The hips are down just inside the heel of the bent leg, whose foot is flat with the knee forward of it.
+      expect(skeleton.spine[0][1]).toBeLessThan(60);
+      expect(Math.abs(skeleton.spine[0][2] - skeleton[bent][2][2])).toBeLessThan(30);
+      expect(skeleton[bent][3][1]).toBeCloseTo(skeleton[bent][2][1]);
+      expect(angleAt(skeleton[bent][0], skeleton[bent][1], skeleton[bent][2])).toBeLessThan(60);
+      expect(skeleton[bent][1][0]).toBeGreaterThan(skeleton[bent][2][0] + 30);
+      expect(tipped(skeleton[bent][2], skeleton[bent][1])).toBeLessThan(40);
+      // The other leg is straight, on its heel with the toes pointing up.
+      expect(angleAt(skeleton[straight][0], skeleton[straight][1], skeleton[straight][2])).toBeGreaterThan(170);
+      expect(skeleton[straight][2][1]).toBeCloseTo(13);
+      expect(skeleton[straight][3][1] - skeleton[straight][2][1]).toBeGreaterThan(35);
+    }
+    // The two sides are mirror images.
+    overRight.rightLeg.forEach((joint, i) => expect(distance(joint, [overLeft.leftLeg[i][0], overLeft.leftLeg[i][1], -overLeft.leftLeg[i][2]])).toBeCloseTo(0));
+    overRight.leftLeg.forEach((joint, i) => expect(distance(joint, [overLeft.rightLeg[i][0], overLeft.rightLeg[i][1], -overLeft.rightLeg[i][2]])).toBeCloseTo(0));
+    // Passing the middle, both feet are flat and both knees bent.
+    const middle = skeletons.reduce((best, skeleton) => (Math.abs(skeleton.spine[0][2]) < Math.abs(best.spine[0][2]) ? skeleton : best));
+    for (const leg of [middle.rightLeg, middle.leftLeg]) {
+      expect(leg[3][1] - leg[2][1]).toBeLessThan(6);
+      expect(angleAt(leg[0], leg[1], leg[2])).toBeLessThan(120);
+    }
+  });
+
+  it('sinks from a wide stance over one leg, the other straight the whole way, and rests at the bottom in resting cossack squat', () => {
+    const clip = RESTING_COSSACK_SQUAT_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightLeg, leftLeg } of skeletons) {
+      expect(distance(rightLeg[2], start.rightLeg[2])).toBeCloseTo(0);
+      expect(distance(leftLeg[2], start.leftLeg[2])).toBeCloseTo(0);
+      // The heel of the leg it sinks over stays down, and the other leg never bends.
+      expect(rightLeg[3][1]).toBeCloseTo(rightLeg[2][1]);
+      expect(angleAt(leftLeg[0], leftLeg[1], leftLeg[2])).toBeGreaterThan(170);
+    }
+    // Standing between the feet with both legs straight and both feet flat.
+    expect(start.spine[0][2]).toBeCloseTo(0);
+    expect(tipped(start.spine[0], start.spine[start.spine.length - 1])).toBeLessThan(5);
+    for (const leg of [start.rightLeg, start.leftLeg]) {
+      expect(angleAt(leg[0], leg[1], leg[2])).toBeGreaterThan(170);
+      expect(leg[3][1]).toBeCloseTo(leg[2][1]);
+    }
+    // The bottom is the Cossack squat's, and it's held.
+    const bottom = joints(solvePose(clip.keyframes[clip.stillFrame].pose));
+    joints(solvePose(COSSACK_SQUAT_3D.keyframes[0].pose)).forEach((joint, i) => expect(distance(joint, bottom[i])).toBeCloseTo(0));
+    expect(clip.keyframes[clip.stillFrame + 1].ms).toBeGreaterThanOrEqual(3000);
   });
 
   it('draws a strap only for a clip that has one, from hand to foot and back', () => {

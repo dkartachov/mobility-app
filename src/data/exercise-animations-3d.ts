@@ -1,4 +1,4 @@
-import { SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pose3, type Vec3 } from '@/lib/rig3d';
+import { SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -1115,5 +1115,268 @@ export const BELLY_DOWN_FOOT_SPLAY_3D: Clip3D = {
     { ms: 2000, pose: FOOT_SPLAY_OUT },
     { ms: 3500, pose: FOOT_SPLAY_OUT },
     { ms: 1800, pose: FOOT_SPLAY_UP },
+  ],
+};
+
+// --- Squats: what the squat clips share ---
+
+const radians = (degrees: number) => (degrees * Math.PI) / 180;
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+const mix3 = (a: Vec3, b: Vec3, t: number): Vec3 => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+const smooth = (t: number) => t * t * (3 - 2 * t);
+/** The point this far from `from` on the way to `to`. */
+const toward = (from: Vec3, to: Vec3, length: number): Vec3 => {
+  const gap = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+  return mix3(from, to, length / gap);
+};
+/** A pin that brings a wrist or ankle to `at` with the elbow or knee out toward `via`. With bones that reach exactly, the joint lands on it. */
+const pinVia = (root: Vec3, via: Vec3, at: Vec3, pointing?: Vec3): Pin & { pole: Vec3 } => ({
+  at,
+  toward: pointing,
+  pole: [via[0] - (root[0] + at[0]) / 2, via[1] - (root[1] + at[1]) / 2, via[2] - (root[2] + at[2]) / 2],
+});
+/** A hair short of an arm's or a leg's full length, so it's straight without locking. */
+const ARM_REACH = 0.999 * (SKELETON.upperArm + SKELETON.forearm);
+const LEG_REACH = 0.999 * (SKELETON.thigh + SKELETON.shin);
+
+/** The ankles sit this far either side of the middle with the feet shoulder-width apart. */
+const SQUAT_ANKLE_Z = 32;
+
+/**
+ * How both legs are bent over feet that stay flat where they are: how far each knee is forward of
+ * its ankle and out to the side of it, and how far the thigh has swung back from standing straight
+ * up on the knee (90 is level, with the hips behind the knees; past that the hips are below them).
+ */
+type SquatLegs = { forward: number; out: number; thigh: number };
+
+/**
+ * The bottom of a deep squat: the shins tipped about 38° forward, which is about as far as an ankle
+ * bends with the heel down, the knees out past the toes, and the hips below the knees.
+ */
+const SQUAT_DEEP: SquatLegs = { forward: 50, out: 36, thigh: 118 };
+/**
+ * Where legs bent like that put the pelvis, and the pins that keep the feet flat with the toes
+ * turned out this far. The knees are worked out first and the hips from them, so the bones keep
+ * their length and the knees land where they're put. `knee` is the right one.
+ */
+const squatStance = (toesOut: number, { forward, out, thigh }: SquatLegs): { pelvis: Vec3; knee: Vec3; pins: NonNullable<Pose3['pins']> } => {
+  const knee: Vec3 = [forward, ANKLE_Y + Math.sqrt(SKELETON.shin ** 2 - forward ** 2 - out ** 2), SQUAT_ANKLE_Z + out];
+  // The thigh comes in from the knee to the hip joint, and what's left of its length swings back.
+  const level = SKELETON.thigh * Math.sqrt(1 - ((SKELETON.hip - knee[2]) / SKELETON.thigh) ** 2);
+  const hip: Vec3 = [knee[0] - level * Math.sin(radians(thigh)), knee[1] + level * Math.cos(radians(thigh)), SKELETON.hip];
+  const foot = (side: 1 | -1): Pin => {
+    const pin = pinVia(
+      [hip[0], hip[1], side * hip[2]],
+      [knee[0], knee[1], side * knee[2]],
+      [0, ANKLE_Y, side * SQUAT_ANKLE_Z],
+      [Math.cos(radians(toesOut)), 0, side * Math.sin(radians(toesOut))]
+    );
+    // A straight leg has no bend to aim, so the knee is nudged the way it goes when it gives: forward and out.
+    return { ...pin, pole: [pin.pole[0] + 1, pin.pole[1], pin.pole[2] + side * 0.3] };
+  };
+  return { pelvis: [hip[0], hip[1], 0], knee, pins: { rightFoot: foot(1), leftFoot: foot(-1) } };
+};
+
+// --- Bottom squat rotation: in the bottom of the squat, one hand stays on the floor while the other arm sweeps up to the ceiling and the chest turns with it ---
+
+const BOTTOM_SQUAT_TOES_OUT = 20;
+const ROTATION_STANCE = squatStance(BOTTOM_SQUAT_TOES_OUT, SQUAT_DEEP);
+/** Where the right wrist is with the hand flat on the floor, between the feet. */
+const ROTATION_FLOOR: Vec3 = [58, WRIST_Y, 16];
+/** How far the chest turns toward the arm that goes up, and how much of that the neck turns back. */
+const ROTATION_TWIST = 55;
+const ROTATION_HEAD_BACK = 27;
+
+/**
+ * The arm on this side (1 the figure's right, -1 its left) this far up, from 0, its hand on the
+ * floor, to 1, straight up at the ceiling. It goes out to the side and over on an arc, staying
+ * close to straight, and the chest and head turn to follow it. The other hand stays planted.
+ */
+const squatRotationAt = (side: 1 | -1, up: number): Pose3 => {
+  const body = (turned: number): Pose3 => ({
+    pelvis: ROTATION_STANCE.pelvis,
+    // The chest lifts a little as it opens, which keeps the arm on the floor long.
+    lean: mix(36, 26, turned),
+    spine: { flex: 10, twist: -side * ROTATION_TWIST * turned },
+    // The head turns with the chest but not as far, so the face stays toward the camera.
+    neck: { flex: -28, twist: side * ROTATION_HEAD_BACK * turned },
+    pins: ROTATION_STANCE.pins,
+  });
+  const shoulderOf = (pose: Pose3) => (side === 1 ? solvePose(pose).rightArm[0] : solvePose(pose).leftArm[0]);
+  const floor = (which: 1 | -1): Pin => ({
+    at: [ROTATION_FLOOR[0], ROTATION_FLOOR[1], which * ROTATION_FLOOR[2]],
+    toward: [1, 0, 0],
+    pole: [-0.5, 0, which],
+  });
+  const start = shoulderOf(body(0));
+  const down: Vec3 = [ROTATION_FLOOR[0] - start[0], ROTATION_FLOOR[1] - start[1], side * ROTATION_FLOOR[2] - start[2]];
+  const reach = Math.hypot(down[0], down[1], down[2]);
+  // From pointing down at the floor to straight up, by way of out to the side, and forward on the
+  // way so the hand passes in front of the knee, not through it.
+  const swing = Math.sin(Math.PI * up);
+  const aim: Vec3 = [mix(down[0] / reach, -0.1, up) + 0.45 * swing, mix(down[1] / reach, 1, up), mix(down[2] / reach, side * 0.1, up) + side * 1.1 * swing];
+  const shoulder = shoulderOf(body(up));
+  const raised: Pin = {
+    at: toward(shoulder, [shoulder[0] + aim[0], shoulder[1] + aim[1], shoulder[2] + aim[2]], mix(reach, ARM_REACH, smooth(Math.min(1, 2 * up)))),
+    toward: mix3([1, 0, 0], aim, smooth(Math.min(1, 3 * up))),
+    pole: [-0.5, 0, side],
+  };
+  return { ...body(up), pins: { ...ROTATION_STANCE.pins, rightHand: side === 1 ? raised : floor(1), leftHand: side === 1 ? floor(-1) : raised } };
+};
+const ROTATION_DOWN = squatRotationAt(1, 0);
+const ROTATION_STEPS = 10;
+const rotationSweep = (side: 1 | -1): Keyframe3[] => [
+  ...alongArc(1800, ROTATION_STEPS, (t) => squatRotationAt(side, t)),
+  { ms: 500, pose: squatRotationAt(side, 1) },
+  ...alongArc(1800, ROTATION_STEPS, (t) => squatRotationAt(side, 1 - t)),
+];
+
+export const BOTTOM_SQUAT_ROTATION_3D: Clip3D = {
+  view: '3d',
+  // From straight in front and a little above, where each arm's sweep from the floor to the ceiling
+  // goes out across the screen, the same on both sides, and the face stays toward the camera.
+  camera: { yaw: 90, pitch: 15 },
+  highlight: ['torso'],
+  // Both arms are in front of the legs all the way: the one on the floor between the knees, and the
+  // other passing in front of its knee on the way up. Once up, its shoulder has turned back behind
+  // the chest, but it stays drawn over it, as at the start, rather than changing sides in mid-sweep.
+  over: ['rightArm', 'leftArm'],
+  behind: [
+    ['rightLeg', 'rightArm'],
+    ['rightLeg', 'leftArm'],
+    ['leftLeg', 'rightArm'],
+    ['leftLeg', 'leftArm'],
+  ],
+  trail: 'rightHand',
+  stillFrame: ROTATION_STEPS,
+  keyframes: [{ ms: 0, pose: ROTATION_DOWN }, ...rotationSweep(1), { ms: 300, pose: ROTATION_DOWN }, ...rotationSweep(-1), { ms: 300, pose: ROTATION_DOWN }],
+};
+
+// --- Cossack squat: feet wide, sinking over one bent leg with its heel down while the other goes straight, toes up ---
+
+/** At the bottom the hips are this far behind the heels and this high, just clear of the floor. */
+const COSSACK_BOTTOM = { x: -38, y: 55 };
+/** Passing through the middle the hips stay low, between two bent knees. */
+const COSSACK_MIDDLE = { x: -20, y: 92 };
+/** At the bottom the middle of the pelvis sits this far inside the bent leg's heel. */
+const COSSACK_INSIDE = 22;
+/** How far out to the side the straight leg reaches at the bottom, from its hip to its heel. */
+const COSSACK_SPAN = Math.sqrt(LEG_REACH ** 2 - COSSACK_BOTTOM.x ** 2 - (COSSACK_BOTTOM.y - ANKLE_Y) ** 2);
+/** The stance that makes room for that: how far each ankle is from the middle, and how far the pelvis shifts over to sit at the bottom. */
+const COSSACK_ANKLE_Z = (COSSACK_SPAN + SKELETON.hip + COSSACK_INSIDE) / 2;
+const COSSACK_SHIFT = COSSACK_ANKLE_Z - COSSACK_INSIDE;
+const COSSACK_TOES_OUT = 35;
+/**
+ * The hands clasped in front of the chest, a counterweight to the hips: tucked in close with the
+ * elbows down by the ribs at 0, and pushed out in front with the elbows opening to the sides at 1,
+ * which is where they go as the hips sink. Out there the elbows are level with the chest, well
+ * above the knee the body sinks over.
+ */
+const cossackHands = (body: Pose3, reach: number): NonNullable<Pose3['pins']> => {
+  const skeleton = solvePose(body);
+  const chest = skeleton.spine[skeleton.spine.length - 1];
+  const hand = (side: 1 | -1): Pin => ({
+    at: [chest[0] + mix(60, 118, reach), chest[1] + mix(-26, 4, reach), chest[2] + side * 6],
+    toward: [1, mix(0.7, 0.2, reach), -side * 0.25],
+    pole: mix3([0, -0.7, side], [0, 0.1, side], reach),
+  });
+  return { rightHand: hand(1), leftHand: hand(-1) };
+};
+
+/**
+ * One leg's pin. `bend` is its part in the squat: 1 the leg the hips sink over, its foot flat and
+ * its knee forward over the toes; 0 in the middle of the stance; -1 the straight leg, rolled onto
+ * its heel with the toes and kneecap pointing up.
+ */
+const cossackLeg = (hip: Vec3, side: 1 | -1, bend: number): Pin => {
+  const ankle: Vec3 = [0, ANKLE_Y, side * COSSACK_ANKLE_Z];
+  const flat: Vec3 = [Math.cos(radians(COSSACK_TOES_OUT)), 0, side * Math.sin(radians(COSSACK_TOES_OUT))];
+  const middle: Vec3 = [0.8, 0.5, side * 0.4];
+  if (bend < 0) return { at: ankle, toward: mix3(flat, [0.15, 1, 0], -bend), pole: mix3(middle, [0.2, 1, 0], -bend) };
+  const knee = toward(ankle, [ankle[0] + 50, ankle[1] + 84, ankle[2] + side * 18], SKELETON.shin);
+  const over = pinVia(hip, knee, ankle).pole;
+  return { at: ankle, toward: flat, pole: mix3(middle, toward([0, 0, 0], over, 1), bend) };
+};
+
+const cossackPose = (pelvis: Vec3, right: number, left: number, lean: number, reach: number): Pose3 => {
+  const body: Pose3 = {
+    pelvis,
+    lean,
+    spine: { flex: 6 },
+    neck: { flex: -0.6 * lean },
+    pins: {
+      rightFoot: cossackLeg([pelvis[0], pelvis[1], pelvis[2] + SKELETON.hip], 1, right),
+      leftFoot: cossackLeg([pelvis[0], pelvis[1], pelvis[2] - SKELETON.hip], -1, left),
+    },
+  };
+  return { ...body, pins: { ...body.pins, ...cossackHands(body, reach) } };
+};
+
+const COSSACK_REACH_MIDDLE = 0.4;
+
+/** Shifted this far across, from -1, at the bottom over the left leg, to 1, over the right. The hips rise a little through the middle. */
+const cossackAcross = (side: number): Pose3 => {
+  const out = side * side;
+  return cossackPose(
+    [mix(COSSACK_MIDDLE.x, COSSACK_BOTTOM.x, out), mix(COSSACK_MIDDLE.y, COSSACK_BOTTOM.y, out), COSSACK_SHIFT * side],
+    side,
+    -side,
+    mix(20, 32, Math.abs(side)),
+    // The hands come in as the hips rise through the middle, though not all the way: the knees are still up under the elbows there.
+    mix(COSSACK_REACH_MIDDLE, 1, out)
+  );
+};
+
+/**
+ * This far down from standing with the feet wide, from 0 to 1, at the bottom over the right leg.
+ * The left leg is straight at both ends, so it stays straight the whole way and the hips come down
+ * around its heel.
+ */
+const cossackSink = (t: number): Pose3 => {
+  const x = COSSACK_BOTTOM.x * t;
+  const z = COSSACK_SHIFT * t;
+  const y = ANKLE_Y + Math.sqrt(LEG_REACH ** 2 - (COSSACK_ANKLE_Z - SKELETON.hip + z) ** 2 - x ** 2);
+  return cossackPose([x, y, z], t, -t, 32 * t, t);
+};
+
+const COSSACK_RIGHT = cossackAcross(1);
+const COSSACK_LEFT = cossackAcross(-1);
+const COSSACK_STEPS = 10;
+
+export const COSSACK_SQUAT_3D: Clip3D = {
+  view: '3d',
+  // From in front, above and well round to the right: the shift from one leg to the other still goes
+  // across the screen, and each bent knee shows from the side instead of coming straight at the camera.
+  camera: { yaw: 56, pitch: 18 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // Over the far leg, where the bent leg shows whole.
+  stillFrame: COSSACK_STEPS,
+  keyframes: [
+    { ms: 0, pose: COSSACK_RIGHT },
+    ...alongArc(2200, COSSACK_STEPS, (t) => cossackAcross(1 - 2 * t)),
+    { ms: 400, pose: COSSACK_LEFT },
+    ...alongArc(2200, COSSACK_STEPS, (t) => cossackAcross(2 * t - 1)),
+    { ms: 400, pose: COSSACK_RIGHT },
+  ],
+};
+
+// --- Resting Cossack squat: the same bottom position, sunk into from standing and held ---
+
+const COSSACK_STANDING = cossackSink(0);
+const RESTING_COSSACK_STEPS = 12;
+
+export const RESTING_COSSACK_SQUAT_3D: Clip3D = {
+  view: '3d',
+  // The same view from the other side, the straight leg nearest, so the bent leg and its flat heel
+  // show whole behind it through the hold.
+  camera: { yaw: 124, pitch: 18 },
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: 1 + RESTING_COSSACK_STEPS,
+  keyframes: [
+    { ms: 0, pose: COSSACK_STANDING },
+    { ms: 500, pose: COSSACK_STANDING },
+    ...alongArc(2000, RESTING_COSSACK_STEPS, cossackSink),
+    { ms: 3500, pose: COSSACK_RIGHT },
+    ...alongArc(1800, RESTING_COSSACK_STEPS, (t) => cossackSink(1 - t)),
   ],
 };

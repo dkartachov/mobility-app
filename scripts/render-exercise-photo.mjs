@@ -88,15 +88,15 @@ const phoneSvg =
   `<path d="${phone.body}" fill="${COLORS.phone.body}" stroke="${COLORS.background}" stroke-width="2" stroke-linejoin="round"/><path d="${phone.screen}" fill="${COLORS.phone.screen}"/>` +
   `<path d="${phone.reading}" fill="none" stroke="${COLORS.phone.reading}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
 for (const slot of frame.slots) {
-  if (stage.trail && slot.part === trailed) {
+  if (stage.trail && slot.part === trailed && !slot.hand) {
     body += `<path d="${stage.trail}" fill="none" stroke="${COLORS.accent}" stroke-width="5" stroke-dasharray="2 12" stroke-linecap="round" opacity="0.8"/>`;
   }
-  if (phone.part === slot.part && !phone.over) body += phoneSvg;
-  body += `<path d="${slot.d}" fill="none" stroke="${COLORS.background}" stroke-width="${2 * OUTLINE}" stroke-linejoin="round"/>`;
+  if (phone.part === slot.part && !slot.hand && !phone.over) body += phoneSvg;
+  body += `<path d="${slot.outline}" fill="none" stroke="${COLORS.background}" stroke-width="${2 * OUTLINE}" stroke-linejoin="round"/>`;
   body += slot.accent
     ? `<path d="${slot.d}" fill="${COLORS.accent}"/>`
     : `<path d="${slot.d}" fill="${COLORS.far}"/><path d="${slot.d}" fill="${COLORS.near}" fill-opacity="${slot.shade}"/>`;
-  if (phone.part === slot.part && phone.over) {
+  if (phone.part === slot.part && !slot.hand && phone.over) {
     // The strap goes behind the phone, like an armband, so it doesn't hide the reading.
     if (phone.band) body += `<path d="${phone.band}" fill="none" stroke="${COLORS.phone.band}" stroke-width="5" stroke-linecap="round"/>`;
     body += phoneSvg;

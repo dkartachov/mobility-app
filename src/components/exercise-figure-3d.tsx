@@ -30,8 +30,8 @@ const COLORS = {
 /** How far the background shows around each part of the body, so limbs that cross stay apart. */
 const OUTLINE = 4.5;
 
-/** One for each part of the body: the torso, the head and the four limbs. */
-const SLOTS = [0, 1, 2, 3, 4, 5];
+/** One for each part of the body: the torso, the head and the four limbs. A clip adds one for each hand it draws on its own. */
+const BODY_SLOTS = 6;
 
 /**
  * The clip's phone, if it's on this slot's part right now: under the limb when it's on the far
@@ -41,7 +41,7 @@ const SLOTS = [0, 1, 2, 3, 4, 5];
 function PhoneLayer({ frame, index, over }: { frame: SharedValue<FigureFrame>; index: number; over: boolean }) {
   const shown = (f: FigureFrame) => {
     'worklet';
-    return f.phone.part === f.slots[index].part && f.phone.over === over;
+    return !f.slots[index].hand && f.phone.part === f.slots[index].part && f.phone.over === over;
   };
   const body = useAnimatedProps(() => {
     const f = frame.get();
@@ -57,7 +57,7 @@ function PhoneLayer({ frame, index, over }: { frame: SharedValue<FigureFrame>; i
   });
   const band = useAnimatedProps(() => {
     const f = frame.get();
-    return { d: over && f.phone.part === f.slots[index].part ? f.phone.band : '' };
+    return { d: over && !f.slots[index].hand && f.phone.part === f.slots[index].part ? f.phone.band : '' };
   });
   return (
     <>
@@ -89,8 +89,11 @@ function Slot({
   trailed?: Part;
   phone: boolean;
 }) {
-  const path = useAnimatedProps(() => ({ d: frame.get().slots[index].part === trailed ? trail : '' }));
-  const outline = useAnimatedProps(() => ({ d: frame.get().slots[index].d }));
+  const path = useAnimatedProps(() => {
+    const slot = frame.get().slots[index];
+    return { d: slot.part === trailed && !slot.hand ? trail : '' };
+  });
+  const outline = useAnimatedProps(() => ({ d: frame.get().slots[index].outline }));
   const far = useAnimatedProps(() => {
     const slot = frame.get().slots[index];
     return { d: slot.accent ? '' : slot.d };
@@ -135,6 +138,7 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
   const time = useClipTime(clip, playing, paused);
   const stage = useMemo(() => stageClip(clip), [clip]);
   const view = stage.view;
+  const slots = useMemo(() => Array.from({ length: BODY_SLOTS + (clip.holds?.length ?? 0) }, (_, index) => index), [clip]);
 
   const frame = useDerivedValue(() => frameAt(clip, view, time.get()));
   const shadow = useAnimatedProps(() => ({ d: frame.get().shadow }));
@@ -160,7 +164,7 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
             <Path d={stage.tape.marks} stroke={COLORS.tape.marks} strokeWidth={1.5} />
           </>
         )}
-        {SLOTS.map((index) => (
+        {slots.map((index) => (
           <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} phone={clip.phone !== undefined} />
         ))}
         {clip.strap && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}

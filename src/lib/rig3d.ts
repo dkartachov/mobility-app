@@ -138,6 +138,19 @@ export type Clip3D = {
    * a thigh lying out to the side there never comes clear of the hips, and would go under them.
    */
   over?: readonly Part[];
+  /**
+   * Pairs of limbs where the first is drawn behind the second all the way through, whenever both
+   * are on the same side of the torso. For limbs that stay against each other, like an arm inside
+   * its knee in a squat: which is nearer where they touch is too close to call from their depths,
+   * and they'd swap places from one frame to the next.
+   */
+  behind?: readonly (readonly [Part, Part])[];
+  /**
+   * Hands that hold on to a limb their own arm goes behind, like fingers hooked over the toes of a
+   * foot whose knee is in front of the arm. Limbs are ordered whole, so the arm would take its hand
+   * behind the foot with it; the hand is drawn again on its own, over the limb it holds.
+   */
+  holds?: readonly HeldLimb[];
   scenery?: readonly Block[];
   /**
    * A strap looped around the ball of this foot, with an end held in each hand. With a `hand`, that
@@ -151,6 +164,8 @@ export type Clip3D = {
   /** The test needs a second person, who isn't drawn: a badge says so instead. */
   partner?: boolean;
 };
+
+export type HeldLimb = { hand: 'rightHand' | 'leftHand'; limb: Part };
 
 /**
  * Where the phone goes. Strapped to a limb, it lies on the bone's surface with its long side along
@@ -198,6 +213,10 @@ export type Skeleton = {
 export type FigureSlot = {
   part: Part;
   d: string;
+  /** The shape the background is drawn around, to keep the part apart from what's under it. The part's own shape, except for a hand drawn on its own. */
+  outline: string;
+  /** A hand drawn on its own over a limb it holds (see `Clip3D.holds`), after its arm's own slot. */
+  hand: boolean;
   /** From 0, furthest from the camera, to 1, nearest. */
   shade: number;
   accent: boolean;
@@ -1171,6 +1190,9 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
   };
 }
 
+/** How far along a hand drawn on its own its outline starts, which keeps the outline off the wrist it joins. */
+const HELD_HAND_OUTLINE_FROM = 0.6;
+
 /** How close on screen two limbs' bones have to come for one to be drawn over the other: about a limb's thickness each. */
 const LIMB_OVERLAP = 2 * LIMB_RADIUS;
 
@@ -1207,7 +1229,11 @@ export function traceFigure(
   /** What the phone's screen reads, see `phoneReading`. Without it the screen is blank. */
   reading?: number,
   /** Limbs to draw over the torso regardless, see `Clip3D.over`. */
-  forcedOver?: readonly Part[]
+  forcedOver?: readonly Part[],
+  /** Pairs of limbs to keep the first behind the second, see `Clip3D.behind`. */
+  forcedBehind?: Clip3D['behind'],
+  /** Hands to draw again over the limb they hold, see `Clip3D.holds`. */
+  holds?: Clip3D['holds']
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -1275,6 +1301,21 @@ export function traceFigure(
     }
     parts[j + 1] = moving;
   }
+  // A clip's own word on two limbs comes last, and only between limbs on the same side of the torso.
+  if (forcedBehind) {
+    for (let pair = 0; pair < forcedBehind.length; pair++) {
+      let back = -1;
+      let front = -1;
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i].part === forcedBehind[pair][0]) back = i;
+        if (parts[i].part === forcedBehind[pair][1]) front = i;
+      }
+      if (back < 0 || front < 0 || back < front || parts[back].layer !== parts[front].layer) continue;
+      const moving = parts[back];
+      for (let i = back; i > front; i--) parts[i] = parts[i - 1];
+      parts[front] = moving;
+    }
+  }
 
   // The head goes over everything it overlaps and is in front of right there, and under
   // everything it overlaps and is behind. Parts it doesn't touch can go either side. If no place
@@ -1311,9 +1352,39 @@ export function traceFigure(
     slots.push({
       part,
       d,
+      outline: d,
+      hand: false,
       shade: Math.max(0, Math.min(1, 0.5 + offset / (2 * SHADE_RANGE))),
       accent: highlight ? highlight.includes(part) : false,
     });
+  }
+
+  // A hand holding a limb goes over it, wherever its arm is. Its outline starts partway along the
+  // hand, so it's kept apart from what it holds without a line across its own wrist.
+  if (holds) {
+    for (let i = 0; i < holds.length; i++) {
+      const isRight = holds[i].hand === 'rightHand';
+      const arm = isRight ? rightArm : leftArm;
+      const armPart: Part = isRight ? 'rightArm' : 'leftArm';
+      let own = -1;
+      let at = -1;
+      for (let k = 0; k < slots.length; k++) {
+        if (slots[k].hand) continue;
+        if (slots[k].part === armPart) own = k;
+        if (slots[k].part === armPart || slots[k].part === holds[i].limb) at = k;
+      }
+      if (own < 0) continue;
+      const [wide, narrow] = ARM_RADII[2];
+      const from = lerpVec(arm[2], arm[3], HELD_HAND_OUTLINE_FROM);
+      slots.splice(at + 1, 0, {
+        part: armPart,
+        d: capsule(arm[2], wide, arm[3], narrow),
+        outline: capsule(from, lerp(wide, narrow, HELD_HAND_OUTLINE_FROM), arm[3], narrow),
+        hand: true,
+        shade: slots[own].shade,
+        accent: slots[own].accent,
+      });
+    }
   }
 
   // A circle on the floor is an oval to the camera, flatter the lower the camera is.
@@ -1363,7 +1434,7 @@ export function trailedPart(trail: Clip3D['trail']): Part | undefined {
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
   const skeleton = solvePose(poseAt3(clip, timeMs));
-  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over);
+  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, clip.behind, clip.holds);
 }
 
 function duration(clip: Clip3D): number {
