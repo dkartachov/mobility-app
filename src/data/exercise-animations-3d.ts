@@ -1665,3 +1665,189 @@ export const BLACKBURN_3D: Clip3D = {
     ...alongArc(2400, BLACKBURN_STEPS, (t) => blackburn(1 - t)),
   ],
 };
+
+// --- Butterfly: sitting with the soles together, the knees lower out toward the floor, then the chest leans in ---
+
+/** The heels are pulled in this far in front of the hips, the soles together. */
+const BUTTERFLY_ANKLE: Vec3 = [62, 15, 12];
+/** How far the knees are raised from level, out to the sides of the hips: sitting down into it, and relaxed toward the floor. */
+const BUTTERFLY_KNEES = { up: 42, down: 12 };
+
+/**
+ * Sitting with the soles together and the hands holding the ankles, the toes showing past them.
+ * Each knee is raised this far from level, out to its side, and the body leans this far in from
+ * sitting tall, from 0 to 1: the pelvis tips forward and the back stays long. The elbows hang down
+ * between the knees sitting tall, and bend and open out above the thighs as the chest comes forward.
+ */
+const butterflyAt = (knees: number, lean: number): Pose3 => {
+  const foot = (side: 1 | -1): Pin => ({
+    at: [BUTTERFLY_ANKLE[0], BUTTERFLY_ANKLE[1], side * BUTTERFLY_ANKLE[2]],
+    // Soles together, the toes forward and a little up, the feet resting on their outer edges.
+    toward: [1, 0.15, 0],
+    pole: [0, Math.sin(radians(knees)), side * Math.cos(radians(knees))],
+  });
+  const hand = (side: 1 | -1): Pin => ({
+    at: [BUTTERFLY_ANKLE[0] + 4, 34, side * 22],
+    toward: [0.5, -0.6, -side * 0.6],
+    pole: [-0.4, -1, side * mix(0.15, 0.35, lean)],
+  });
+  return {
+    pelvis: [0, SIT_PELVIS_Y, 0],
+    lean: mix(2, 14, lean),
+    spine: { flex: mix(4, 8, lean) },
+    // The head lifts to look ahead over the feet rather than drop with the chest, which also keeps
+    // the face toward the camera, so the nose doesn't come and go.
+    neck: { flex: mix(-4, -18, lean) },
+    pins: { rightFoot: foot(1), leftFoot: foot(-1), rightHand: hand(1), leftHand: hand(-1) },
+  };
+};
+const BUTTERFLY_UP = butterflyAt(BUTTERFLY_KNEES.up, 0);
+const BUTTERFLY_TALL = butterflyAt(BUTTERFLY_KNEES.down, 0);
+const BUTTERFLY_LEANING = butterflyAt(BUTTERFLY_KNEES.down, 1);
+const BUTTERFLY_STEPS = 8;
+
+export const BUTTERFLY_3D: Clip3D = {
+  view: '3d',
+  // From straight in front and above, where the knees lower out to the sides across the screen and
+  // both legs show the same. From either side, one knee comes at the camera and hides the feet.
+  camera: { yaw: 90, pitch: 38 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The arms are over the legs, so the hands show on the ankles and the elbows above the thighs.
+  // Where the elbows hang between the knees, which is nearer is too close to call.
+  behind: [
+    ['rightLeg', 'rightArm'],
+    ['leftLeg', 'leftArm'],
+    ['rightLeg', 'leftArm'],
+    ['leftLeg', 'rightArm'],
+  ],
+  // Sitting tall with the knees relaxed toward the floor, where the shape of the legs shows best.
+  stillFrame: 2,
+  // Sitting down into it, the knees relax first, then the chest leans in and holds.
+  keyframes: [
+    { ms: 0, pose: BUTTERFLY_UP },
+    { ms: 400, pose: BUTTERFLY_UP },
+    { ms: 1600, pose: BUTTERFLY_TALL },
+    { ms: 600, pose: BUTTERFLY_TALL },
+    ...alongArc(1800, BUTTERFLY_STEPS, (t) => butterflyAt(BUTTERFLY_KNEES.down, t)),
+    { ms: 3000, pose: BUTTERFLY_LEANING },
+    ...alongArc(1600, BUTTERFLY_STEPS, (t) => butterflyAt(BUTTERFLY_KNEES.down, 1 - t)),
+    { ms: 1400, pose: BUTTERFLY_UP },
+  ],
+};
+
+// --- Cobra to prayer: hands, knees and feet planted, the hips travel back on an arc around the knees, from cobra through all fours to the heels ---
+
+/** The knees rest on the floor here, the shins and the tops of the feet flat behind them. */
+const COBRA_KNEE_Z = SKELETON.hip;
+/**
+ * The hands stay planted this far ahead of the knees: as far as the arms reach with the hips back on
+ * the heels, which is also near enough for them to be straight with the chest up in cobra.
+ */
+const COBRA_HANDS: Vec3 = [178, WRIST_Y, SKELETON.shoulder];
+/**
+ * How far the thighs are raised from lying along the floor ahead of the knees: a little in cobra,
+ * where the hips stay low and the knees down, up over the knees on all fours, and on back to sit on
+ * the heels in prayer.
+ */
+const COBRA_THIGH = { cobra: 20, prayer: 156 };
+/** How high the middle of the head is with the forehead resting on the floor. */
+const COBRA_HEAD_DOWN = SKELETON.head + 2;
+
+/**
+ * The body this far from cobra (0) to prayer (1), the neck straight. The hips swing back around the
+ * knees, the back goes from arched to long, sloping down over the thighs in prayer, and the body
+ * tips as far forward as keeps the shoulders an arm's reach from the hands, so the arms are
+ * straight at both ends and just soft in between.
+ */
+const cobraBody = (t: number): Pose3 => {
+  const thigh = radians(mix(COBRA_THIGH.cobra, COBRA_THIGH.prayer, t));
+  const pelvis: Vec3 = [SKELETON.thigh * Math.cos(thigh), ANKLE_Y + SKELETON.thigh * Math.sin(thigh), 0];
+  const leg = (side: 1 | -1): Pin =>
+    pinVia([pelvis[0], pelvis[1], side * SKELETON.hip], [0, ANKLE_Y, side * COBRA_KNEE_Z], [-SKELETON.shin, ANKLE_Y, side * COBRA_KNEE_Z], [-1, 0, 0]);
+  const hand = (side: 1 | -1): Pin => ({
+    at: [COBRA_HANDS[0], COBRA_HANDS[1], side * COBRA_HANDS[2]],
+    toward: [1, 0, 0],
+    // The elbows point back under the body, and lift out to the sides with the arms reaching long.
+    pole: mix3([-1, 0, side * 0.3], [-0.2, 1, side * 0.6], smooth(t)),
+  });
+  const body = (lean: number): Pose3 => ({
+    pelvis,
+    lean,
+    // Arched in cobra, long from all fours on.
+    spine: { flex: t < 0.5 ? mix(-45, 0, smooth(2 * t)) : mix(0, 8, smooth(2 * t - 1)) },
+    pins: { rightFoot: leg(1), leftFoot: leg(-1), rightHand: hand(1), leftHand: hand(-1) },
+  });
+  const gap = (lean: number) => {
+    const shoulder = solvePose(body(lean)).rightArm[0];
+    return Math.hypot(COBRA_HANDS[0] - shoulder[0], COBRA_HANDS[1] - shoulder[1], COBRA_HANDS[2] - shoulder[2]);
+  };
+  // Through all fours the elbows give a little, as in cat cow.
+  const reach = ARM_REACH * mix(0.995, 0.985, Math.sin(Math.PI * t));
+  // Tipping forward brings the shoulders toward the hands until they point at them, so the lean
+  // that reaches is found on the way there.
+  let [upright, tipped] = [-10, 170];
+  let nearest = upright;
+  for (let tip = upright; tip <= tipped; tip += 2) if (gap(tip) < gap(nearest)) nearest = tip;
+  [upright, tipped] = [-10, nearest];
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + tipped) / 2;
+    if (gap(tip) > reach) upright = tip;
+    else tipped = tip;
+  }
+  return body((upright + tipped) / 2);
+};
+
+/** How high the base of the neck is, and the head, with the neck straight. */
+const neckBaseHeight = (pose: Pose3) => solvePose(pose).spine[6][1];
+const ALL_FOURS_BODY = cobraBody(0.5);
+const PRAYER_BODY = cobraBody(1);
+const COBRA_DROP = {
+  from: neckBaseHeight(ALL_FOURS_BODY),
+  to: neckBaseHeight(PRAYER_BODY),
+  head: solvePose(ALL_FOURS_BODY).head[1],
+};
+
+/**
+ * Cobra to prayer, this far along. Looking ahead with the chest up, then the head drops between
+ * the arms. From all fours it comes down with the shoulders, its height above the floor shrinking
+ * in step with how far they still have to go, so the forehead touches the floor just as the hips
+ * settle on the heels. Landing any sooner, the body would carry on down under a head that has
+ * stopped, and look like it's pushing up off it.
+ */
+const cobraToPrayer = (t: number): Pose3 => {
+  const body = cobraBody(t);
+  if (t <= 0.5) return { ...body, neck: { flex: mix(-8, 0, smooth(2 * t)) } };
+  const left = (neckBaseHeight(body) - COBRA_DROP.to) / (COBRA_DROP.from - COBRA_DROP.to);
+  const target = mix(COBRA_HEAD_DOWN, COBRA_DROP.head, left);
+  const height = (flex: number) => solvePose({ ...body, neck: { flex } }).head[1];
+  // Bending the neck further tips the head further down.
+  let [lifted, dropped] = [-60, 80];
+  for (let i = 0; i < 40; i++) {
+    const flex = (lifted + dropped) / 2;
+    if (height(flex) < target) dropped = flex;
+    else lifted = flex;
+  }
+  return { ...body, neck: { flex: (lifted + dropped) / 2 } };
+};
+const COBRA = cobraToPrayer(0);
+const PRAYER = cobraToPrayer(1);
+/** The hips travel on an arc, so it takes this many keyframes for the knees to stay put between them. */
+const COBRA_TO_PRAYER_STEPS = 24;
+
+export const COBRA_TO_PRAYER_3D: Clip3D = {
+  view: '3d',
+  // From the right side, a little in front and above, as for cat cow: the hips' arc back over the
+  // knees is flat on the screen, and the head drops behind the near arm. Further round to the
+  // front the nose comes and goes as the head turns down, and the head and the near thigh swap.
+  camera: { yaw: 22, pitch: 12 },
+  highlight: ['torso'],
+  // Cobra. Prayer has its own exercise and tile.
+  stillFrame: 0,
+  keyframes: [
+    { ms: 0, pose: COBRA },
+    { ms: 600, pose: COBRA },
+    ...alongArc(2200, COBRA_TO_PRAYER_STEPS, cobraToPrayer),
+    { ms: 900, pose: PRAYER },
+    ...alongArc(2200, COBRA_TO_PRAYER_STEPS, (t) => cobraToPrayer(1 - t)),
+  ],
+};

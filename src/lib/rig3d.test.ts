@@ -9,7 +9,9 @@ import {
   BLACKBURN_3D,
   BOTTOM_SQUAT_3D,
   BOTTOM_SQUAT_ROTATION_3D,
+  BUTTERFLY_3D,
   CAT_COW_3D,
+  COBRA_TO_PRAYER_3D,
   COSSACK_SQUAT_3D,
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
@@ -306,6 +308,18 @@ describe('traceFigure', () => {
       }
     });
 
+    it('stays on one side seen head on, rather than jumping from side to side with rounding', () => {
+      const view = viewOf({ yaw: 90, pitch: 38 });
+      const drawn = new Set<string>();
+      for (const twist of [-1e-9, 0, 1e-9, -0.1, 0.1]) {
+        const d = traceFigure(solvePose({ ...STANDING, neck: { twist } }), view).slots.find((slot) => slot.part === 'head')!.d;
+        const [cx] = project(view, solvePose({ ...STANDING, neck: { twist } }).head);
+        const xs = [...d.slice(d.indexOf('Z') + 1).matchAll(/[ML](-?[\d.]+) /g)].map((m) => Number(m[1]));
+        drawn.add(Math.sign(xs.reduce((total, x) => total + x, 0) / xs.length - cx).toString());
+      }
+      expect(drawn.size).toBe(1);
+    });
+
     it('is left off in profile, where the body shows which way the figure faces', () => {
       expect(nose(0).points).toEqual([]);
       expect(nose(180).points).toEqual([]);
@@ -369,6 +383,8 @@ describe('3D clips', () => {
       'squat-to-stand',
       'cossack-squat',
       'resting-cossack-squat',
+      'butterfly',
+      'cobra-to-prayer',
       'warmup-marching',
     ]));
   });
@@ -817,6 +833,93 @@ describe('3D clips', () => {
     const up = skeletons[sweeps.indexOf(Math.max(...sweeps))];
     expect(up.rightArm[2][0]).toBeGreaterThan(up.head[0]);
     expect(up.rightArm[2][2] - up.head[2]).toBeGreaterThan(SKELETON.head + 10);
+  });
+
+  it('lowers the knees out toward the floor with the soles together, then leans the chest in, in butterfly', () => {
+    const clip = BUTTERFLY_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightLeg, leftLeg, rightArm, leftArm, spine, head } of skeletons) {
+      for (const [leg, arm, first] of [[rightLeg, rightArm, start.rightLeg], [leftLeg, leftArm, start.leftLeg]] as const) {
+        // The feet stay where they are, pulled in in front of the hips with the soles together.
+        expect(distance(leg[2], first[2])).toBeCloseTo(0);
+        expect(leg[2][0]).toBeGreaterThan(spine[0][0] + 40);
+        expect(leg[2][0]).toBeLessThan(spine[0][0] + SKELETON.thigh);
+        // The knee is out to its own side, wider than the hips, and the hand holds the ankle.
+        expect(Math.abs(leg[1][2])).toBeGreaterThan(SKELETON.thigh * 0.8);
+        expect(distance(arm[2], leg[2])).toBeLessThan(25);
+      }
+      expect(rightLeg[2][2] - leftLeg[2][2]).toBeLessThan(2 * 12.5);
+      // Sitting on the floor the whole time, the two sides mirroring each other.
+      expect(spine[0][1]).toBeCloseTo(start.spine[0][1]);
+      rightLeg.forEach((joint, i) => expect(distance(joint, [leftLeg[i][0], leftLeg[i][1], -leftLeg[i][2]])).toBeCloseTo(0));
+      // The face looks ahead rather than down at the floor.
+      expect(head[1]).toBeGreaterThan(start.spine[0][1] + SKELETON.torso);
+    }
+    const tall = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const leaning = skeletons.reduce((most, skeleton) => (skeleton.spine[6][0] > most.spine[6][0] ? skeleton : most));
+    // The knees start raised and relax toward the floor, without reaching it.
+    expect(start.rightLeg[1][1]).toBeGreaterThan(70);
+    expect(tall.rightLeg[1][1]).toBeLessThan(45);
+    expect(tall.rightLeg[1][1]).toBeGreaterThan(25);
+    // Then the chest leans in a little from sitting tall, the back long rather than slumped.
+    expect(tipped(tall.spine[0], tall.spine[6])).toBeLessThan(15);
+    expect(tipped(leaning.spine[0], leaning.spine[6])).toBeGreaterThan(10);
+    expect(tipped(leaning.spine[0], leaning.spine[6])).toBeLessThan(25);
+    expect(leaning.rightLeg[1][1]).toBeCloseTo(tall.rightLeg[1][1]);
+    // Nothing ever changes places, the arms in front of the legs, and the nose shows all the way.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['torso leftLeg rightLeg leftArm rightArm head']));
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 10) {
+      expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBeGreaterThan(2);
+    }
+  });
+
+  it('pushes the hips back from cobra through all fours onto the heels, hands, knees and feet planted, in cobra to prayer', () => {
+    const clip = COBRA_TO_PRAYER_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightLeg, leftLeg, rightArm, leftArm, head } of skeletons) {
+      // Hands, knees and feet stay where they are: the knees down on the floor, the shins flat behind them.
+      for (const [arm, first] of [[rightArm, start.rightArm], [leftArm, start.leftArm]] as const) expect(distance(arm[2], first[2])).toBeCloseTo(0);
+      for (const [leg, first] of [[rightLeg, start.rightLeg], [leftLeg, start.leftLeg]] as const) {
+        expect(distance(leg[1], first[1])).toBeLessThan(0.5);
+        expect(distance(leg[2], first[2])).toBeCloseTo(0);
+        expect(leg[1][1]).toBeCloseTo(leg[2][1], 0);
+        expect(leg[1][0] - leg[2][0]).toBeCloseTo(SKELETON.shin, 0);
+      }
+      // The arms never more than a little bent.
+      for (const arm of [rightArm, leftArm]) expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(150);
+      // The head never goes into the floor.
+      expect(head[1]).toBeGreaterThanOrEqual(SKELETON.head);
+    }
+    // Cobra: the hips low in front of the knees, the chest up and the arms straight.
+    expect(start.spine[0][0]).toBeGreaterThan(SKELETON.thigh * 0.9);
+    expect(start.spine[0][1]).toBeLessThan(55);
+    expect(start.spine[6][1]).toBeGreaterThan(140);
+    expect(angleAt(start.rightArm[0], start.rightArm[1], start.rightArm[2])).toBeGreaterThan(165);
+    // On the way, all fours: the hips up over the knees.
+    const over = skeletons.reduce((best, skeleton) => (Math.abs(skeleton.spine[0][0]) < Math.abs(best.spine[0][0]) ? skeleton : best));
+    expect(Math.abs(over.spine[0][0])).toBeLessThan(10);
+    expect(over.spine[0][1]).toBeGreaterThan(105);
+    // Prayer: sitting back on the heels, the arms reaching long and the forehead down on the floor.
+    const prayer = skeletons.reduce((best, skeleton) => (skeleton.spine[0][0] < best.spine[0][0] ? skeleton : best));
+    expect(Math.abs(prayer.spine[0][0] - prayer.rightLeg[2][0])).toBeLessThan(15);
+    expect(prayer.spine[0][1]).toBeLessThan(65);
+    expect(angleAt(prayer.rightArm[0], prayer.rightArm[1], prayer.rightArm[2])).toBeGreaterThan(160);
+    expect(prayer.head[1]).toBeLessThan(SKELETON.head + 5);
+    // From all fours the head comes down steadily, and only touches the floor once the hips have
+    // settled on the heels, so the body never carries on down under a head that has stopped.
+    // Prayer is the keyframe the hold starts from, after the hold in cobra.
+    const prayerAt = clip.keyframes.findIndex((frame, i) => i > 1 && clip.keyframes[i + 1]?.pose === frame.pose);
+    const timeOf = (index: number) => clip.keyframes.slice(1, index + 1).reduce((total, frame) => total + frame.ms, 0);
+    const [allFours, settled] = [(timeOf(1) + timeOf(prayerAt)) / 2, timeOf(prayerAt)];
+    const heights: number[] = [];
+    for (let t = allFours; t <= settled; t += 10) heights.push(solvePose(poseAt3(clip, t)).head[1]);
+    heights.slice(1).forEach((height, i) => expect(height).toBeLessThanOrEqual(heights[i] + 1e-6));
+    heights.slice(0, -5).forEach((height) => expect(height).toBeGreaterThan(SKELETON.head + 2.01));
+    // Nothing ever changes places: the head drops behind the near arm.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightLeg rightArm']));
   });
 
   it('sinks from standing into a deep squat with the heels down and the elbows inside the knees in bottom squat', () => {

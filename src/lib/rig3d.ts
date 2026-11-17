@@ -709,6 +709,8 @@ const NOSE_WING = { f: 30, u: -6.5, side: 6.5 };
 const NOSE_TURN = { bridge: 0.78, nostril: 0.5 };
 /** How many points trace the turn. */
 const NOSE_TURN_STEPS = 8;
+/** How much nearer the middle of the face one nostril has to be to count, about a face turned 2° from head on. */
+const NOSE_HEAD_ON = 0.5;
 
 /** A point on the face, as the camera sees it: along the way the face points, up the head, and to its right. */
 function onFace(view: Mat3, skeleton: Skeleton, f: number, u: number, side = 0): Vec2 {
@@ -746,7 +748,10 @@ function noseLine(view: Mat3, skeleton: Skeleton, head: Vec3): Vec2[] {
   // nearer the middle of the face.
   const toRight = Math.hypot(right[0] - head[0], right[1] - head[1]);
   const toLeft = Math.hypot(left[0] - head[0], left[1] - head[1]);
-  const wing = toRight < toLeft ? right : left;
+  // Head on, the two are as near as each other, and rounding would pick one or the other from
+  // frame to frame, so the nose jumps from side to side. Unless the right one is clearly nearer,
+  // it's the left.
+  const wing = toRight < toLeft - NOSE_HEAD_ON ? right : left;
   const from: Vec2 = [root[0] + (tip[0] - root[0]) * NOSE_TURN.bridge, root[1] + (tip[1] - root[1]) * NOSE_TURN.bridge];
   const to: Vec2 = [tip[0] + (wing[0] - tip[0]) * NOSE_TURN.nostril, tip[1] + (wing[1] - tip[1]) * NOSE_TURN.nostril];
   const points: Vec2[] = [root];

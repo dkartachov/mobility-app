@@ -14,7 +14,9 @@ import {
   BELLY_DOWN_FOOT_SPLAY_3D,
   BOTTOM_SQUAT_3D,
   BOTTOM_SQUAT_ROTATION_3D,
+  BUTTERFLY_3D,
   CAT_COW_3D,
+  COBRA_TO_PRAYER_3D,
   COSSACK_SQUAT_3D,
   LEG_SWINGS_3D,
   NINETY_TO_NINETY_3D,
@@ -26,8 +28,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  BUTTERFLY,
-  COBRA_TO_PRAYER,
   COUCH_STRETCH,
   COW_FACE_ARMS,
   CROSS_BODY_SHOULDER_STRETCH,
@@ -172,7 +172,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lean forward for a deeper stretch',
     ],
     photo: require('@/assets/images/exercises/butterfly.png'),
-    animation: BUTTERFLY,
+    animation: BUTTERFLY_3D,
   },
   {
     id: 'bottom-squat',
@@ -554,7 +554,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Flow back into cobra and keep alternating',
     ],
     photo: require('@/assets/images/exercises/cobra-to-prayer.png'),
-    animation: COBRA_TO_PRAYER,
+    animation: COBRA_TO_PRAYER_3D,
     active: true,
     oneMinuteOnly: true,
   },
