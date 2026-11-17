@@ -1149,11 +1149,23 @@ const SQUAT_ANKLE_Z = 32;
  */
 type SquatLegs = { forward: number; out: number; thigh: number };
 
+/** Straight legs, with the hips this far behind the heels. */
+const squatStraight = (back: number): SquatLegs => {
+  const out = (SKELETON.hip - SQUAT_ANKLE_Z) / 2;
+  const level = Math.sqrt(1 - (out / SKELETON.thigh) ** 2);
+  return { forward: -back / 2, out, thigh: (Math.asin(back / 2 / (SKELETON.thigh * level)) * 180) / Math.PI };
+};
 /**
  * The bottom of a deep squat: the shins tipped about 38° forward, which is about as far as an ankle
  * bends with the heel down, the knees out past the toes, and the hips below the knees.
  */
 const SQUAT_DEEP: SquatLegs = { forward: 50, out: 36, thigh: 118 };
+const mixLegs = (a: SquatLegs, b: SquatLegs, t: number): SquatLegs => ({
+  forward: mix(a.forward, b.forward, t),
+  out: mix(a.out, b.out, t),
+  thigh: mix(a.thigh, b.thigh, t),
+});
+
 /**
  * Where legs bent like that put the pelvis, and the pins that keep the feet flat with the toes
  * turned out this far. The knees are worked out first and the hips from them, so the bones keep
@@ -1177,9 +1189,190 @@ const squatStance = (toesOut: number, { forward, out, thigh }: SquatLegs): { pel
   return { pelvis: [hip[0], hip[1], 0], knee, pins: { rightFoot: foot(1), leftFoot: foot(-1) } };
 };
 
-// --- Bottom squat rotation: in the bottom of the squat, one hand stays on the floor while the other arm sweeps up to the ceiling and the chest turns with it ---
+// --- Bottom squat: from standing, sinking into a deep squat with the heels down, the elbows pushing the knees out ---
 
 const BOTTOM_SQUAT_TOES_OUT = 20;
+
+/**
+ * This far down into the squat, from 0, standing, to 1. The chest stays up as the hips sink back
+ * and down. The palms are pressed together in front of the chest from the start, the elbows tucked
+ * in by the ribs, so the arms never pass the legs on the way down: the elbows open as the knees
+ * come up to them, and end against the insides of the knees.
+ */
+const bottomSquatAt = (t: number): Pose3 => {
+  const { pelvis, knee, pins } = squatStance(BOTTOM_SQUAT_TOES_OUT, mixLegs(squatStraight(0), SQUAT_DEEP, t));
+  const body: Pose3 = { pelvis, lean: 30 * t, spine: { flex: 6 * t }, neck: { flex: -22 * t }, pins };
+  const skeleton = solvePose(body);
+  const chest = skeleton.spine[skeleton.spine.length - 1];
+  const hand = (side: 1 | -1): Pin => {
+    const shoulder = side === 1 ? skeleton.rightArm[0] : skeleton.leftArm[0];
+    const tucked: Vec3 = [shoulder[0] + 6, shoulder[1] - 68, shoulder[2] + side * 20];
+    const atKnee: Vec3 = [knee[0] - 8, knee[1] + 8, side * (knee[2] - 24)];
+    const elbow = toward(shoulder, mix3(tucked, atKnee, t), SKELETON.upperArm);
+    // Low enough on the chest that the fingertips stay clear of the chin.
+    const pressed = toward(elbow, [chest[0] + 38, chest[1] - 42, side * 11], SKELETON.forearm);
+    return pinVia(shoulder, elbow, pressed, [0.8, 0.6, 0]);
+  };
+  return { ...body, pins: { ...pins, rightHand: hand(1), leftHand: hand(-1) } };
+};
+const BOTTOM_SQUAT_STANDING = bottomSquatAt(0);
+const BOTTOM_SQUAT_DOWN = bottomSquatAt(1);
+const BOTTOM_SQUAT_STEPS = 8;
+
+export const BOTTOM_SQUAT_3D: Clip3D = {
+  view: '3d',
+  // From straight in front and a little above, where the knees open out across the screen. From
+  // either side, the far arm has to come across the front of the chest to reach the near hand, and
+  // arms are drawn whole: its shoulder came out over the chest with it.
+  camera: { yaw: 90, pitch: 15 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The thighs are over the hips all the way through, standing as well as coming forward toward
+  // the camera in the squat, rather than changing sides partway down.
+  over: ['rightLeg', 'leftLeg'],
+  // The arms are over the legs, so the elbows pressing on the knees are in front of them. The hands
+  // meet in the middle, as near as each other, so one is picked to stay on top.
+  behind: [
+    ['rightLeg', 'rightArm'],
+    ['leftLeg', 'leftArm'],
+    ['rightLeg', 'leftArm'],
+    ['leftLeg', 'rightArm'],
+    ['leftArm', 'rightArm'],
+  ],
+  stillFrame: 1 + BOTTOM_SQUAT_STEPS,
+  keyframes: [
+    { ms: 0, pose: BOTTOM_SQUAT_STANDING },
+    { ms: 500, pose: BOTTOM_SQUAT_STANDING },
+    ...alongArc(2000, BOTTOM_SQUAT_STEPS, bottomSquatAt),
+    { ms: 3500, pose: BOTTOM_SQUAT_DOWN },
+    ...alongArc(1800, BOTTOM_SQUAT_STEPS, (t) => bottomSquatAt(1 - t)),
+  ],
+};
+
+// --- Squat to stand: folded forward holding the toes, dropping into a deep squat and straightening back up without letting go ---
+
+const STS_TOES_OUT = 12;
+/** Folded, the hips sit this far behind the heels. */
+const STS_HIPS_BACK = 30;
+/** Where the right wrist is with the fingers hooked over the toes. */
+const STS_HOLD: Vec3 = [38, 36, 38];
+
+/** How far the body tips forward folded over straight legs, and at the bottom of the squat with the chest up. */
+const STS_LEAN = { folded: 98, squatting: 26 };
+
+/**
+ * The body `fold` of the way from standing into the forward fold, and from there `squat` of the way
+ * down into the squat, tipped forward by `lean`.
+ */
+const squatToStandLeaning = (fold: number, squat: number, lean: number): Pose3 => {
+  const { pelvis, pins } = squatStance(STS_TOES_OUT, mixLegs(squatStraight(STS_HIPS_BACK * fold), SQUAT_DEEP, squat));
+  return { pelvis, lean, spine: { flex: mix(58 * fold, 4, squat) }, neck: { flex: mix(15 * fold, -12, squat) }, pins };
+};
+/** How far the right shoulder is from where its hand holds the toes. */
+const stsReach = (pose: Pose3) => {
+  const shoulder = solvePose(pose).rightArm[0];
+  return Math.hypot(STS_HOLD[0] - shoulder[0], STS_HOLD[1] - shoulder[1], STS_HOLD[2] - shoulder[2]);
+};
+const STS_REACH = { folded: stsReach(squatToStandLeaning(1, 0, STS_LEAN.folded)), squatting: stsReach(squatToStandLeaning(1, 1, STS_LEAN.squatting)) };
+
+/**
+ * On the way between the fold and the squat the hips swing back behind the heels before they drop
+ * under, and the hands don't leave the toes. So the lean there is whatever keeps the shoulders an
+ * arm's reach from the toes: the chest stays low over the thighs and only lifts as the hips sink.
+ */
+const squatToStandBody = (fold: number, squat: number): Pose3 => {
+  if (squat === 0) return squatToStandLeaning(fold, 0, STS_LEAN.folded * fold);
+  const reach = mix(STS_REACH.folded, STS_REACH.squatting, squat);
+  // The further the body tips forward, the nearer the shoulders come to the toes.
+  let [upright, tipped] = [0, 140];
+  for (let i = 0; i < 40; i++) {
+    const lean = (upright + tipped) / 2;
+    if (stsReach(squatToStandLeaning(1, squat, lean)) > reach) upright = lean;
+    else tipped = lean;
+  }
+  return squatToStandLeaning(1, squat, (upright + tipped) / 2);
+};
+/** Each hand's place from its shoulder with the arms hanging, and with the toes held in the fold. */
+
+/**
+ * Standing, the arms hang straight at the sides. As the body folds they keep hanging straight down
+ * from the shoulders, swinging forward with them, and only in the last part of the fold do the
+ * hands close in on the toes and take hold, the elbows giving out to the sides. They stay on the
+ * toes through the squat, coming in between the knees and straightening as the chest lifts.
+ */
+const squatToStandAt = (fold: number, squat = 0): Pose3 => {
+  const body = squatToStandBody(fold, squat);
+  const skeleton = solvePose(body);
+  const reaching = smooth(Math.max(0, (fold - 0.45) / 0.55));
+  const hand = (side: 1 | -1): Pin => {
+    const shoulder = side === 1 ? skeleton.rightArm[0] : skeleton.leftArm[0];
+    const hanging: Vec3 = [shoulder[0] + 3, shoulder[1] - 0.997 * ARM_REACH, shoulder[2] + side * 14];
+    const hold: Vec3 = [STS_HOLD[0], STS_HOLD[1], side * STS_HOLD[2]];
+    // Partway down the toes are still out of reach, so the hand goes as far toward them as the arm allows.
+    const aim = mix3(hanging, hold, reaching);
+    const gap = Math.hypot(aim[0] - shoulder[0], aim[1] - shoulder[1], aim[2] - shoulder[2]);
+    const limit = 0.997 * ARM_REACH;
+    return {
+      at: fold === 1 ? hold : gap > limit ? mix3(shoulder, aim, limit / gap) : aim,
+      toward: mix3([0, -1, 0], [0.15, -1, side * 0.1], reaching),
+      pole: mix3(mix3([-1, 0, side * 0.3], [-0.6, 0.4, side], reaching), [-1, 0.2, side * 0.3], squat),
+    };
+  };
+  return {
+    ...body,
+    pins: { ...body.pins, rightHand: hand(1), leftHand: hand(-1) },
+    // Hanging at the sides, each arm is outside its thigh: in front of the near leg from here, behind
+    // the far one. From the toes down into the squat it's inside its knee, the other way round. The
+    // change comes halfway into the fold, while the hands are swinging forward and clear of the legs.
+    behind: fold >= STS_ARMS_INSIDE ? STS_INSIDE_KNEES : STS_OUTSIDE_THIGHS,
+  };
+};
+const STS_ARMS_INSIDE = 0.5;
+const STS_OUTSIDE_THIGHS = [
+  ['rightLeg', 'rightArm'],
+  ['leftArm', 'leftLeg'],
+] as const;
+const STS_INSIDE_KNEES = [
+  ['rightArm', 'rightLeg'],
+  ['leftLeg', 'leftArm'],
+] as const;
+const STS_STANDING = squatToStandAt(0);
+const STS_FOLDED = squatToStandAt(1);
+const STS_SQUATTING = squatToStandAt(1, 1);
+const STS_STEPS = 8;
+/** The fold from standing swings the shoulders through a wide arc, so it takes finer steps to keep the hanging hands in reach between them. */
+const STS_FOLD_STEPS = 16;
+const stsDown = () => alongArc(1400, STS_STEPS, (t) => squatToStandAt(1, t));
+const stsUp = () => alongArc(1400, STS_STEPS, (t) => squatToStandAt(1, 1 - t));
+
+export const SQUAT_TO_STAND_3D: Clip3D = {
+  view: '3d',
+  // From the right side and a little in front, where the fold and the hips dropping behind the
+  // heels are flat on the screen and both hands show on the toes.
+  camera: { yaw: 25, pitch: 10 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The fingers stay hooked over the toes, though the near arm is behind its knee.
+  holds: [
+    { hand: 'rightHand', limb: 'rightLeg' },
+    { hand: 'leftHand', limb: 'leftLeg' },
+  ],
+  stillFrame: STS_FOLD_STEPS + STS_STEPS,
+  keyframes: [
+    { ms: 0, pose: STS_STANDING },
+    ...alongArc(1500, STS_FOLD_STEPS, (t) => squatToStandAt(t)),
+    ...stsDown(),
+    { ms: 500, pose: STS_SQUATTING },
+    ...stsUp(),
+    { ms: 400, pose: STS_FOLDED },
+    ...stsDown(),
+    { ms: 500, pose: STS_SQUATTING },
+    ...stsUp(),
+    ...alongArc(1500, STS_FOLD_STEPS, (t) => squatToStandAt(1 - t)),
+    { ms: 500, pose: STS_STANDING },
+  ],
+};
+
+// --- Bottom squat rotation: in the bottom of the squat, one hand stays on the floor while the other arm sweeps up to the ceiling and the chest turns with it ---
+
 const ROTATION_STANCE = squatStance(BOTTOM_SQUAT_TOES_OUT, SQUAT_DEEP);
 /** Where the right wrist is with the hand flat on the floor, between the feet. */
 const ROTATION_FLOOR: Vec3 = [58, WRIST_Y, 16];

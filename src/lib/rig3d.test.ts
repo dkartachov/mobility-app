@@ -6,6 +6,7 @@ import {
   BACK_LYING_REVERSE_PIGEON_3D,
   BEHIND_THE_BACK_CHEST_OPENER_3D,
   BELLY_DOWN_FOOT_SPLAY_3D,
+  BOTTOM_SQUAT_3D,
   BOTTOM_SQUAT_ROTATION_3D,
   CAT_COW_3D,
   COSSACK_SQUAT_3D,
@@ -25,6 +26,7 @@ import {
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
   SIT_AND_REACH_3D,
+  SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
 } from '@/data/exercise-animations-3d';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
@@ -104,6 +106,28 @@ function tipped(base: Vec3, top: Vec3): number {
 
 /** How far apart the middles of two limbs have to be for them not to touch. */
 const LIMB_CLEAR = 20;
+
+/** How many steps the squat to stand takes to fold forward from standing, which puts the fold on that keyframe. */
+const STS_FOLD_STEPS_IN_TEST = 16;
+
+/** The closest two limbs' bones come on screen, given their joints as the camera sees them. */
+function boneGap(a: readonly Vec3[], b: readonly Vec3[]): number {
+  let gap = Infinity;
+  for (let i = 1; i < a.length; i++) {
+    for (let step = 0; step <= 8; step++) {
+      const p = a[i - 1].map((v, k) => v + (a[i][k] - v) * (step / 8));
+      for (let j = 1; j < b.length; j++) {
+        const [s, e] = [b[j - 1], b[j]];
+        const dx = e[0] - s[0];
+        const dy = e[1] - s[1];
+        const lengthSquared = dx * dx + dy * dy;
+        const t = lengthSquared < 1e-6 ? 0 : Math.max(0, Math.min(1, ((p[0] - s[0]) * dx + (p[1] - s[1]) * dy) / lengthSquared));
+        gap = Math.min(gap, Math.hypot(s[0] + dx * t - p[0], s[1] + dy * t - p[1]));
+      }
+    }
+  }
+  return gap;
+}
 
 /** How far apart two projected points are on screen. */
 function onScreen(a: Vec3, b: Vec3): number {
@@ -339,7 +363,9 @@ describe('3D clips', () => {
       'behind-the-back-chest-opener',
       'back-lying-reverse-pigeon',
       'belly-down-foot-splay',
+      'bottom-squat',
       'bottom-squat-rotation',
+      'squat-to-stand',
       'cossack-squat',
       'resting-cossack-squat',
       'warmup-marching',
@@ -741,6 +767,95 @@ describe('3D clips', () => {
     expect(fallen.rightLeg[2][1]).toBeLessThan(start.rightLeg[2][1] - 20);
   });
 
+  it('sinks from standing into a deep squat with the heels down and the elbows inside the knees in bottom squat', () => {
+    const skeletons = samples(BOTTOM_SQUAT_3D).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightLeg, leftLeg } of skeletons) {
+      for (const [leg, first] of [[rightLeg, start.rightLeg], [leftLeg, start.leftLeg]] as const) {
+        // The feet stay flat where they are, heels down.
+        expect(distance(leg[2], first[2])).toBeCloseTo(0);
+        expect(distance(leg[3], first[3])).toBeCloseTo(0);
+        expect(leg[3][1]).toBeCloseTo(leg[2][1]);
+        // The shin never tips further forward than an ankle bends with the heel down.
+        expect(tipped(leg[2], leg[1])).toBeLessThan(39);
+      }
+      rightLeg.forEach((joint, i) => expect(distance(joint, [leftLeg[i][0], leftLeg[i][1], -leftLeg[i][2]])).toBeCloseTo(0));
+    }
+    // Standing: legs straight, feet about shoulder-width apart, toes slightly out.
+    expect(angleAt(start.rightLeg[0], start.rightLeg[1], start.rightLeg[2])).toBeGreaterThan(175);
+    expect(start.rightLeg[2][2] - start.leftLeg[2][2]).toBeGreaterThan(50);
+    expect(start.rightLeg[2][2] - start.leftLeg[2][2]).toBeLessThan(75);
+    expect(start.rightLeg[3][2] - start.rightLeg[2][2]).toBeGreaterThan(8);
+    expect(start.rightLeg[3][2] - start.rightLeg[2][2]).toBeLessThan(20);
+
+    const down = solvePose(BOTTOM_SQUAT_3D.keyframes[BOTTOM_SQUAT_3D.stillFrame].pose);
+    // As low as it goes: the hips well below the knees.
+    expect(down.spine[0][1]).toBeLessThan(down.rightLeg[1][1] - 20);
+    // The knees are pushed out, wider than the toes.
+    expect(down.rightLeg[1][2]).toBeGreaterThan(down.rightLeg[3][2] + 10);
+    // Chest up.
+    expect(tipped(down.spine[0], down.spine[down.spine.length - 1])).toBeLessThan(40);
+    // Each elbow against the inside of its knee, and the palms together.
+    for (const [arm, leg] of [[down.rightArm, down.rightLeg], [down.leftArm, down.leftLeg]] as const) {
+      expect(distance(arm[1], leg[1])).toBeLessThan(30);
+      expect(Math.abs(arm[1][2])).toBeLessThan(Math.abs(leg[1][2]));
+    }
+    expect(distance(down.rightArm[2], down.leftArm[2])).toBeLessThan(12);
+    // It holds there.
+    expect(BOTTOM_SQUAT_3D.keyframes[BOTTOM_SQUAT_3D.stillFrame + 1].ms).toBeGreaterThanOrEqual(3000);
+  });
+
+  it('keeps hold of the toes from the fold down into the squat and back up, twice, in squat to stand', () => {
+    const clip = SQUAT_TO_STAND_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    const knee = ({ rightLeg }: Skeleton) => angleAt(rightLeg[0], rightLeg[1], rightLeg[2]);
+    for (const { rightLeg, leftLeg } of skeletons) {
+      for (const [leg, first] of [[rightLeg, start.rightLeg], [leftLeg, start.leftLeg]] as const) {
+        expect(distance(leg[2], first[2])).toBeCloseTo(0);
+        expect(leg[3][1]).toBeCloseTo(leg[2][1]);
+      }
+    }
+    // It starts standing tall.
+    expect(knee(start)).toBeGreaterThan(175);
+    expect(tipped(start.spine[0], start.spine[start.spine.length - 1])).toBeLessThan(2);
+
+    // Once the fingers are on the toes they stay there until the last straightening up.
+    const holding = skeletons.map(({ rightArm, leftArm, rightLeg, leftLeg }) => distance(rightArm[3], rightLeg[3]) < 5 && distance(leftArm[3], leftLeg[3]) < 5);
+    const first = holding.indexOf(true);
+    const last = holding.lastIndexOf(true);
+    expect(first).toBeGreaterThan(10);
+    expect(last - first).toBeGreaterThan(skeletons.length / 2);
+    expect(holding.slice(first, last + 1).every(Boolean)).toBe(true);
+    const held = skeletons.slice(first, last + 1);
+
+    // The fold: legs straight, the head hanging below the hips.
+    for (const fold of [held[0], held[held.length - 1]]) {
+      expect(knee(fold)).toBeGreaterThan(175);
+      expect(fold.head[1]).toBeLessThan(fold.spine[0][1]);
+    }
+    // The squat: hips below the knees, the arms inside the knees, and the torso leaning a little
+    // forward over the feet, as a body balances in a deep squat: the chest and head are ahead of the
+    // heels, not tipped back behind them.
+    const squat = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(squat.spine[0][1]).toBeLessThan(squat.rightLeg[1][1] - 20);
+    const lean = tipped(squat.spine[0], squat.spine[squat.spine.length - 1]);
+    expect(lean).toBeGreaterThan(20);
+    expect(lean).toBeLessThan(35);
+    expect(squat.spine[squat.spine.length - 1][0]).toBeGreaterThan(squat.rightLeg[2][0] + 15);
+    expect(squat.head[0]).toBeGreaterThan(squat.spine[squat.spine.length - 1][0]);
+    for (const [arm, leg] of [[squat.rightArm, squat.rightLeg], [squat.leftArm, squat.leftLeg]] as const) {
+      expect(Math.abs(arm[1][2])).toBeLessThan(Math.abs(leg[1][2]) - LIMB_CLEAR);
+      // Leaning in over the feet brings the shoulders nearer the toes, so the elbows give a little.
+      expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(100);
+    }
+    // Down into the squat and back up to straight legs twice without letting go.
+    const low = held.map((skeleton) => skeleton.spine[0][1] < squat.spine[0][1] + 5);
+    expect(low.filter((isLow, i) => isLow && !low[i - 1]).length).toBe(2);
+    const between = held.slice(low.indexOf(true), low.lastIndexOf(true));
+    expect(Math.max(...between.map(knee))).toBeGreaterThan(175);
+  });
+
   it('keeps one hand on the floor while the other arm reaches for the ceiling and the chest turns to it, each side in turn, in bottom squat rotation', () => {
     const skeletons = samples(BOTTOM_SQUAT_ROTATION_3D).map(solvePose);
     const start = skeletons[0];
@@ -785,11 +900,17 @@ describe('3D clips', () => {
     for (const order of drawOrders(BOTTOM_SQUAT_ROTATION_3D)) {
       expect(order.replace('rightArm leftArm', 'leftArm rightArm')).toBe('torso leftLeg rightLeg leftArm rightArm head');
     }
+    // In the bottom squat the thighs are over the hips all the way through and the arms over the
+    // thighs, so the elbows are in front of the knees. Only the head moves, behind the hands at the
+    // bottom.
+    for (const order of drawOrders(BOTTOM_SQUAT_3D)) {
+      expect(order.replace(' head', '')).toBe('torso leftLeg rightLeg leftArm rightArm');
+    }
   });
 
   it('keeps the arms clear of the legs where they are not meant to touch in the squat clips', () => {
     // The head is never near enough to a hand for the two to be drawn over each other.
-    for (const clip of [COSSACK_SQUAT_3D, RESTING_COSSACK_SQUAT_3D]) {
+    for (const clip of [BOTTOM_SQUAT_3D, COSSACK_SQUAT_3D, RESTING_COSSACK_SQUAT_3D]) {
       const view = viewOf(clip.camera);
       for (const skeleton of samples(clip).map(solvePose)) {
         const head = project(view, skeleton.head);
@@ -840,6 +961,33 @@ describe('3D clips', () => {
     expect(reach(solvePose(RESTING_COSSACK_SQUAT_3D.keyframes[0].pose))).toBeLessThan(Math.min(...samples(COSSACK_SQUAT_3D).map(solvePose).map(reach)) - 10);
   });
 
+  it('starts with straight arms at the sides, which hang straight down through the fold before the hands close on the toes, in squat to stand', () => {
+    const clip = SQUAT_TO_STAND_3D;
+    const elbow = ({ rightArm }: Skeleton) => angleAt(rightArm[0], rightArm[1], rightArm[2]);
+    const start = solvePose(clip.keyframes[0].pose);
+    // Standing: both arms straight, hanging by the sides, just outside the hips.
+    for (const arm of [start.rightArm, start.leftArm]) {
+      expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(165);
+      expect(fromHanging(arm[0], arm[2])).toBeLessThan(8);
+      expect(Math.abs(arm[2][2])).toBeGreaterThan(Math.abs(arm[0][2]));
+    }
+    // Halfway into the fold they still hang straight down from the shoulders, so they swing forward
+    // with the body rather than staying stuck to it.
+    const halfway = solvePose(clip.keyframes[STS_FOLD_STEPS_IN_TEST / 2].pose);
+    expect(elbow(halfway)).toBeGreaterThan(160);
+    expect(fromHanging(halfway.rightArm[0], halfway.rightArm[2])).toBeLessThan(15);
+    expect(halfway.rightArm[2][0]).toBeGreaterThan(start.rightArm[2][0] + 40);
+    // The fold is the keyframe the first reach down ends on; the squat is the still frame.
+    const fold = solvePose(clip.keyframes[STS_FOLD_STEPS_IN_TEST].pose);
+    const squat = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(elbow(fold)).toBeLessThan(140);
+    expect(elbow(squat)).toBeGreaterThan(100);
+    // The chest lifts from the fold, though it still leans forward over the feet.
+    expect(tipped(squat.spine[0], squat.spine[squat.spine.length - 1])).toBeLessThan(tipped(fold.spine[0], fold.spine[fold.spine.length - 1]) - 50);
+    // In the fold the elbows are out wider than the shoulders.
+    expect(Math.abs(fold.rightArm[1][2])).toBeGreaterThan(Math.abs(fold.rightArm[0][2]) + 15);
+  });
+
   it('shows the nose all the way through the bottom squat rotation', () => {
     const view = viewOf(BOTTOM_SQUAT_ROTATION_3D.camera);
     for (const skeleton of samples(BOTTOM_SQUAT_ROTATION_3D).map(solvePose)) {
@@ -847,6 +995,49 @@ describe('3D clips', () => {
       // The head's circle, and the line of the nose cut into it.
       expect(head?.d.split('Z').filter((piece) => piece !== '')).toHaveLength(2);
     }
+  });
+
+  it('changes the arms from outside the thighs to inside the knees in squat to stand only while they are clear of the legs', () => {
+    const clip = SQUAT_TO_STAND_3D;
+    const view = viewOf(clip.camera);
+    const orders = drawOrders(clip);
+    const changes = orders.flatMap((order, i) => (i > 0 && order !== orders[i - 1] ? [i * 10] : []));
+    // Once on the way into the first fold and once on the way out of the last.
+    expect(changes).toHaveLength(2);
+    for (const t of changes) {
+      const skeleton = solvePose(poseAt3(clip, t));
+      const flat = (points: Vec3[]) => points.map((point) => project(view, point));
+      for (const [arm, leg] of [[skeleton.rightArm, skeleton.rightLeg], [skeleton.leftArm, skeleton.leftLeg]] as const) {
+        // Well clear: further apart than both limbs' thickness and the outline between them, about 37.
+        expect(boneGap(flat(arm), flat(leg))).toBeGreaterThan(3 * LIMB_CLEAR);
+      }
+    }
+    // Hanging at the sides, the near arm is over the near thigh; in the squat it's behind the knee.
+    const order = (t: number) => frameAt(clip, view, t).slots.filter((slot) => !slot.hand).map((slot) => slot.part);
+    expect(order(0).indexOf('rightArm')).toBeGreaterThan(order(0).indexOf('rightLeg'));
+    const squatAt = clip.keyframes.slice(1, clip.stillFrame + 1).reduce((total, frame) => total + frame.ms, 0);
+    expect(order(squatAt).indexOf('rightArm')).toBeLessThan(order(squatAt).indexOf('rightLeg'));
+  });
+
+  it('draws the hands over the toes they hold in squat to stand, though the near arm is behind its knee', () => {
+    const clip = SQUAT_TO_STAND_3D;
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 50) {
+      const { slots } = frameAt(clip, view, t);
+      // The six parts of the body, and each hand again on its own.
+      expect(slots).toHaveLength(8);
+      const at = (part: string, hand: boolean) => slots.findIndex((slot) => slot.part === part && slot.hand === hand);
+      expect(at('rightArm', true)).toBeGreaterThan(at('rightLeg', false));
+      expect(at('leftArm', true)).toBeGreaterThan(at('leftLeg', false));
+      expect(at('leftArm', true)).toBeGreaterThan(at('leftArm', false));
+      for (const slot of slots) {
+        // A hand on its own is outlined from partway along, which leaves no line across its wrist.
+        if (slot.hand) expect(slot.outline).not.toBe(slot.d);
+        else expect(slot.outline).toBe(slot.d);
+      }
+    }
+    // Every other clip draws just the six parts.
+    expect(frameAt(BOTTOM_SQUAT_3D, viewOf(BOTTOM_SQUAT_3D.camera), 0).slots).toHaveLength(6);
   });
 
   it('puts one limb behind another when a clip says so, but only on the same side of the torso', () => {

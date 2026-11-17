@@ -92,6 +92,12 @@ export type Pose3 = {
   leftLeg?: LegPose;
   /** Pin a limb in every pose of a clip or in none: a pin can move between poses, but not come and go. */
   pins?: { rightHand?: Pin; leftHand?: Pin; rightFoot?: Pin; leftFoot?: Pin };
+  /**
+   * Like the clip's `behind`, for this pose and on the way from it to the next. For limbs that
+   * really change sides partway through a clip, like arms that hang outside the thighs and end up
+   * inside the knees: put the change on a pose where the two are clear of each other on screen.
+   */
+  behind?: Clip3D['behind'];
 };
 
 export type Keyframe3 = {
@@ -414,6 +420,7 @@ export function poseAt3(clip: Clip3D, timeMs: number): Pose3 {
           rightFoot: lerpPin(a.pins?.rightFoot, b.pins?.rightFoot, t),
           leftFoot: lerpPin(a.pins?.leftFoot, b.pins?.leftFoot, t),
         },
+        behind: t >= 1 ? b.behind : a.behind,
       };
     }
     elapsed += ms;
@@ -1433,8 +1440,10 @@ export function trailedPart(trail: Clip3D['trail']): Part | undefined {
 /** The clip at a moment, drawn. */
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
-  const skeleton = solvePose(poseAt3(clip, timeMs));
-  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, clip.behind, clip.holds);
+  const pose = poseAt3(clip, timeMs);
+  const skeleton = solvePose(pose);
+  const behind = pose.behind ? (clip.behind ? [...clip.behind, ...pose.behind] : pose.behind) : clip.behind;
+  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds);
 }
 
 function duration(clip: Clip3D): number {

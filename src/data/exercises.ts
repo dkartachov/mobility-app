@@ -11,6 +11,7 @@ import {
   BACK_LYING_REVERSE_PIGEON_3D,
   BEHIND_THE_BACK_CHEST_OPENER_3D,
   BELLY_DOWN_FOOT_SPLAY_3D,
+  BOTTOM_SQUAT_3D,
   BOTTOM_SQUAT_ROTATION_3D,
   CAT_COW_3D,
   COSSACK_SQUAT_3D,
@@ -20,11 +21,11 @@ import {
   NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
   PANCAKE_3D,
   RESTING_COSSACK_SQUAT_3D,
+  SQUAT_TO_STAND_3D,
 } from './exercise-animations-3d';
 
 import {
   BLACKBURN,
-  BOTTOM_SQUAT,
   BUTTERFLY,
   COBRA_TO_PRAYER,
   COUCH_STRETCH,
@@ -75,7 +76,6 @@ import {
   SHOULDER_PASS_THROUGHS,
   SIDE_LYING_EXTERNAL_ROTATION,
   SLEEPER_STRETCH,
-  SQUAT_TO_STAND,
   STANDING_FORWARD_FOLD,
   THE_BREAKDANCER,
   THE_SAGITTARIUS,
@@ -187,7 +187,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Push your knees out with your elbows and hold',
     ],
     photo: require('@/assets/images/exercises/bottom-squat.png'),
-    animation: BOTTOM_SQUAT,
+    animation: BOTTOM_SQUAT_3D,
   },
   {
     id: 'downward-facing-dog',
@@ -425,7 +425,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Straighten your legs back up and keep alternating',
     ],
     photo: require('@/assets/images/exercises/squat-to-stand.png'),
-    animation: SQUAT_TO_STAND,
+    animation: SQUAT_TO_STAND_3D,
     active: true,
     oneMinuteOnly: true,
   },
