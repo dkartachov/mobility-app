@@ -17,7 +17,9 @@ import { EXERCISES, getExercise, getExercises, type Exercise } from '@/data/exer
 export default function ExerciseScreen() {
   // `list` is the ids of the exercises it was opened from, in order, to swipe through. Without it,
   // say from a link, it swipes through the whole library.
-  const { id, list } = useLocalSearchParams<{ id: string; list?: string }>();
+  // `eggs` are the exercises whose easter egg was found in the library, shown in place of their animation.
+  const { id, list, eggs } = useLocalSearchParams<{ id: string; list?: string; eggs?: string }>();
+  const [found] = useState(() => new Set(eggs?.split(',')));
   const exercise = getExercise(id);
   const [exercises] = useState(() => {
     const listed = list ? getExercises(list.split(',')) : EXERCISES;
@@ -68,6 +70,7 @@ export default function ExerciseScreen() {
               exercise={item}
               position={exercises.length > 1 ? `${page + 1} of ${exercises.length}` : undefined}
               showing={page === index}
+              egg={found.has(item.id) ? item.easterEgg : undefined}
             />
           </View>
         )}
@@ -81,10 +84,24 @@ export default function ExerciseScreen() {
  * screen plays its animation, from the start each time it's swiped to, and moves its title into
  * the header, so a page swiped away doesn't leave its name up there.
  */
-function ExercisePage({ exercise, position, showing }: { exercise: Exercise; position?: string; showing: boolean }) {
+function ExercisePage({
+  exercise,
+  position,
+  showing,
+  egg,
+}: {
+  exercise: Exercise;
+  position?: string;
+  showing: boolean;
+  egg?: Exercise['easterEgg'];
+}) {
   return (
     <>
-      <ExerciseVideo photo={exercise.photo} animation={exercise.animation} playing={showing} />
+      {egg ? (
+        <ExerciseVideo photo={egg.photo} caption={egg.caption} />
+      ) : (
+        <ExerciseVideo photo={exercise.photo} animation={exercise.animation} playing={showing} />
+      )}
       <PageScroll>
         <PageHeader
           eyebrow={[exercise.active ? 'Active' : 'Passive', exercise.twoSided && 'Both sides', position]

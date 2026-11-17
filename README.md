@@ -153,10 +153,11 @@ Moved to the new engine:
 | Blackburn | Library | `BLACKBURN_3D` |
 | Butterfly | Library | `BUTTERFLY_3D` |
 | Cobra to prayer | Library | `COBRA_TO_PRAYER_3D` |
+| Downward facing dog | Library | `DOWNWARD_FACING_DOG_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly and cobra to prayer.
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer and downward facing dog.
 
 Library (`src/data/exercises.ts`):
 
@@ -166,7 +167,6 @@ Library (`src/data/exercises.ts`):
 | Cow face arms | `COW_FACE_ARMS` | |
 | Cross-body shoulder stretch | `CROSS_BODY_SHOULDER_STRETCH` | |
 | Cuban rotation | `CUBAN_ROTATION` | dumbbells |
-| Downward facing dog | `DOWNWARD_FACING_DOG` | |
 | Downward facing dog to cobra | `DOWNWARD_FACING_DOG_TO_COBRA` | |
 | Elephant walk | `ELEPHANT_WALK` | |
 | Figure four stretch | `FIGURE_FOUR_STRETCH` | |

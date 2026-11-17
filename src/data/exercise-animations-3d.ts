@@ -1851,3 +1851,145 @@ export const COBRA_TO_PRAYER_3D: Clip3D = {
     ...alongArc(2200, COBRA_TO_PRAYER_STEPS, (t) => cobraToPrayer(1 - t)),
   ],
 };
+
+// --- Downward facing dog: hands and toes planted, the hips lift up and back off the knees into an upside-down V, then the heels sink ---
+
+/** The toes are tucked under, the balls of the feet on the floor here, hip-width apart. */
+const DOG_TOES: Vec3 = [-78, 0, SKELETON.hip];
+/** How high the tip of a foot sits resting on the floor. */
+const DOG_TOE_Y = 10.5;
+/**
+ * The hands stay planted a little ahead of the shoulders on all fours, which is how far from the
+ * feet they are in the V: the legs and the body with the arms in line meet at the hips at about 64°.
+ */
+const DOG_HANDS: Vec3 = [140, WRIST_Y, SKELETON.shoulder];
+/** The knees rest on the floor under the hips to start. */
+const DOG_KNEE: Vec3 = [0, ANKLE_Y, SKELETON.hip];
+/** How steep the feet are, from the floor: nearly upright with the knees down, and the heels sunk in the V. */
+const DOG_FOOT = { kneeling: 70, sunk: 8 };
+
+/** Where the ankle is with the toes on the floor and the foot this steep, and which way the foot points. */
+const dogFoot = (steep: number, side: 1 | -1): { at: Vec3; toward: Vec3 } => {
+  const angle = radians(steep);
+  return {
+    at: [DOG_TOES[0] - SKELETON.foot * Math.cos(angle), DOG_TOE_Y + SKELETON.foot * Math.sin(angle), side * DOG_TOES[2]],
+    toward: [Math.cos(angle), -Math.sin(angle), 0],
+  };
+};
+
+/** The pelvis with the knees down on the floor under it, the shin rising from the knee to the tucked-under foot. */
+const DOG_KNEELING_PELVIS: Vec3 = [DOG_KNEE[0], DOG_KNEE[1] + SKELETON.thigh, 0];
+
+/**
+ * How far the shoulders are from the hands in the V, as a share of the arms' reach, with the body
+ * pointed straight at them. A hair short, so the straight arms come out a few degrees off in line
+ * with the back: exactly in line, a hair of reach takes a big turn of the body, and the head and
+ * shoulders would snap into and out of the V.
+ */
+const DOG_ARMS_IN_LINE = 0.99;
+
+/**
+ * Where the hips are in the V with the feet this steep: the legs straight, and the body nearly in
+ * line with the straight arms, so the hips are a leg's reach from the ankles and about a body and
+ * arm's from the hands.
+ */
+const dogHips = (steep: number): Vec3 => {
+  const ankle = dogFoot(steep, 1).at;
+  const [legs, body] = [LEG_REACH, SKELETON.torso + DOG_ARMS_IN_LINE * ARM_REACH];
+  const across = [DOG_HANDS[0] - ankle[0], DOG_HANDS[1] - ankle[1]];
+  const gap = Math.hypot(across[0], across[1]);
+  const along = (legs * legs - body * body + gap * gap) / (2 * gap);
+  const up = Math.sqrt(legs * legs - along * along);
+  const [ux, uy] = [across[0] / gap, across[1] / gap];
+  return [ankle[0] + ux * along - uy * up, ankle[1] + uy * along + ux * up, 0];
+};
+
+/** The body over these hips, tipped forward this far, hands and toes planted. */
+const dogBody = (pelvis: Vec3, steep: number, lean: number, kneePole: Vec3): Pose3 => {
+  const foot = (side: 1 | -1): Pin => ({ ...dogFoot(steep, side), pole: kneePole });
+  const hand = (side: 1 | -1): Pin => ({ at: [DOG_HANDS[0], DOG_HANDS[1], side * DOG_HANDS[2]], toward: [1, 0, 0], pole: [-1, 0, side * 0.3] });
+  return {
+    pelvis,
+    lean,
+    pins: { rightFoot: foot(1), leftFoot: foot(-1), rightHand: hand(1), leftHand: hand(-1) },
+  };
+};
+
+/** How far the shoulders are from the hands. */
+const dogArmGap = (pose: Pose3) => {
+  const shoulder = solvePose(pose).rightArm[0];
+  return Math.hypot(DOG_HANDS[0] - shoulder[0], DOG_HANDS[1] - shoulder[1], DOG_HANDS[2] - shoulder[2]);
+};
+
+/** How far to tip the body over these hips, as far forward as keeps the shoulders `reach` from the hands. */
+const dogLean = (pelvis: Vec3, steep: number, reach: number): number => {
+  const gap = (lean: number) => dogArmGap(dogBody(pelvis, steep, lean, DOG_STRAIGHT_POLE));
+  let nearest = 0;
+  for (let tip = 0; tip <= 180; tip += 2) if (gap(tip) < gap(nearest)) nearest = tip;
+  let [upright, tipped] = [0, nearest];
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + tipped) / 2;
+    if (gap(tip) > reach) upright = tip;
+    else tipped = tip;
+  }
+  return (upright + tipped) / 2;
+};
+
+const DOG_KNEELING_POLE = pinVia(
+  [DOG_KNEELING_PELVIS[0], DOG_KNEELING_PELVIS[1], SKELETON.hip],
+  DOG_KNEE,
+  dogFoot(DOG_FOOT.kneeling, 1).at
+).pole;
+/** The knees point forward toward the hands on the way up. Once the legs are straight it no longer matters. */
+const DOG_STRAIGHT_POLE: Vec3 = [1, 0.2, 0];
+
+/**
+ * Where the hips are from the knees (0) up into the V (1). They swing up and back around the ankles
+ * as the knees straighten, and the heels lower toward the floor all the way, in one movement with
+ * the hips rather than waiting for the V.
+ */
+const dogPelvis = (t: number): Vec3 => {
+  const ankle = dogFoot(mix(DOG_FOOT.kneeling, DOG_FOOT.sunk, t), 1).at;
+  // The hips as seen from the ankles, kneeling and in the V.
+  const [from, to] = [dogFoot(DOG_FOOT.kneeling, 1).at, dogFoot(DOG_FOOT.sunk, 1).at];
+  const hips = dogHips(DOG_FOOT.sunk);
+  const start = [DOG_KNEELING_PELVIS[0] - from[0], DOG_KNEELING_PELVIS[1] - from[1]];
+  const end = [hips[0] - to[0], hips[1] - to[1]];
+  const length = mix(Math.hypot(start[0], start[1]), LEG_REACH, t);
+  const angle = mix(Math.atan2(start[1], start[0]), Math.atan2(end[1], end[0]), t);
+  return [ankle[0] + length * Math.cos(angle), ankle[1] + length * Math.sin(angle), 0];
+};
+
+/**
+ * From the knees (0) up into the V with the heels sunk (1), in one movement. The body tips as far
+ * forward as keeps the arms just short of straight, the elbows giving a little on the way as in cat
+ * cow, and the reach eases into its ends so the head and shoulders do too.
+ */
+const dogLift = (t: number): Pose3 => {
+  const pelvis = dogPelvis(t);
+  const steep = mix(DOG_FOOT.kneeling, DOG_FOOT.sunk, t);
+  const reach = ARM_REACH * (mix(0.995, 1, smooth(t)) - 0.012 * Math.sin(Math.PI * t) ** 2);
+  return dogBody(pelvis, steep, dogLean(pelvis, steep, reach), mix3(DOG_KNEELING_POLE, DOG_STRAIGHT_POLE, t));
+};
+
+const DOG_KNEELING = dogLift(0);
+const DOWNWARD_DOG = dogLift(1);
+/** The hips travel on an arc, so it takes this many keyframes for the toes to stay put between them. */
+const DOG_LIFT_STEPS = 24;
+
+export const DOWNWARD_FACING_DOG_3D: Clip3D = {
+  view: '3d',
+  // From the right side, a little in front and above, as for cat cow: the V is flat on the screen,
+  // and the head hangs between the arms behind the near one.
+  camera: { yaw: 22, pitch: 12 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The V with the heels sunk.
+  stillFrame: 1 + DOG_LIFT_STEPS,
+  keyframes: [
+    { ms: 0, pose: DOG_KNEELING },
+    { ms: 500, pose: DOG_KNEELING },
+    ...alongArc(1500, DOG_LIFT_STEPS, dogLift),
+    { ms: 3500, pose: DOWNWARD_DOG },
+    ...alongArc(1800, DOG_LIFT_STEPS, (t) => dogLift(1 - t)),
+  ],
+};

@@ -13,6 +13,7 @@ import {
   CAT_COW_3D,
   COBRA_TO_PRAYER_3D,
   COSSACK_SQUAT_3D,
+  DOWNWARD_FACING_DOG_3D,
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
   HIP_INTERNAL_ROTATION_3D,
@@ -385,6 +386,7 @@ describe('3D clips', () => {
       'resting-cossack-squat',
       'butterfly',
       'cobra-to-prayer',
+      'downward-facing-dog',
       'warmup-marching',
     ]));
   });
@@ -920,6 +922,65 @@ describe('3D clips', () => {
     heights.slice(0, -5).forEach((height) => expect(height).toBeGreaterThan(SKELETON.head + 2.01));
     // Nothing ever changes places: the head drops behind the near arm.
     expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightLeg rightArm']));
+  });
+
+  it('lifts the hips up and back off the knees into a V, then sinks the heels, in downward facing dog', () => {
+    const clip = DOWNWARD_FACING_DOG_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightArm, leftArm, rightLeg, leftLeg } of skeletons) {
+      // The hands stay planted, and the toes stay tucked under on the floor where they started.
+      for (const [arm, first] of [[rightArm, start.rightArm], [leftArm, start.leftArm]] as const) expect(distance(arm[2], first[2])).toBeCloseTo(0);
+      for (const [leg, first] of [[rightLeg, start.rightLeg], [leftLeg, start.leftLeg]] as const) {
+        expect(distance(leg[3], first[3])).toBeLessThan(1);
+        // The foot points toward the hands, the heel behind the toes.
+        expect(leg[3][0]).toBeGreaterThan(leg[2][0]);
+      }
+    }
+    // On hands and knees to start: the knees on the floor under the hips.
+    for (const leg of [start.rightLeg, start.leftLeg]) {
+      expect(leg[1][1]).toBeCloseTo(13, 0);
+      expect(Math.abs(leg[1][0] - start.spine[0][0])).toBeLessThan(1);
+    }
+    // The V: the hips the highest point, the legs and arms straight, the arms nearly in line with the
+    // back, and the legs and body meeting at the hips in an upside-down V.
+    const dog = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const [pelvis, neckBase] = [dog.spine[0], dog.spine[6]];
+    for (const point of [neckBase, dog.head, ...dog.rightArm, ...dog.rightLeg.slice(1)]) expect(point[1]).toBeLessThan(pelvis[1]);
+    for (const leg of [dog.rightLeg, dog.leftLeg]) expect(angleAt(leg[0], leg[1], leg[2])).toBeGreaterThan(170);
+    for (const arm of [dog.rightArm, dog.leftArm]) {
+      expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(170);
+      expect(angleAt(pelvis, neckBase, [neckBase[0] + arm[2][0] - arm[0][0], neckBase[1] + arm[2][1] - arm[0][1], neckBase[2]])).toBeGreaterThan(165);
+    }
+    const hips = angleAt(dog.rightLeg[2], dog.rightLeg[0], [neckBase[0], neckBase[1], dog.rightLeg[0][2]]);
+    expect(hips).toBeGreaterThan(55);
+    expect(hips).toBeLessThan(75);
+    // The heels lower all the way up into the V, in one movement with the hips rather than after
+    // them, and end just off the floor.
+    const timeOf = (index: number) => clip.keyframes.slice(1, index + 1).reduce((total, frame) => total + frame.ms, 0);
+    const heels: number[] = [];
+    for (let t = timeOf(1); t <= timeOf(clip.stillFrame); t += 10) heels.push(solvePose(poseAt3(clip, t)).rightLeg[2][1]);
+    heels.slice(1).forEach((height, i) => expect(height).toBeLessThanOrEqual(heels[i] + 1e-6));
+    const halfway = heels[Math.floor(heels.length / 2)];
+    expect(heels[0] - halfway).toBeGreaterThan(0.3 * (heels[0] - heels[heels.length - 1]));
+    expect(dog.rightLeg[2][1]).toBeLessThan(20);
+    // The head eases out of the V and into it with the hips, rather than snapping: in the first and
+    // last 50ms of the way down it moves well under its top speed.
+    const headSpeeds: number[] = [];
+    const down = timeOf(clip.stillFrame + 1);
+    for (let t = down; t < durationOf(clip); t += 50) {
+      headSpeeds.push(distance(solvePose(poseAt3(clip, t)).head, solvePose(poseAt3(clip, Math.min(t + 50, durationOf(clip)))).head));
+    }
+    const top = Math.max(...headSpeeds);
+    expect(headSpeeds[0]).toBeLessThan(0.45 * top);
+    expect(headSpeeds[headSpeeds.length - 1]).toBeLessThan(0.45 * top);
+    // Nothing ever changes places: the head hangs between the arms, behind the near one, and the
+    // face, seen from the side, never shows a nose.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightLeg rightArm']));
+    const view = viewOf(clip.camera);
+    const headParts = new Set<number>();
+    for (let t = 0; t <= durationOf(clip); t += 10) headParts.add(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length);
+    expect(headParts.size).toBe(1);
   });
 
   it('sinks from standing into a deep squat with the heels down and the elbows inside the knees in bottom squat', () => {

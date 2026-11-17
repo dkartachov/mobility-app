@@ -21,7 +21,9 @@ import {
   POSITIONS,
   searchExercises,
 } from '@/data/exercises';
+import { useSoundEffect } from '@/hooks/use-sound-effect';
 import { useTheme } from '@/hooks/use-theme';
+import { haptic } from '@/lib/haptics';
 import {
   filterLibrary,
   hasLibraryFilters,
@@ -42,6 +44,22 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<LibraryFilters>(NO_LIBRARY_FILTERS);
+  // Easter eggs found by holding a tile. They're only kept while the library is open, so they're
+  // gone again next time.
+  const [eggs, setEggs] = useState<ReadonlySet<string>>(new Set());
+  const bark = useSoundEffect(require('@/assets/sounds/charlie-bark.wav'));
+  const toggleEgg = (id: string) => {
+    if (eggs.has(id)) haptic.tap();
+    else {
+      haptic.success();
+      bark.play();
+    }
+    setEggs((found) => {
+      const next = new Set(found);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  };
   // The list follows a moment behind, so the chips and search field respond straight away instead
   // of waiting for every tile to render; otherwise a chip's fade stalls until the list is done.
   const listQuery = useDeferredValue(query);
@@ -124,7 +142,10 @@ export default function LibraryScreen() {
           </View>
         </View>
       }
-      renderItem={({ item }) => <ExerciseTile exercise={item} list={results} />}
+      extraData={eggs}
+      renderItem={({ item }) => (
+        <ExerciseTile exercise={item} list={results} eggs={eggs} onFindEgg={() => toggleEgg(item.id)} />
+      )}
     />
   );
 }

@@ -19,7 +19,10 @@ export function ExerciseVideo({
   animation,
   playing = true,
   paused = false,
+  caption,
 }: {
+  /** Written over the photo, when it's shown. */
+  caption?: string;
   photo?: ImageSource;
   animation?: ExerciseAnimation;
   playing?: boolean;
@@ -43,6 +46,13 @@ export function ExerciseVideo({
     return (
       <View style={styles.video}>
         <Image source={photo} style={StyleSheet.absoluteFill} contentFit="cover" />
+        {caption && (
+          <View style={styles.caption}>
+            <ThemedText type="small" style={styles.captionText}>
+              {caption}
+            </ThemedText>
+          </View>
+        )}
       </View>
     );
   }
@@ -69,5 +79,17 @@ const styles = StyleSheet.create({
   label: {
     color: '#FFFFFF',
     opacity: 0.8,
+  },
+  caption: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(11, 26, 25, 0.7)',
+  },
+  captionText: {
+    color: '#FFFFFF',
   },
 });

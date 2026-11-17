@@ -18,6 +18,7 @@ import {
   CAT_COW_3D,
   COBRA_TO_PRAYER_3D,
   COSSACK_SQUAT_3D,
+  DOWNWARD_FACING_DOG_3D,
   LEG_SWINGS_3D,
   NINETY_TO_NINETY_3D,
   NINETY_TO_NINETY_ROTATIONS_3D,
@@ -32,7 +33,6 @@ import {
   COW_FACE_ARMS,
   CROSS_BODY_SHOULDER_STRETCH,
   CUBAN_ROTATION,
-  DOWNWARD_FACING_DOG,
   DOWNWARD_FACING_DOG_TO_COBRA,
   ELEPHANT_WALK,
   FIGURE_FOUR_STRETCH,
@@ -132,6 +132,11 @@ export type Exercise = {
   equipment?: Equipment[];
   instructions: string[];
   photo?: ImageSource;
+  /**
+   * A hidden photo, found by long-pressing the exercise's tile in the library. It stands in for the
+   * photo and the animation until you leave the library.
+   */
+  easterEgg?: { photo: ImageSource; caption: string };
   /** Shown in place of the photo on the exercise and workout screens. */
   animation?: ExerciseAnimation;
   /** Always held for 1 minute in generated workouts, never 2. */
@@ -201,8 +206,10 @@ const ALL_EXERCISES: Exercise[] = [
       'Lift your hips up and back into an upside-down V',
       'Push the floor away, let your heels sink and hold',
     ],
-    photo: require('@/assets/images/exercises/downward-dog.jpg'),
-    animation: DOWNWARD_FACING_DOG,
+    photo: require('@/assets/images/exercises/downward-facing-dog.png'),
+    // Charlie, demonstrating. An easter egg: long-press the tile in the library.
+    easterEgg: { photo: require('@/assets/images/exercises/downward-dog.jpg'), caption: 'Demonstrated by Charlie' },
+    animation: DOWNWARD_FACING_DOG_3D,
     oneMinuteOnly: true,
   },
   {
