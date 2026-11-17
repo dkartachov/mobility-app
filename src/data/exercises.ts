@@ -10,6 +10,7 @@ import {
   ANKLE_MOBILIZATION_3D,
   BACK_LYING_REVERSE_PIGEON_3D,
   BEHIND_THE_BACK_CHEST_OPENER_3D,
+  BLACKBURN_3D,
   BELLY_DOWN_FOOT_SPLAY_3D,
   BOTTOM_SQUAT_3D,
   BOTTOM_SQUAT_ROTATION_3D,
@@ -25,7 +26,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  BLACKBURN,
   BUTTERFLY,
   COBRA_TO_PRAYER,
   COUCH_STRETCH,
@@ -376,7 +376,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keeping them lifted, sweep your arms slowly from by your sides up overhead and back',
     ],
     photo: require('@/assets/images/exercises/blackburn.png'),
-    animation: BLACKBURN,
+    animation: BLACKBURN_3D,
     active: true,
     oneMinuteOnly: true,
   },

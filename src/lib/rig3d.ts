@@ -157,6 +157,14 @@ export type Clip3D = {
    * behind the foot with it; the hand is drawn again on its own, over the limb it holds.
    */
   holds?: readonly HeldLimb[];
+  /**
+   * Hands that rest on the body, reached round from an arm on the far side of it, like the hands on
+   * the lower back in Blackburn. The arm goes behind the torso all the way through, as its shoulder
+   * end is, and its forearm and hand are drawn again on their own over the torso. Limbs are ordered
+   * whole, so otherwise the whole arm would come over the torso with the hand, its shoulder end
+   * drawn over the shoulder blade it's behind, and jump back behind it when the hand lifts off.
+   */
+  handsOnBody?: readonly ('rightHand' | 'leftHand')[];
   scenery?: readonly Block[];
   /**
    * A strap looped around the ball of this foot, with an end held in each hand. With a `hand`, that
@@ -221,7 +229,10 @@ export type FigureSlot = {
   d: string;
   /** The shape the background is drawn around, to keep the part apart from what's under it. The part's own shape, except for a hand drawn on its own. */
   outline: string;
-  /** A hand drawn on its own over a limb it holds (see `Clip3D.holds`), after its arm's own slot. */
+  /**
+   * A hand drawn on its own over a limb it holds (see `Clip3D.holds`), after its arm's own slot, or
+   * a forearm and hand over the torso (see `Clip3D.handsOnBody`).
+   */
   hand: boolean;
   /** From 0, furthest from the camera, to 1, nearest. */
   shade: number;
@@ -1199,6 +1210,8 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
 
 /** How far along a hand drawn on its own its outline starts, which keeps the outline off the wrist it joins. */
 const HELD_HAND_OUTLINE_FROM = 0.6;
+/** How far along the forearm from the elbow the outline of a forearm drawn on its own over the torso starts. */
+const RESTING_FOREARM_OUTLINE_FROM = 0.4;
 
 /** How close on screen two limbs' bones have to come for one to be drawn over the other: about a limb's thickness each. */
 const LIMB_OVERLAP = 2 * LIMB_RADIUS;
@@ -1240,7 +1253,9 @@ export function traceFigure(
   /** Pairs of limbs to keep the first behind the second, see `Clip3D.behind`. */
   forcedBehind?: Clip3D['behind'],
   /** Hands to draw again over the limb they hold, see `Clip3D.holds`. */
-  holds?: Clip3D['holds']
+  holds?: Clip3D['holds'],
+  /** Arms to put behind the torso with their forearms and hands drawn again over it, see `Clip3D.handsOnBody`. */
+  handsOnBody?: Clip3D['handsOnBody']
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -1276,7 +1291,8 @@ export function traceFigure(
   // Each limb is under the torso (0) or over it (2), by where the two overlap on screen.
   const limb = (part: Part, points: Vec3[], isLeg: boolean) => {
     const depth = meanDepth(points);
-    const over = (forcedOver ? forcedOver.includes(part) : false) || overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg);
+    const resting = handsOnBody ? (part === 'rightArm' && handsOnBody.includes('rightHand')) || (part === 'leftArm' && handsOnBody.includes('leftHand')) : false;
+    const over = !resting && ((forcedOver ? forcedOver.includes(part) : false) || overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg));
     return { part, d: limbShape(points, isLeg ? LEG_RADII : ARM_RADII), depth, points, layer: over ? 2 : 0 };
   };
   const parts: { part: Part; d: string; depth: number; points: Vec3[]; layer: number }[] = [
@@ -1366,6 +1382,36 @@ export function traceFigure(
     });
   }
 
+  // A hand resting on the body goes over the torso with its forearm, and over the legs, which lie
+  // under the body's surface, but under the other arm, while the arm itself stays behind. The outline starts partway along the forearm, so it
+  // doesn't draw a line across the elbow where the forearm joins the rest of the arm.
+  if (handsOnBody) {
+    for (let i = 0; i < handsOnBody.length; i++) {
+      const isRight = handsOnBody[i] === 'rightHand';
+      const arm = isRight ? rightArm : leftArm;
+      const armPart: Part = isRight ? 'rightArm' : 'leftArm';
+      let own = -1;
+      let at = -1;
+      for (let k = 0; k < slots.length; k++) {
+        if (slots[k].hand) continue;
+        if (slots[k].part === armPart) own = k;
+        if (slots[k].part === 'torso') at = k;
+        else if (at >= 0 && (slots[k].part === 'rightLeg' || slots[k].part === 'leftLeg' || slots[k].part === 'head')) at = k;
+      }
+      if (own < 0 || at < 0) continue;
+      const [wide, narrow] = ARM_RADII[1];
+      const from = lerpVec(arm[1], arm[2], RESTING_FOREARM_OUTLINE_FROM);
+      slots.splice(at + 1, 0, {
+        part: armPart,
+        d: limbShape(arm.slice(1), ARM_RADII.slice(1)),
+        outline: capsule(from, lerp(wide, narrow, RESTING_FOREARM_OUTLINE_FROM), arm[2], narrow) + capsule(arm[2], ARM_RADII[2][0], arm[3], ARM_RADII[2][1]),
+        hand: true,
+        shade: slots[own].shade,
+        accent: slots[own].accent,
+      });
+    }
+  }
+
   // A hand holding a limb goes over it, wherever its arm is. Its outline starts partway along the
   // hand, so it's kept apart from what it holds without a line across its own wrist.
   if (holds) {
@@ -1443,7 +1489,7 @@ export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   const pose = poseAt3(clip, timeMs);
   const skeleton = solvePose(pose);
   const behind = pose.behind ? (clip.behind ? [...clip.behind, ...pose.behind] : pose.behind) : clip.behind;
-  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds);
+  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody);
 }
 
 function duration(clip: Clip3D): number {

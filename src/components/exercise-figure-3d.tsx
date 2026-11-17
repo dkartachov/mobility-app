@@ -30,7 +30,10 @@ const COLORS = {
 /** How far the background shows around each part of the body, so limbs that cross stay apart. */
 const OUTLINE = 4.5;
 
-/** One for each part of the body: the torso, the head and the four limbs. A clip adds one for each hand it draws on its own. */
+/**
+ * One for each part of the body: the torso, the head and the four limbs. A clip adds one for each
+ * hand it draws on its own, holding a limb (`holds`) or resting on the body (`handsOnBody`).
+ */
 const BODY_SLOTS = 6;
 
 /**
@@ -138,7 +141,10 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
   const time = useClipTime(clip, playing, paused);
   const stage = useMemo(() => stageClip(clip), [clip]);
   const view = stage.view;
-  const slots = useMemo(() => Array.from({ length: BODY_SLOTS + (clip.holds?.length ?? 0) }, (_, index) => index), [clip]);
+  const slots = useMemo(
+    () => Array.from({ length: BODY_SLOTS + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) }, (_, index) => index),
+    [clip]
+  );
 
   const frame = useDerivedValue(() => frameAt(clip, view, time.get()));
   const shadow = useAnimatedProps(() => ({ d: frame.get().shadow }));

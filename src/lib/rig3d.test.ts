@@ -6,6 +6,7 @@ import {
   BACK_LYING_REVERSE_PIGEON_3D,
   BEHIND_THE_BACK_CHEST_OPENER_3D,
   BELLY_DOWN_FOOT_SPLAY_3D,
+  BLACKBURN_3D,
   BOTTOM_SQUAT_3D,
   BOTTOM_SQUAT_ROTATION_3D,
   CAT_COW_3D,
@@ -400,6 +401,14 @@ describe('3D clips', () => {
       });
     });
 
+    it('draws as many parts as the figure component makes room for', () => {
+      // `exercise-figure-3d.tsx` sets up one shape for each of the six parts of the body, and one more
+      // for each hand a clip draws on its own. A part beyond that would never be drawn.
+      const view = viewOf(clip.camera);
+      const expected = 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0);
+      for (let t = 0; t <= durationOf(clip); t += 100) expect(frameAt(clip, view, t).slots).toHaveLength(expected);
+    });
+
     it('keeps every joint above the floor', () => {
       for (const skeleton of skeletons) {
         for (const joint of joints(skeleton)) expect(joint[1]).toBeGreaterThanOrEqual(8);
@@ -765,6 +774,49 @@ describe('3D clips', () => {
     expect(apart(start)).toBeCloseTo(start.rightLeg[1][2] - start.leftLeg[1][2]);
     expect(apart(fallen)).toBeGreaterThan(apart(start) + 2 * SKELETON.shin * Math.sin((40 * Math.PI) / 180));
     expect(fallen.rightLeg[2][1]).toBeLessThan(start.rightLeg[2][1] - 20);
+  });
+
+  it('sweeps both arms, held off the floor, from the hands on the lower back to straight overhead in blackburn', () => {
+    const skeletons = samples(BLACKBURN_3D).map(solvePose);
+    /** How far round from pointing down by the side an arm is, seen from above: negative is in over the back. */
+    const swept = (arm: Vec3[]) => (Math.atan2((arm[2][2] - arm[0][2]) * Math.sign(arm[0][2]), arm[0][0] - arm[2][0]) * 180) / Math.PI;
+    for (const { rightArm, leftArm, spine } of skeletons) {
+      for (const arm of [rightArm, leftArm]) {
+        // Held up off the floor the whole way, higher at the hand than the shoulder, and straight
+        // from out at the sides on.
+        expect(arm[2][1]).toBeGreaterThan(arm[0][1] + 20);
+        if (swept(arm) >= 75) expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(170);
+      }
+      // Both arms move together, mirroring each other.
+      rightArm.forEach((joint, i) => expect(distance(joint, [leftArm[i][0], leftArm[i][1], -leftArm[i][2]])).toBeCloseTo(0));
+      // Lying flat.
+      for (const point of spine) expect(point[1]).toBeCloseTo(spine[0][1]);
+    }
+    // It starts and ends with the hands resting on the lower back, elbows bent and out to the sides.
+    for (const { rightArm, leftArm, spine } of [skeletons[0], skeletons[skeletons.length - 1]]) {
+      for (const arm of [rightArm, leftArm]) {
+        expect(arm[2][0]).toBeGreaterThan(spine[0][0]);
+        expect(arm[2][0]).toBeLessThan(spine[0][0] + SKELETON.torso / 3);
+        expect(Math.abs(arm[2][2])).toBeLessThan(25);
+        expect(arm[2][1]).toBeGreaterThan(spine[0][1] + 20);
+        expect(angleAt(arm[0], arm[1], arm[2])).toBeLessThan(120);
+        expect(Math.abs(arm[1][2])).toBeGreaterThan(Math.abs(arm[0][2]));
+      }
+    }
+    // Out to the sides partway, then on to overhead.
+    const sweeps = skeletons.map(({ rightArm }) => swept(rightArm));
+    expect(Math.min(...sweeps)).toBeLessThan(0);
+    expect(Math.max(...sweeps)).toBeGreaterThan(160);
+    expect(swept(solvePose(BLACKBURN_3D.keyframes[BLACKBURN_3D.stillFrame].pose).rightArm)).toBeGreaterThan(75);
+    expect(swept(solvePose(BLACKBURN_3D.keyframes[BLACKBURN_3D.stillFrame].pose).rightArm)).toBeLessThan(95);
+    // Nothing ever changes places. The far arm stays behind the body, its shoulder end under the
+    // shoulder blade, with its forearm and hand drawn again over the back, over the legs and under
+    // the near arm; the near arm is over everything.
+    expect(new Set(drawOrders(BLACKBURN_3D))).toEqual(new Set(['leftLeg leftArm torso head rightLeg leftArm hand rightArm']));
+    // Overhead, the hands are either side of the head, clear of it.
+    const up = skeletons[sweeps.indexOf(Math.max(...sweeps))];
+    expect(up.rightArm[2][0]).toBeGreaterThan(up.head[0]);
+    expect(up.rightArm[2][2] - up.head[2]).toBeGreaterThan(SKELETON.head + 10);
   });
 
   it('sinks from standing into a deep squat with the heels down and the elbows inside the knees in bottom squat', () => {

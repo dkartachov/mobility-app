@@ -1573,3 +1573,95 @@ export const RESTING_COSSACK_SQUAT_3D: Clip3D = {
     ...alongArc(1800, RESTING_COSSACK_STEPS, (t) => cossackSink(1 - t)),
   ],
 };
+
+// --- Blackburn: lying face down, both straight arms lifted off the floor sweep from the sides to overhead ---
+
+/** How far the straight arms are lifted off the floor, and how far round they sweep overhead. */
+const BLACKBURN_LIFT = 14;
+const BLACKBURN_OVERHEAD = 168;
+/**
+ * Where the right wrist rests at the start and end: on the lower back, a little out from the spine,
+ * with the fingers toward the middle and the elbow bent up and out.
+ */
+const BLACKBURN_LOWER_BACK: Vec3 = [15, 46, 20];
+/** The arms are straight by the time they've swept this far, straight out to the sides at 90. */
+const BLACKBURN_STRAIGHT_BY = 75;
+
+/**
+ * Face down with the head toward +x and the forehead just off the floor, the legs long with the tops
+ * of the feet on the floor. From the hands resting on the lower back (0), the arms lift off the back
+ * and sweep out to the sides, the elbows straightening on the way, then on round to overhead (1),
+ * held up off the floor the whole time.
+ */
+const blackburn = (t: number): Pose3 => {
+  const body: Pose3 = {
+    pelvis: [0, PRONE_PELVIS_Y, 0],
+    lean: 90,
+    neck: { flex: -12 },
+    rightLeg: { flex: 2.6, abduct: 2, ankle: -88 },
+    leftLeg: { flex: 2.6, abduct: 2, ankle: -88 },
+  };
+  const shoulder = solvePose(body).rightArm[0];
+  // The right hand's way from the shoulder to the lower back, as a sweep round from pointing down
+  // the side (negative is in behind the back), a lift off the floor and a reach.
+  const [dx, dy, dz] = [BLACKBURN_LOWER_BACK[0] - shoulder[0], BLACKBURN_LOWER_BACK[1] - shoulder[1], BLACKBURN_LOWER_BACK[2] - shoulder[2]];
+  const backReach = Math.hypot(dx, dy, dz);
+  const backSweep = (Math.atan2(dz, -dx) * 180) / Math.PI;
+  const backLift = (Math.asin(dy / backReach) * 180) / Math.PI;
+
+  const degrees = mix(backSweep, BLACKBURN_OVERHEAD, t);
+  const straight = smooth(Math.min(1, (degrees - backSweep) / (BLACKBURN_STRAIGHT_BY - backSweep)));
+  const sweep = radians(degrees);
+  const lift = radians(mix(backLift, BLACKBURN_LIFT, straight));
+  const reach = mix(backReach, ARM_REACH, straight);
+  const wrist = (side: 1 | -1): Vec3 => [
+    shoulder[0] - reach * Math.cos(sweep) * Math.cos(lift),
+    shoulder[1] + reach * Math.sin(lift),
+    side * (shoulder[2] + reach * Math.sin(sweep) * Math.cos(lift)),
+  ];
+  // On the back the fingers point in toward the spine and a little down; once the arm is straight
+  // the hand carries on from it.
+  const fingers = (side: 1 | -1): Vec3 => {
+    const along = wrist(side);
+    return mix3([-0.3, -0.3, -side], [(along[0] - shoulder[0]) / reach, (along[1] - shoulder[1]) / reach, (along[2] - side * shoulder[2]) / reach], straight);
+  };
+  return {
+    ...body,
+    pins: {
+      rightHand: { at: wrist(1), toward: fingers(1), pole: [-0.3, 0.4, 1] },
+      leftHand: { at: wrist(-1), toward: fingers(-1), pole: [-0.3, 0.4, -1] },
+    },
+  };
+};
+const BLACKBURN_DOWN = blackburn(0);
+const BLACKBURN_UP = blackburn(1);
+/** Pinned hands go straight between keyframes, cutting across the arc, so it takes this many for the elbows to stay all but straight. */
+const BLACKBURN_STEPS = 32;
+
+export const BLACKBURN_3D: Clip3D = {
+  view: '3d',
+  // From above and behind the right foot: the arms sweep across the floor like the hands of a
+  // clock, both clear of the body, and the mat and shadows still show the figure lying down.
+  // Straight from behind the feet the sweep reads better, but the figure looks like it's standing.
+  camera: { yaw: -50, pitch: 65 },
+  highlight: ['rightArm', 'leftArm'],
+  // The arms are held up off the floor, over the legs lying on it. By the sides a hand is beside
+  // the hip, where by depth alone each arm would go under its leg partway into the sweep.
+  behind: [
+    ['rightLeg', 'rightArm'],
+    ['leftLeg', 'leftArm'],
+  ],
+  // The left arm, on the far side, stays behind the body, its shoulder end under the shoulder
+  // blade, while its forearm and hand lie over the back.
+  handsOnBody: ['leftHand'],
+  trail: 'rightHand',
+  // Halfway, with the arms straight out to the sides.
+  stillFrame: 1 + BLACKBURN_STEPS / 2,
+  keyframes: [
+    { ms: 0, pose: BLACKBURN_DOWN },
+    { ms: 400, pose: BLACKBURN_DOWN },
+    ...alongArc(2400, BLACKBURN_STEPS, blackburn),
+    { ms: 400, pose: BLACKBURN_UP },
+    ...alongArc(2400, BLACKBURN_STEPS, (t) => blackburn(1 - t)),
+  ],
+};
