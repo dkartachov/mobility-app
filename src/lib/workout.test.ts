@@ -125,14 +125,14 @@ describe('filterExercises', () => {
     expect(standing).toEqual(expect.arrayContaining(['standing-forward-fold', 'bottom-squat', 'knight-stretch']));
     expect(standing).toContain('neck-side-stretch');
     expect(standing).not.toContain('seated-pike-stretch');
-    expect(standing).not.toContain('happy-baby');
+    expect(standing).not.toContain('lying-knee-hug');
     expect(standing).not.toContain('cat-cow');
   });
 
   it('keeps only exercises done on a mat, and those that can be done either way', () => {
     const seated = ids(['seated'], [...EQUIPMENT]);
 
-    expect(seated).toEqual(expect.arrayContaining(['seated-pike-stretch', 'happy-baby', 'blackburn', 'cat-cow']));
+    expect(seated).toEqual(expect.arrayContaining(['seated-pike-stretch', 'lying-knee-hug', 'blackburn', 'cat-cow']));
     expect(seated).toContain('neck-side-stretch');
     expect(seated).not.toContain('standing-forward-fold');
     expect(seated).not.toContain('knight-stretch');

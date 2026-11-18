@@ -159,10 +159,15 @@ Moved to the new engine:
 | Lying knee hug | Library | `LYING_KNEE_HUG_3D` |
 | Lying hamstring stretch | Library | `LYING_HAMSTRING_STRETCH_3D` |
 | Seated pike stretch | Library | `SEATED_PIKE_STRETCH_3D` |
+| Three legged downward facing dog | Library | `THREE_LEGGED_DOWNWARD_FACING_DOG_3D` |
+| Standing forward fold | Library | `STANDING_FORWARD_FOLD_3D` |
+| Kneeling wrist stretch | Library | `KNEELING_WRIST_STRETCH_3D` |
+| Floor angels | Library | `FLOOR_ANGELS_3D` |
+| Reverse tabletop | Library | `REVERSE_TABLETOP_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch and seated pike stretch.
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch, seated pike stretch, three legged downward facing dog, standing forward fold, kneeling wrist stretch, floor angels and reverse tabletop.
 
 Library (`src/data/exercises.ts`):
 
@@ -176,17 +181,14 @@ Library (`src/data/exercises.ts`):
 | Elephant walk | `ELEPHANT_WALK` | |
 | Figure four stretch | `FIGURE_FOUR_STRETCH` | |
 | Finger tendon glides | `FINGER_TENDON_GLIDES` | the hand view |
-| Floor angels | `FLOOR_ANGELS` | |
 | Frog rocks | `FROG_ROCKS` | |
 | Frog stretch | `FROG_STRETCH` | |
 | Half kneeling frog stretch | `HALF_KNEELING_FROG_STRETCH` | |
 | Half spinal twist | `HALF_SPINAL_TWIST` | |
 | Half-twisted lizard | `HALF_TWISTED_LIZARD` | |
-| Happy baby | `HAPPY_BABY` | |
 | Hip circles | `HIP_CIRCLES` | |
 | Horse stance | `HORSE_STANCE` | |
 | Inchworm | `INCHWORM` | a travelling camera |
-| Kneeling wrist stretch | `KNEELING_WRIST_STRETCH` | |
 | Knight stretch | `KNIGHT_STRETCH` | |
 | Knight to hamstring | `KNIGHT_TO_HAMSTRING` | |
 | Lizard pose | `LIZARD_POSE` | |
@@ -202,7 +204,6 @@ Library (`src/data/exercises.ts`):
 | Pyramid stretch | `PYRAMID_STRETCH` | |
 | Reverse clamshells | `REVERSE_CLAMSHELLS` | |
 | Reverse scorpion | `REVERSE_SCORPION` | |
-| Reverse tabletop | `REVERSE_TABLETOP` | |
 | Scap mobilization | `SCAP_MOBILIZATION` | |
 | Seated hip internal rotation | `SEATED_HIP_INTERNAL_ROTATION` | mini band |
 | Seated shoulder extension | `SEATED_SHOULDER_EXTENSION` | |
@@ -210,11 +211,9 @@ Library (`src/data/exercises.ts`):
 | Shoulder pass-throughs | `SHOULDER_PASS_THROUGHS` | |
 | Side-lying external rotation | `SIDE_LYING_EXTERNAL_ROTATION` | dumbbell |
 | Sleeper stretch | `SLEEPER_STRETCH` | |
-| Standing forward fold | `STANDING_FORWARD_FOLD` | |
 | The Breakdancer | `THE_BREAKDANCER` | |
 | The Sagittarius | `THE_SAGITTARIUS` | |
 | Thread the needle | `THREAD_THE_NEEDLE` | limbs split in front of and behind the torso |
-| Three legged downward facing dog | `THREE_LEGGED_DOWNWARD_FACING_DOG` | |
 | Windshield wipers with knee lift | `WINDSHIELD_WIPERS_WITH_KNEE_LIFT` | mini band |
 | World's greatest stretch | `WORLDS_GREATEST_STRETCH` | |
 | Wrist rocks | `WRIST_ROCKS` | |

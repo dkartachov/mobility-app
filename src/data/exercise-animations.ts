@@ -2252,48 +2252,22 @@ export const LYING_KNEE_HUG: FigureClip = {
   ...intoHold(LEG_RAISE_DOWN, [{ ms: 1600, pose: KNEE_TO_CHEST_IN }]),
 };
 
-// --- Happy baby: lying on the back, the knees come up toward the armpits and the hands hold the feet ---
+// --- Figure four: lying on the back, one ankle crosses over the other knee, then that leg pulls in ---
 
-const HAPPY_BABY_START: Pose = {
+/** Lying on the back with the knees bent and the feet flat. */
+const KNEES_BENT_ON_BACK: Pose = {
   ...LEG_RAISE_DOWN,
   nearFoot: [560, ANKLE_Y, 0],
   farFoot: [568, ANKLE_Y, 0],
 };
-const HAPPY_BABY_HOLD: Pose = {
-  ...LEG_RAISE_DOWN,
-  nearHand: [372, 318, 0],
-  farHand: [380, 318, 0],
-  nearFoot: [372, 300, 0],
-  farFoot: [380, 300, 0],
-  // The knees open out past the chest toward the armpits, so the thighs look short from the side.
-  knees: [
-    [372, 395],
-    [380, 395],
-  ],
-};
-
-export const HAPPY_BABY: FigureClip = {
-  view: 'side',
-  armBends: [1, 1],
-  ...LYING_CAMERA,
-  ...intoHold(
-    {
-      ...HAPPY_BABY_START,
-      knees: [kneeOf(LEG_RAISE_DOWN.hip, HAPPY_BABY_START.nearFoot), kneeOf(LEG_RAISE_DOWN.hip, HAPPY_BABY_START.farFoot)],
-    },
-    [{ ms: 2000, pose: HAPPY_BABY_HOLD }]
-  ),
-};
-
-// --- Figure four: lying on the back, one ankle crosses over the other knee, then that leg pulls in ---
 
 const FIGURE_FOUR_HIP: Point = [440, 446];
 const FIGURE_FOUR_FAR_FOOT: Extremity = [568, ANKLE_Y, 0];
 const FIGURE_FOUR_FAR_KNEE = kneeOf(FIGURE_FOUR_HIP, FIGURE_FOUR_FAR_FOOT);
 
 const FIGURE_FOUR_START: Pose = {
-  ...HAPPY_BABY_START,
-  knees: [kneeOf(FIGURE_FOUR_HIP, HAPPY_BABY_START.nearFoot), FIGURE_FOUR_FAR_KNEE],
+  ...KNEES_BENT_ON_BACK,
+  knees: [kneeOf(FIGURE_FOUR_HIP, KNEES_BENT_ON_BACK.nearFoot), FIGURE_FOUR_FAR_KNEE],
 };
 /** The near ankle rests across the far knee, the near knee opening toward the camera. */
 const FIGURE_FOUR_CROSSED: Pose = {

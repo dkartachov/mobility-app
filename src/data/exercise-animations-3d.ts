@@ -2279,3 +2279,315 @@ export const SEATED_PIKE_STRETCH_3D: Clip3D = {
     ...alongArc(2200, PIKE_STEPS, (t) => pikeAt(1 - t)),
   ],
 };
+
+// --- Three legged downward facing dog: from the V, one straight leg at a time swings up behind, the hips level ---
+
+/** How far past in line with the back the lifted leg goes: up behind, as high as it will go. */
+const THREE_LEG_PAST_BACK = 12;
+
+/** Which way a leg points from the hip, as an angle in the side-on plane (0 ahead, 90 up). */
+const sideAngle = (from: Vec3, to: Vec3) => Math.atan2(to[1] - from[1], to[0] - from[0]);
+
+const THREE_LEG_V = solvePose(DOWNWARD_DOG);
+/** The planted leg, from the hip down to the ankle. */
+const THREE_LEG_DOWN = sideAngle(THREE_LEG_V.rightLeg[0], THREE_LEG_V.rightLeg[2]);
+/** In line with the back, the line from the neck to the hips carried on past them, and a little higher. */
+const THREE_LEG_UP = sideAngle(THREE_LEG_V.spine[6], THREE_LEG_V.spine[0]) - radians(THREE_LEG_PAST_BACK);
+/** How far the planted foot is turned from the line of its leg, toward the front: the toes tucked under. */
+const THREE_LEG_TUCKED_ANKLE = (() => {
+  const toward = DOWNWARD_DOG.pins!.rightFoot!.toward!;
+  return Math.atan2(toward[1], toward[0]) - THREE_LEG_DOWN;
+})();
+
+/**
+ * The V with the right (1) or left (-1) leg lifted this far, from planted (0) to up behind (1). The
+ * leg stays straight and swings back around the hip, and the foot turns with it, flexed square to
+ * the shin, so the sole faces the ceiling at the top. Blending the foot's direction from the tucked
+ * toes to anything along the leg goes through nearly opposite directions, and the foot spins.
+ */
+const threeLegged = (side: 1 | -1, lift: number): Pose3 => {
+  const hip = side === 1 ? THREE_LEG_V.rightLeg[0] : THREE_LEG_V.leftLeg[0];
+  // Swinging back the long way round, behind the body, never forward under it.
+  const up = THREE_LEG_UP > THREE_LEG_DOWN ? THREE_LEG_UP - 2 * Math.PI : THREE_LEG_UP;
+  const angle = mix(THREE_LEG_DOWN, up, lift);
+  const along: Vec3 = [Math.cos(angle), Math.sin(angle), 0];
+  const planted = DOWNWARD_DOG.pins![side === 1 ? 'rightFoot' : 'leftFoot']!;
+  // The foot keeps its angle to the shin, easing from the tucked toes' angle to square once clear of the floor.
+  const ankle = mix(THREE_LEG_TUCKED_ANKLE, Math.PI / 2, smooth(Math.min(1, Math.max(0, (lift - 0.1) / 0.5))));
+  const foot: Pin = {
+    at: lift === 0 ? planted.at : [hip[0] + LEG_REACH * along[0], hip[1] + LEG_REACH * along[1], hip[2]],
+    toward: lift === 0 ? planted.toward : [Math.cos(angle + ankle), Math.sin(angle + ankle), 0],
+    // The knee's hair of bend stays on the kneecap's side, square to the leg. A fixed pole ends up
+    // in line with the leg as it passes level behind the body, and the bend flips to the back.
+    pole: lift === 0 ? planted.pole : [Math.cos(angle + Math.PI / 2), Math.sin(angle + Math.PI / 2), 0],
+  };
+  return { ...DOWNWARD_DOG, pins: { ...DOWNWARD_DOG.pins, [side === 1 ? 'rightFoot' : 'leftFoot']: foot } };
+};
+/** The foot travels on an arc around the hip, so it takes this many keyframes for the leg to stay straight between them. */
+const THREE_LEG_STEPS = 72;
+const threeLegLift = (side: 1 | -1, ms: number, down = false) => alongArc(ms, THREE_LEG_STEPS, (t) => threeLegged(side, down ? 1 - t : t));
+
+export const THREE_LEGGED_DOWNWARD_FACING_DOG_3D: Clip3D = {
+  view: '3d',
+  camera: DOWNWARD_FACING_DOG_3D.camera,
+  highlight: ['rightLeg', 'leftLeg'],
+  // The right leg up behind.
+  stillFrame: 1 + THREE_LEG_STEPS,
+  keyframes: [
+    { ms: 0, pose: DOWNWARD_DOG },
+    { ms: 400, pose: DOWNWARD_DOG },
+    ...threeLegLift(1, 1300),
+    { ms: 600, pose: threeLegged(1, 1) },
+    ...threeLegLift(1, 1300, true),
+    { ms: 400, pose: DOWNWARD_DOG },
+    ...threeLegLift(-1, 1300),
+    { ms: 600, pose: threeLegged(-1, 1) },
+    ...threeLegLift(-1, 1300, true),
+  ],
+};
+
+// --- Standing forward fold: feet planted hip-width apart and the knees soft, hinging from the hips until the head and arms hang ---
+
+const FOLD_STANDING = solvePose(STANDING);
+/** The feet stay planted where they stand. */
+const FOLD_FEET = {
+  rightFoot: { at: FOLD_STANDING.rightLeg[2], toward: [1, 0, 0] as Vec3 },
+  leftFoot: { at: FOLD_STANDING.leftLeg[2], toward: [1, 0, 0] as Vec3 },
+};
+/** All the way down: the hinge at the hips, the back rounding over, the neck letting the head hang, and the knees soft. */
+const FOLD = { lean: 78, spine: 46, neck: 30, knees: 14, hipsBack: 16 };
+
+/**
+ * The fold this far down, from standing (0). The hips go back over the heels as the body tips, so
+ * the weight stays over the feet, and drop as the knees soften. The arms hang straight down from
+ * the shoulders, as they would.
+ */
+const forwardFoldAt = (t: number): Pose3 => {
+  const knee = FOLD.knees * t;
+  // Bending the knees with the shins upright drops the hips by this much.
+  const drop = SKELETON.thigh * (1 - Math.cos(radians(knee)));
+  const body: Pose3 = {
+    pelvis: [-FOLD.hipsBack * t, STANDING.pelvis[1] - drop, 0],
+    lean: FOLD.lean * t,
+    spine: { flex: FOLD.spine * t },
+    neck: { flex: FOLD.neck * t },
+    pins: FOLD_FEET,
+  };
+  const elbow = mix(8, 4, t);
+  const arm = (flex: number): ArmPose => ({ flex, abduct: 5, elbow });
+  // Raising the arm forward swings the hand ahead of the shoulder; hanging, it's right below it.
+  const ahead = (flex: number) => {
+    const [shoulder, , wrist] = solvePose({ ...body, rightArm: arm(flex) }).rightArm;
+    return wrist[0] - shoulder[0];
+  };
+  let [back, forward] = [-40, 160];
+  for (let i = 0; i < 40; i++) {
+    const flex = (back + forward) / 2;
+    if (ahead(flex) > 0) forward = flex;
+    else back = flex;
+  }
+  const hang = arm((back + forward) / 2);
+  return { ...body, rightArm: hang, leftArm: hang };
+};
+const FOLD_UP = forwardFoldAt(0);
+const FOLD_DOWN = forwardFoldAt(1);
+const FOLD_STEPS = 16;
+
+export const STANDING_FORWARD_FOLD_3D: Clip3D = {
+  view: '3d',
+  camera: { yaw: 24, pitch: 10 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The far arm hangs beside its leg standing, and ahead of the shins folded, never across it, so it
+  // stays behind it rather than swapping places as it swings forward.
+  behind: [['leftArm', 'leftLeg']],
+  stillFrame: 1 + FOLD_STEPS,
+  keyframes: [
+    { ms: 0, pose: FOLD_UP },
+    { ms: 500, pose: FOLD_UP },
+    ...alongArc(2200, FOLD_STEPS, forwardFoldAt),
+    { ms: 3500, pose: FOLD_DOWN },
+    ...alongArc(2200, FOLD_STEPS, (t) => forwardFoldAt(1 - t)),
+  ],
+};
+
+// --- Kneeling wrist stretch: on all fours with the fingers turned back toward the knees, the hips shift back with the arms straight ---
+
+/** The knees stay planted under where the hips start, as on all fours. */
+const WRIST_KNEE_X = ALL_FOURS.pelvis[0];
+/** The hands stay planted under the shoulders, the palms flat and the fingers pointing back at the knees. */
+const WRIST_HANDS = ALL_FOURS.pins.rightHand.at;
+/** How far the thighs tip back from upright over the knees by the end: the hips most of the way back toward the heels. */
+const WRIST_THIGH_BACK = 46;
+
+/**
+ * The body with the hips this far back (0 over the knees, 1 as far as they go), swinging around the
+ * knees, and tipped as far forward as keeps the arms straight, so the shoulders move back behind
+ * the hands and the wrists bend further.
+ */
+const wristStretchAt = (t: number): Pose3 => {
+  const thigh = radians(90 + WRIST_THIGH_BACK * t);
+  const pelvis: Vec3 = [WRIST_KNEE_X + SKELETON.thigh * Math.cos(thigh), ANKLE_Y + SKELETON.thigh * Math.sin(thigh), 0];
+  const leg = (side: 1 | -1): Pin =>
+    pinVia([pelvis[0], pelvis[1], side * SKELETON.hip], [WRIST_KNEE_X, ANKLE_Y, side * SKELETON.hip], [WRIST_KNEE_X - SKELETON.shin, ANKLE_Y, side * SKELETON.hip], [-1, 0, 0]);
+  const hand = (side: 1 | -1): Pin => ({ at: [WRIST_HANDS[0], WRIST_HANDS[1], side * WRIST_HANDS[2]], toward: [-1, 0, 0], pole: [-1, 0, side * 0.3] });
+  const body = (lean: number): Pose3 => ({
+    pelvis,
+    lean,
+    neck: { flex: 12 },
+    pins: { rightFoot: leg(1), leftFoot: leg(-1), rightHand: hand(1), leftHand: hand(-1) },
+  });
+  const gap = (lean: number) => distance(solvePose(body(lean)).rightArm[0], [WRIST_HANDS[0], WRIST_HANDS[1], WRIST_HANDS[2]]);
+  // Tipping forward brings the shoulders toward the hands until they're right over them.
+  let nearest = 0;
+  for (let tip = 0; tip <= 150; tip += 2) if (gap(tip) < gap(nearest)) nearest = tip;
+  let [upright, tipped] = [0, nearest];
+  const reach = 0.998 * ARM_REACH;
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + tipped) / 2;
+    if (gap(tip) > reach) upright = tip;
+    else tipped = tip;
+  }
+  return body((upright + tipped) / 2);
+};
+const WRIST_FORWARD = wristStretchAt(0);
+const WRIST_BACK = wristStretchAt(1);
+const WRIST_STEPS = 12;
+
+export const KNEELING_WRIST_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // As for cat cow: the hips' shift back is flat on the screen, and the fingers point back along it.
+  camera: { yaw: 22, pitch: 16 },
+  highlight: ['rightArm', 'leftArm'],
+  stillFrame: 1 + WRIST_STEPS,
+  keyframes: [
+    { ms: 0, pose: WRIST_FORWARD },
+    { ms: 600, pose: WRIST_FORWARD },
+    ...alongArc(1800, WRIST_STEPS, wristStretchAt),
+    { ms: 3000, pose: WRIST_BACK },
+    ...alongArc(1800, WRIST_STEPS, (t) => wristStretchAt(1 - t)),
+  ],
+};
+
+// --- Floor angels: lying on the back with the knees bent, the arms slide along the floor from a goalpost shape to overhead ---
+
+/** The knees point at the ceiling with the feet flat, hip-width apart. */
+const ANGEL_KNEE = { x: 64, y: 99 };
+const ANGEL_ANKLE_X = ANGEL_KNEE.x + Math.sqrt(SKELETON.shin ** 2 - (ANGEL_KNEE.y - ANKLE_Y) ** 2);
+const ANGEL_LEGS = ((): Pose3['pins'] => {
+  const foot = (side: 1 | -1): Pin =>
+    pinVia(
+      [LYING_ON_BACK.pelvis[0], LYING_ON_BACK.pelvis[1], side * SKELETON.hip],
+      [ANGEL_KNEE.x, ANGEL_KNEE.y, side * SKELETON.hip],
+      [ANGEL_ANKLE_X, ANKLE_Y, side * SKELETON.hip],
+      [1, 0, 0]
+    );
+  return { rightFoot: foot(1), leftFoot: foot(-1) };
+})();
+const ANGEL_SHOULDER = solvePose({ ...LYING_ON_BACK, pins: ANGEL_LEGS }).rightArm[0];
+
+/**
+ * The arms with the upper arm this far round from the side of the body (90 straight out, 180 along
+ * past the head) and the elbow bent this far toward the head, the whole arm flat on the floor at
+ * the shoulders' height, the backs of the hands down.
+ */
+const angelArms = (out: number, elbow: number): NonNullable<Pose3['pins']> => {
+  const hand = (side: 1 | -1): Pin => {
+    const shoulder: Vec3 = [ANGEL_SHOULDER[0], ANGEL_SHOULDER[1], side * ANGEL_SHOULDER[2]];
+    // Toward the feet is +x; the head is -x.
+    const upper: Vec3 = [Math.cos(radians(out)), 0, side * Math.sin(radians(out))];
+    const fore: Vec3 = [Math.cos(radians(out + elbow)), 0, side * Math.sin(radians(out + elbow))];
+    const at = (from: Vec3, along: Vec3, length: number): Vec3 => [from[0] + length * along[0], from[1], from[2] + length * along[2]];
+    // A hair short of the bones' length, so the elbow is solved onto the floor and not past it.
+    const elbowAt = at(shoulder, upper, 0.999 * SKELETON.upperArm);
+    return pinVia(shoulder, elbowAt, at(elbowAt, fore, 0.999 * SKELETON.forearm), fore);
+  };
+  return { rightHand: hand(1), leftHand: hand(-1) };
+};
+
+/** From the goalpost (0) to overhead (1): the upper arms sweep round past the head as the elbows open. */
+const angelAt = (t: number): Pose3 => ({ ...LYING_ON_BACK, pins: { ...ANGEL_LEGS, ...angelArms(mix(90, 152, t), mix(90, 22, t)) } });
+const ANGEL_GOALPOST = angelAt(0);
+const ANGEL_OVERHEAD = angelAt(1);
+const ANGEL_STEPS = 12;
+
+export const FLOOR_ANGELS_3D: Clip3D = {
+  view: '3d',
+  // From above and to the right, so the sweep along the floor shows nearly flat on.
+  camera: { yaw: 0, pitch: 62 },
+  highlight: ['rightArm', 'leftArm'],
+  stillFrame: 0,
+  keyframes: [
+    { ms: 0, pose: ANGEL_GOALPOST },
+    ...alongArc(2000, ANGEL_STEPS, angelAt),
+    { ms: 400, pose: ANGEL_OVERHEAD },
+    ...alongArc(2000, ANGEL_STEPS, (t) => angelAt(1 - t)),
+    { ms: 400, pose: ANGEL_GOALPOST },
+  ],
+};
+
+// --- Reverse tabletop: sitting with the knees bent and the hands behind, fingers forward, the hips press up until the body is a table ---
+
+/** The feet stay planted flat, hip-width apart, a shin's length under where the knees are at the top. */
+const TABLE_FEET_X = SKELETON.thigh;
+/**
+ * The hands stay planted behind, shoulder-width apart, fingers pointing forward at the feet: far
+ * enough back that the arms lean back a little from upright at the top, as they do.
+ */
+const TABLE_HANDS: Vec3 = [-150, WRIST_Y, SKELETON.shoulder];
+/**
+ * Where the pelvis is sitting (0) and at the top (1). At the top the thighs are level and the shins
+ * upright under the knees. The arms are longer than the shins, so with them straight the shoulders
+ * sit a little higher than the hips.
+ */
+const TABLE_PELVIS = { sitting: [-30, SIT_PELVIS_Y, 0] as Vec3, up: [0, ANKLE_Y + SKELETON.shin, 0] as Vec3 };
+/** The chin tucked a little sitting, and the head in line with the spine at the top: tipped back, it hangs off the shoulders. */
+const TABLE_NECK = { sitting: 10, up: 0 };
+
+/**
+ * Reverse tabletop this far up. The hips rise along a gentle arc, forward over the feet, and the
+ * body tips back as far as keeps the arms straight to the planted hands.
+ */
+const tabletopAt = (t: number): Pose3 => {
+  const [from, to] = [TABLE_PELVIS.sitting, TABLE_PELVIS.up];
+  // The hips come up before they come forward, as they press off the floor.
+  const pelvis: Vec3 = [mix(from[0], to[0], smooth(t)), mix(from[1], to[1], Math.sin((Math.PI / 2) * t)), 0];
+  const foot = (side: 1 | -1): Pin => ({ at: [TABLE_FEET_X, ANKLE_Y, side * SKELETON.hip], toward: [1, 0, 0], pole: [1, 1, 0] });
+  const hand = (side: 1 | -1): Pin => ({ at: [TABLE_HANDS[0], TABLE_HANDS[1], side * TABLE_HANDS[2]], toward: [1, 0, 0], pole: [-1, 0, side * 0.2] });
+  const body = (lean: number): Pose3 => ({
+    pelvis,
+    lean,
+    neck: { flex: mix(TABLE_NECK.sitting, TABLE_NECK.up, smooth(t)) },
+    pins: { rightFoot: foot(1), leftFoot: foot(-1), rightHand: hand(1), leftHand: hand(-1) },
+  });
+  const gap = (lean: number) => distance(solvePose(body(lean)).rightArm[0], TABLE_HANDS);
+  // Tipping back brings the shoulders toward the hands, so the lean that reaches is found on the way there.
+  const reach = ARM_REACH;
+  let nearest = 0;
+  for (let tip = 0; tip >= -120; tip -= 2) if (gap(tip) < gap(nearest)) nearest = tip;
+  let [upright, back] = [0, nearest];
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + back) / 2;
+    if (gap(tip) > reach) upright = tip;
+    else back = tip;
+  }
+  return body((upright + back) / 2);
+};
+const TABLE_SITTING = tabletopAt(0);
+const TABLE_UP = tabletopAt(1);
+const TABLE_STEPS = 16;
+
+export const REVERSE_TABLETOP_3D: Clip3D = {
+  view: '3d',
+  // From the side, a little in front and above: the hips' rise is flat on the screen, and the
+  // near arm and leg are in front of the body.
+  camera: { yaw: 16, pitch: 10 },
+  highlight: ['torso'],
+  stillFrame: 1 + TABLE_STEPS,
+  keyframes: [
+    { ms: 0, pose: TABLE_SITTING },
+    { ms: 600, pose: TABLE_SITTING },
+    ...alongArc(1800, TABLE_STEPS, tabletopAt),
+    { ms: 3000, pose: TABLE_UP },
+    ...alongArc(1800, TABLE_STEPS, (t) => tabletopAt(1 - t)),
+  ],
+};

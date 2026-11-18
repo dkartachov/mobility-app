@@ -26,14 +26,14 @@ async function open(params: { id: string; list?: string }) {
 
 describe('exercise screen', () => {
   it('opens on the tapped exercise, placed in the list it came from', async () => {
-    await open({ id: 'butterfly', list: 'pancake,butterfly,happy-baby' });
+    await open({ id: 'butterfly', list: 'pancake,butterfly,puppy-pose' });
 
     expect(await screen.findByText(/2 of 3/)).toBeTruthy();
     expect(screen.getByRole('header', { name: 'Butterfly' })).toBeTruthy();
   });
 
   it('plays only the exercise on screen, switching over on a swipe', async () => {
-    await open({ id: 'butterfly', list: 'pancake,butterfly,happy-baby' });
+    await open({ id: 'butterfly', list: 'pancake,butterfly,puppy-pose' });
     expect(await screen.findAllByText('Playing')).toHaveLength(1);
     expect(screen.getByRole('header', { name: 'Butterfly' })).toBeTruthy();
 
