@@ -911,10 +911,10 @@ const ANKLE_MOB_FRONT_ANKLE: Vec3 = [0, ANKLE_Y, SKELETON.hip];
  * and travel forward as the knee drives over the toes. The hands rest on the waist, elbows out and
  * back, clear of the legs.
  */
-const ankleMobilizationAt = (shin: number, lean: number): Pose3 => {
+const ankleMobilizationAt = (shin: number, lean: number, backKnee: Vec3 = ANKLE_MOB_BACK_KNEE): Pose3 => {
   const tip = (shin * Math.PI) / 180;
   const front = [SKELETON.shin * Math.sin(tip), ANKLE_Y + SKELETON.shin * Math.cos(tip)];
-  const back = [ANKLE_MOB_BACK_KNEE[0], ANKLE_MOB_BACK_KNEE[1]];
+  const back = [backKnee[0], backKnee[1]];
   const gap = Math.hypot(front[0] - back[0], front[1] - back[1]);
   const rise = Math.sqrt(SKELETON.thigh ** 2 - (gap / 2) ** 2);
   const pelvis: Vec3 = [
@@ -928,7 +928,7 @@ const ankleMobilizationAt = (shin: number, lean: number): Pose3 => {
     neck: { flex: -lean },
     pins: {
       rightFoot: { at: ANKLE_MOB_FRONT_ANKLE, toward: [1, 0, 0] },
-      leftFoot: { at: [ANKLE_MOB_BACK_KNEE[0] - SKELETON.shin, ANKLE_Y, -SKELETON.hip], toward: [-1, 0, 0], pole: [1, -1, 0] },
+      leftFoot: { at: [backKnee[0] - SKELETON.shin, ANKLE_Y, backKnee[2]], toward: [-1, 0, 0], pole: [1, -1, 0] },
       rightHand: { at: [pelvis[0] + 4, pelvis[1] + 49, 30], toward: [1, -0.5, 0], pole: [-1, 0, 1] },
       leftHand: { at: [pelvis[0] + 4, pelvis[1] + 49, -30], toward: [1, -0.5, 0], pole: [-1, 0, -1] },
     },
@@ -1150,8 +1150,8 @@ const SQUAT_ANKLE_Z = 32;
 type SquatLegs = { forward: number; out: number; thigh: number };
 
 /** Straight legs, with the hips this far behind the heels. */
-const squatStraight = (back: number): SquatLegs => {
-  const out = (SKELETON.hip - SQUAT_ANKLE_Z) / 2;
+const squatStraight = (back: number, ankleZ = SQUAT_ANKLE_Z): SquatLegs => {
+  const out = (SKELETON.hip - ankleZ) / 2;
   const level = Math.sqrt(1 - (out / SKELETON.thigh) ** 2);
   return { forward: -back / 2, out, thigh: (Math.asin(back / 2 / (SKELETON.thigh * level)) * 180) / Math.PI };
 };
@@ -1167,12 +1167,13 @@ const mixLegs = (a: SquatLegs, b: SquatLegs, t: number): SquatLegs => ({
 });
 
 /**
- * Where legs bent like that put the pelvis, and the pins that keep the feet flat with the toes
- * turned out this far. The knees are worked out first and the hips from them, so the bones keep
- * their length and the knees land where they're put. `knee` is the right one.
+ * Where legs bent like that put the pelvis, and the pins that keep the feet flat, `ankleZ` either
+ * side of the middle, with the toes turned out this far. The knees are worked out first and the
+ * hips from them, so the bones keep their length and the knees land where they're put. `knee` is
+ * the right one.
  */
-const squatStance = (toesOut: number, { forward, out, thigh }: SquatLegs): { pelvis: Vec3; knee: Vec3; pins: NonNullable<Pose3['pins']> } => {
-  const knee: Vec3 = [forward, ANKLE_Y + Math.sqrt(SKELETON.shin ** 2 - forward ** 2 - out ** 2), SQUAT_ANKLE_Z + out];
+const squatStance = (toesOut: number, { forward, out, thigh }: SquatLegs, ankleZ = SQUAT_ANKLE_Z): { pelvis: Vec3; knee: Vec3; pins: NonNullable<Pose3['pins']> } => {
+  const knee: Vec3 = [forward, ANKLE_Y + Math.sqrt(SKELETON.shin ** 2 - forward ** 2 - out ** 2), ankleZ + out];
   // The thigh comes in from the knee to the hip joint, and what's left of its length swings back.
   const level = SKELETON.thigh * Math.sqrt(1 - ((SKELETON.hip - knee[2]) / SKELETON.thigh) ** 2);
   const hip: Vec3 = [knee[0] - level * Math.sin(radians(thigh)), knee[1] + level * Math.cos(radians(thigh)), SKELETON.hip];
@@ -1180,7 +1181,7 @@ const squatStance = (toesOut: number, { forward, out, thigh }: SquatLegs): { pel
     const pin = pinVia(
       [hip[0], hip[1], side * hip[2]],
       [knee[0], knee[1], side * knee[2]],
-      [0, ANKLE_Y, side * SQUAT_ANKLE_Z],
+      [0, ANKLE_Y, side * ankleZ],
       [Math.cos(radians(toesOut)), 0, side * Math.sin(radians(toesOut))]
     );
     // A straight leg has no bend to aim, so the knee is nudged the way it goes when it gives: forward and out.
@@ -2589,5 +2590,302 @@ export const REVERSE_TABLETOP_3D: Clip3D = {
     ...alongArc(1800, TABLE_STEPS, tabletopAt),
     { ms: 3000, pose: TABLE_UP },
     ...alongArc(1800, TABLE_STEPS, (t) => tabletopAt(1 - t)),
+  ],
+};
+
+// --- Knight stretch: half kneeling with both knees at 90°, the pelvis tucks under and the hips shift forward over the planted back knee ---
+
+/**
+ * Half kneeling as in ankle mobilization, but with the back knee a thigh's length behind the front
+ * foot, so that upright (0) both knees are at 90°, the hips straight over the back knee. As the
+ * front shin tips forward, the hips travel forward and a little down and the back thigh swings back
+ * behind them, opening the front of that hip. The pelvis tucks under as it goes: the whole body tips
+ * back from the pelvis and the spine rounds back up by as much, so the chest stays upright.
+ */
+const KNIGHT_BACK_KNEE: Vec3 = [-SKELETON.thigh, ANKLE_Y, -SKELETON.hip];
+const knightAt = (t: number): Pose3 => {
+  const pose = ankleMobilizationAt(mix(0, 22, t), 0, KNIGHT_BACK_KNEE);
+  const tuck = 7 * t;
+  return { ...pose, lean: -tuck, spine: { flex: tuck }, neck: { flex: 0 } };
+};
+const KNIGHT_UPRIGHT = knightAt(0);
+const KNIGHT_FORWARD = knightAt(1);
+const KNIGHT_STEPS = 10;
+
+export const KNIGHT_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From the back leg's side, a little in front and above: the stretch is in the front of that hip,
+  // so its thigh swinging back is nearest and flat on the screen, and the front leg shows beyond.
+  camera: { yaw: 162, pitch: 12 },
+  highlight: ['leftLeg'],
+  stillFrame: 1 + KNIGHT_STEPS,
+  keyframes: [
+    { ms: 0, pose: KNIGHT_UPRIGHT },
+    { ms: 500, pose: KNIGHT_UPRIGHT },
+    ...alongArc(1800, KNIGHT_STEPS, knightAt),
+    { ms: 3500, pose: KNIGHT_FORWARD },
+    ...alongArc(1600, KNIGHT_STEPS, (t) => knightAt(1 - t)),
+  ],
+};
+
+// --- Horse stance: from the front, feet wide with the toes a little out, sinking until the thighs are level and holding ---
+
+/** The ankles sit this far either side of the middle: about twice shoulder-width apart. */
+const HORSE_ANKLE_Z = 88;
+const HORSE_TOES_OUT = 15;
+/**
+ * At the bottom the knees are over the toes, pushed out along the way the feet point, and the
+ * thighs are level (`thigh: 90`).
+ */
+const HORSE_DOWN_LEGS: SquatLegs = {
+  forward: 24 * Math.cos(radians(HORSE_TOES_OUT)),
+  out: 24 * Math.sin(radians(HORSE_TOES_OUT)) + 6,
+  thigh: 90,
+};
+
+/**
+ * This far down into the stance, from 0, standing, to 1. The chest stays up, the body leaning
+ * forward only as far as keeps it over the feet. The hands rest on top of the upper thighs, elbows
+ * out to the sides; standing, the thighs are out of reach, so the straight arms hang toward them
+ * and the hands settle on them on the way down.
+ */
+const HORSE_HAND_ALONG = 0.5;
+/** How far above the middle of the thigh the palm rests, on its top. */
+const HORSE_HAND_ON_TOP = 13;
+const horseStanceAt = (t: number): Pose3 => {
+  const { pelvis, pins } = squatStance(HORSE_TOES_OUT, mixLegs(squatStraight(0, HORSE_ANKLE_Z), HORSE_DOWN_LEGS, t), HORSE_ANKLE_Z);
+  const lean = 14 * t;
+  const body: Pose3 = { pelvis, lean, neck: { flex: -lean }, pins };
+  const skeleton = solvePose(body);
+  const hand = (side: 1 | -1): Pin => {
+    const [hip, knee] = side === 1 ? skeleton.rightLeg : skeleton.leftLeg;
+    const shoulder = side === 1 ? skeleton.rightArm[0] : skeleton.leftArm[0];
+    const onThigh = mix3(hip, knee, HORSE_HAND_ALONG);
+    const target: Vec3 = [onThigh[0], onThigh[1] + HORSE_HAND_ON_TOP, onThigh[2]];
+    const at = distance(shoulder, target) > ARM_REACH ? toward(shoulder, target, ARM_REACH) : target;
+    // The fingers point down the thigh toward the knee.
+    return { at, toward: [knee[0] - hip[0], knee[1] - hip[1] - 20, knee[2] - hip[2]], pole: [-0.3, 0, side] };
+  };
+  return { ...body, pins: { ...pins, rightHand: hand(1), leftHand: hand(-1) } };
+};
+const HORSE_UP = horseStanceAt(0);
+const HORSE_DOWN = horseStanceAt(1);
+const HORSE_STEPS = 10;
+
+export const HORSE_STANCE_3D: Clip3D = {
+  view: '3d',
+  // From straight in front and a little above, where the knees push out across the screen and the
+  // level thighs come toward the camera.
+  camera: { yaw: 90, pitch: 12 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The thighs come off the front of the hips toward the camera, so they stay over them.
+  over: ['rightLeg', 'leftLeg'],
+  // The hands rest on top of the thighs, so the arms are over the legs.
+  behind: [
+    ['rightLeg', 'rightArm'],
+    ['leftLeg', 'leftArm'],
+  ],
+  stillFrame: 1 + HORSE_STEPS,
+  keyframes: [
+    { ms: 0, pose: HORSE_UP },
+    { ms: 500, pose: HORSE_UP },
+    ...alongArc(1800, HORSE_STEPS, horseStanceAt),
+    { ms: 4000, pose: HORSE_DOWN },
+    ...alongArc(1600, HORSE_STEPS, (t) => horseStanceAt(1 - t)),
+  ],
+};
+
+// --- Lying windshield wiper hold: lying on the back, knees bent and feet planted wide, both knees fall to one side and stay there ---
+
+/** The feet planted flat a little wider than the hips, a shin's reach down from the knees. */
+const WIPER_ANKLE: Vec3 = [ANGEL_ANKLE_X, ANKLE_Y, 30];
+/** How far round the knees fall from pointing at the ceiling. */
+const WIPER_DROP = 62;
+
+/**
+ * Both knees turned this far round from upright, toward the figure's right for a positive number.
+ * The feet stay planted where they are, so each knee swings on a circle around the line from its
+ * hip to its ankle and the thighs and shins keep their length: the right thigh turns out and the
+ * left one in. The arms lie straight out to the sides on the floor.
+ */
+const wiperAt = (drop: number): Pose3 => {
+  const body: Pose3 = { ...LYING_ON_BACK, pins: angelArms(80, 0) };
+  const skeleton = solvePose({ ...body, pins: { ...body.pins, ...ANGEL_LEGS } });
+  const foot = (side: 1 | -1): Pin => {
+    const hip = side === 1 ? skeleton.rightLeg[0] : skeleton.leftLeg[0];
+    const ankle: Vec3 = [WIPER_ANKLE[0], WIPER_ANKLE[1], side * WIPER_ANKLE[2]];
+    const axis = toward([0, 0, 0], [ankle[0] - hip[0], ankle[1] - hip[1], ankle[2] - hip[2]], 1);
+    const gap = distance(hip, ankle);
+    const middle = mix3(hip, ankle, 0.5);
+    const radius = Math.sqrt(SKELETON.thigh ** 2 - (gap / 2) ** 2) * 0.999;
+    // Straight up, square to the axis, and the way round toward the figure's right from there.
+    const lift = axis[1];
+    const up = toward([0, 0, 0], [-lift * axis[0], 1 - lift * axis[1], -lift * axis[2]], 1);
+    let across: Vec3 = [axis[1] * up[2] - axis[2] * up[1], axis[2] * up[0] - axis[0] * up[2], axis[0] * up[1] - axis[1] * up[0]];
+    if (across[2] < 0) across = [-across[0], -across[1], -across[2]];
+    const r = radians(drop);
+    const knee: Vec3 = [
+      middle[0] + radius * (up[0] * Math.cos(r) + across[0] * Math.sin(r)),
+      middle[1] + radius * (up[1] * Math.cos(r) + across[1] * Math.sin(r)),
+      middle[2] + radius * (up[2] * Math.cos(r) + across[2] * Math.sin(r)),
+    ];
+    return pinVia(hip, knee, ankle, [1, 0, 0]);
+  };
+  return { ...body, pins: { ...body.pins, rightFoot: foot(1), leftFoot: foot(-1) } };
+};
+const WIPER_UP = wiperAt(0);
+const WIPER_LEFT = wiperAt(-WIPER_DROP);
+const WIPER_STEPS = 10;
+
+export const LYING_WINDSHIELD_WIPER_HOLD_3D: Clip3D = {
+  view: '3d',
+  // From the right, toward the feet and above: the bent knees show from the side, and they fall
+  // to the left, away from the camera, where the two legs lie one beyond the other rather than
+  // over each other. Straight from the feet, the legs are end-on and read as straight. It's a
+  // passive stretch, so one side is shown, held; the exercise says to switch.
+  camera: { yaw: 40, pitch: 42 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The thighs rise off the front of the hips toward the camera above, so they stay over them. The
+  // far one's top otherwise went under the hips partway into the fall.
+  over: ['rightLeg', 'leftLeg'],
+  stillFrame: 1 + WIPER_STEPS,
+  keyframes: [
+    { ms: 0, pose: WIPER_UP },
+    { ms: 600, pose: WIPER_UP },
+    ...alongArc(2000, WIPER_STEPS, (t) => wiperAt(-WIPER_DROP * t)),
+    { ms: 3500, pose: WIPER_LEFT },
+    ...alongArc(1800, WIPER_STEPS, (t) => wiperAt(-WIPER_DROP * (1 - t))),
+  ],
+};
+
+// --- Frog stretch and frog rocks: knees wide with the shins parallel behind them and the feet turned out, on the forearms, the hips sinking back ---
+
+/** The knees rest on the floor this far either side of the middle, level with the pelvis's start. */
+const FROG_KNEE_Z = 72;
+/**
+ * Where the pelvis is, this far forward of the knees. The knees stay planted, so the hips move on
+ * a thigh's length from them: highest straight over the knees' line, lower forward or back of it.
+ */
+const frogPelvis = (forward: number): Vec3 => [
+  forward,
+  ANKLE_Y + Math.sqrt(SKELETON.thigh ** 2 - (FROG_KNEE_Z - SKELETON.hip) ** 2 - forward ** 2),
+  0,
+];
+/** The spine is straight here, so the shoulders sit a torso's length from the pelvis. */
+const FROG_TORSO = distance(solvePose({ pelvis: [0, 100, 0], lean: 90 }).rightArm[0], [0, 100, SKELETON.shoulder]);
+/**
+ * The pelvis and the lean of the body that put the right shoulder at `shoulder` (its height and how
+ * far forward), with the hips on their way round the knees.
+ */
+const frogBodyAt = (shoulder: readonly [number, number]): { pelvis: Vec3; lean: number } => {
+  const gap = (forward: number) => {
+    const pelvis = frogPelvis(forward);
+    return Math.hypot(shoulder[0] - pelvis[0], shoulder[1] - pelvis[1]);
+  };
+  // The nearer the hips come forward, the nearer they are to the shoulders.
+  let [back, front] = [-80, Math.min(80, shoulder[0])];
+  for (let i = 0; i < 40; i++) {
+    const forward = (back + front) / 2;
+    if (gap(forward) > FROG_TORSO) back = forward;
+    else front = forward;
+  }
+  const pelvis = frogPelvis((back + front) / 2);
+  return { pelvis, lean: (Math.atan2(shoulder[0] - pelvis[0], shoulder[1] - pelvis[1]) * 180) / Math.PI };
+};
+
+/**
+ * On the forearms with the hips over the knees' line: the elbows on the floor straight under the
+ * shoulders and the forearms flat ahead, the hands planted where they'll stay.
+ */
+const FROG_ELBOW = (() => {
+  const shoulderY = WRIST_Y + 0.999 * SKELETON.upperArm;
+  const pelvis = frogPelvis(0);
+  return [pelvis[0] + Math.sqrt(FROG_TORSO ** 2 - (shoulderY - pelvis[1]) ** 2), WRIST_Y] as const;
+})();
+const FROG_WRIST = [FROG_ELBOW[0] + 0.999 * SKELETON.forearm, WRIST_Y] as const;
+
+/** Where the knees and feet stay: the shins lying flat and parallel straight back, the feet turned out to the sides. */
+const frogLegs = (pelvis: Vec3): NonNullable<Pose3['pins']> => {
+  const foot = (side: 1 | -1): Pin =>
+    pinVia([pelvis[0], pelvis[1], side * SKELETON.hip], [0, ANKLE_Y, side * FROG_KNEE_Z], [-0.999 * SKELETON.shin, ANKLE_Y, side * FROG_KNEE_Z], [0, 0, side]);
+  return { rightFoot: foot(1), leftFoot: foot(-1) };
+};
+
+/**
+ * The whole frog with the right shoulder at `shoulder`, the hands on the floor at `FROG_WRIST`. The
+ * elbow is where the upper arm and forearm meet below the line from shoulder to wrist, bending back
+ * toward the knees, so it comes down onto the floor as the body lowers.
+ */
+const frogAt = (shoulder: readonly [number, number]): Pose3 => {
+  const { pelvis, lean } = frogBodyAt(shoulder);
+  const [sx, sy] = shoulder;
+  const [wx, wy] = FROG_WRIST;
+  const reach = Math.hypot(wx - sx, wy - sy);
+  const half = Math.sqrt(Math.max(0, SKELETON.upperArm ** 2 - (reach / 2) ** 2));
+  // Of the two places the bones meet, the lower one, toward the knees.
+  const across = [-(wy - sy) / reach, (wx - sx) / reach];
+  const side = across[1] > 0 ? -1 : 1;
+  const elbow2 = [(sx + wx) / 2 + side * half * across[0], (sy + wy) / 2 + side * half * across[1]];
+  const hand = (side: 1 | -1): Pin =>
+    pinVia([sx, sy, side * SKELETON.shoulder], [elbow2[0], elbow2[1], side * SKELETON.shoulder], [wx, wy, side * SKELETON.shoulder], [1, 0, 0]);
+  return {
+    pelvis,
+    lean,
+    neck: { flex: 8 },
+    pins: { ...frogLegs(pelvis), rightHand: hand(1), leftHand: hand(-1) },
+  };
+};
+
+/** Resting on the forearms with the upper arms tipped this far forward of upright (negative: the shoulders behind the elbows, the hips back). */
+const frogOnForearms = (tip: number): Pose3 =>
+  frogAt([FROG_ELBOW[0] + 0.999 * SKELETON.upperArm * Math.sin(radians(tip)), FROG_ELBOW[1] + 0.999 * SKELETON.upperArm * Math.cos(radians(tip))]);
+
+/**
+ * From the right, a little in front and above: the hips sinking back is flat on the screen, and the
+ * far knee shows out wide beyond the near one. From behind, the head went under the arms, and
+ * from higher the legs lying flat hid the bend at the knees.
+ */
+const FROG_CAMERA = { yaw: 15, pitch: 22 };
+
+/** The upper arms tipped forward with the hips forward of the knees, and back with the hips sunk behind them. */
+const FROG_ROCK = { forward: 22, back: -32 };
+const frogRock = (t: number): Pose3 => frogOnForearms(mix(FROG_ROCK.forward, FROG_ROCK.back, t));
+const FROG_ROCK_STEPS = 12;
+
+export const FROG_ROCKS_3D: Clip3D = {
+  view: '3d',
+  camera: FROG_CAMERA,
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: FROG_ROCK_STEPS,
+  keyframes: [
+    { ms: 0, pose: frogRock(0) },
+    ...alongArc(1500, FROG_ROCK_STEPS, frogRock),
+    { ms: 300, pose: frogRock(1) },
+    ...alongArc(1500, FROG_ROCK_STEPS, (t) => frogRock(1 - t)),
+    { ms: 300, pose: frogRock(0) },
+  ],
+};
+
+/**
+ * The frog stretch is frog rocks held: from the hips forward of the knees, they sink back as far
+ * as the rocks go, behind the knees and low toward the floor, the upper arms reaching forward to the
+ * elbows, and stay there.
+ */
+const FROG_DEPTH = FROG_ROCK.back;
+const FROG_SETTLED = frogOnForearms(FROG_DEPTH);
+const frogSink = (t: number): Pose3 => frogOnForearms(mix(FROG_ROCK.forward, FROG_DEPTH, t));
+const FROG_SINK_STEPS = 10;
+
+export const FROG_STRETCH_3D: Clip3D = {
+  view: '3d',
+  camera: FROG_CAMERA,
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: 1 + FROG_SINK_STEPS,
+  keyframes: [
+    { ms: 0, pose: frogSink(0) },
+    { ms: 500, pose: frogSink(0) },
+    ...alongArc(1800, FROG_SINK_STEPS, frogSink),
+    { ms: 3000, pose: FROG_SETTLED },
+    ...alongArc(1600, FROG_SINK_STEPS, (t) => frogSink(1 - t)),
   ],
 };

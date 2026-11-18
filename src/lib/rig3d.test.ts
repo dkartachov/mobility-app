@@ -38,6 +38,11 @@ import {
   SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
   FLOOR_ANGELS_3D,
+  FROG_ROCKS_3D,
+  FROG_STRETCH_3D,
+  HORSE_STANCE_3D,
+  KNIGHT_STRETCH_3D,
+  LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
   STANDING_FORWARD_FOLD_3D,
@@ -146,6 +151,12 @@ function boneGap(a: readonly Vec3[], b: readonly Vec3[]): number {
 /** How far apart two projected points are on screen. */
 function onScreen(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
+}
+
+/** The longest a clip stays still on one pose. */
+function longestHold(clip: Clip3D): number {
+  const same = (a: Pose3, b: Pose3) => JSON.stringify(a) === JSON.stringify(b);
+  return Math.max(...clip.keyframes.slice(1).map((frame, i) => (same(frame.pose, clip.keyframes[i].pose) ? frame.ms : 0)));
 }
 
 /** The order the body's parts are drawn in, at every moment of a clip. A clip whose parts never swap has one. */
@@ -2081,5 +2092,100 @@ describe('3D clips', () => {
       const order = traceFigure(solvePose(pose), view).slots.map((slot) => slot.part);
       expect(order.indexOf('leftLeg')).toBeLessThan(order.indexOf('rightLeg'));
     }
+  });
+  it('keeps the back knee planted while the hips shift forward past it, the chest upright, in knight stretch', () => {
+    const poses = samples(KNIGHT_STRETCH_3D).map(solvePose);
+    const [first] = poses;
+    // Both knees start at 90°.
+    expect(angleAt(first.rightLeg[0], first.rightLeg[1], first.rightLeg[2])).toBeCloseTo(90, 0);
+    expect(angleAt(first.leftLeg[0], first.leftLeg[1], first.leftLeg[2])).toBeCloseTo(90, 0);
+    for (const { leftLeg, rightLeg, spine } of poses) {
+      expect(distance(leftLeg[1], first.leftLeg[1])).toBeLessThan(0.5);
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(tipped(spine[0], spine[spine.length - 1])).toBeLessThan(6);
+    }
+    const held = solvePose(KNIGHT_STRETCH_3D.keyframes[KNIGHT_STRETCH_3D.stillFrame].pose);
+    // The back thigh has swung back behind the hip.
+    expect(held.leftLeg[0][0] - held.leftLeg[1][0]).toBeGreaterThan(25);
+    expect(new Set(drawOrders(KNIGHT_STRETCH_3D)).size).toBe(1);
+  });
+
+  it('sinks until the thighs are level with the knees out over the toes, feet planted wide, hands on the thighs, in horse stance', () => {
+    const poses = samples(HORSE_STANCE_3D).map(solvePose);
+    const [first] = poses;
+    for (const { rightLeg, leftLeg } of poses) {
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+    }
+    // About twice shoulder-width apart.
+    expect(first.rightLeg[2][2] - first.leftLeg[2][2]).toBeGreaterThan(2.5 * SKELETON.shoulder * 2);
+    const held = solvePose(HORSE_STANCE_3D.keyframes[HORSE_STANCE_3D.stillFrame].pose);
+    for (const leg of [held.rightLeg, held.leftLeg]) {
+      expect(leg[1][1]).toBeCloseTo(leg[0][1], 0);
+      // The knee is ahead of the ankle and out past it, the way the toes point.
+      expect(leg[1][0] - leg[2][0]).toBeGreaterThan(15);
+      expect(Math.abs(leg[1][2])).toBeGreaterThan(Math.abs(leg[2][2]));
+    }
+    expect(tipped(held.spine[0], held.spine[held.spine.length - 1])).toBeLessThan(20);
+    // The hands rest on top of the thighs, halfway along.
+    for (const [arm, leg] of [[held.rightArm, held.rightLeg], [held.leftArm, held.leftLeg]]) {
+      const middle = midpoint(leg[0], leg[1]);
+      expect(distance(arm[2], [middle[0], middle[1] + 13, middle[2]])).toBeLessThan(1);
+    }
+  });
+
+  it('drops both knees to one side and holds them there with the feet planted in the lying windshield wiper hold', () => {
+    const poses = samples(LYING_WINDSHIELD_WIPER_HOLD_3D).map(solvePose);
+    const [first] = poses;
+    let [right, left] = [false, false];
+    // Both knees fall the same way, one side only.
+    for (const { rightLeg, leftLeg } of poses) {
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+      // Both knees go the same way.
+      const shift = [rightLeg[1][2] - first.rightLeg[1][2], leftLeg[1][2] - first.leftLeg[1][2]];
+      expect(Math.sign(Math.round(shift[0]))).toBe(Math.sign(Math.round(shift[1])));
+      if (shift[0] > 60) right = true;
+      if (shift[0] < -60) left = true;
+    }
+    expect([right, left]).toEqual([false, true]);
+    expect(longestHold(LYING_WINDSHIELD_WIPER_HOLD_3D)).toBeGreaterThanOrEqual(3000);
+  });
+
+  it('keeps the knees planted wide with the shins parallel, and holds on the forearms with the hips sunk as deep as the rocks go, in the frog clips', () => {
+    for (const clip of [FROG_STRETCH_3D, FROG_ROCKS_3D]) {
+      const poses = samples(clip).map(solvePose);
+      for (const { rightLeg, leftLeg, rightArm } of poses) {
+        for (const leg of [rightLeg, leftLeg]) {
+          expect(leg[1][1]).toBeCloseTo(13, 0);
+          expect(Math.abs(leg[1][2])).toBeGreaterThan(65);
+          expect(leg[2][2]).toBeCloseTo(leg[1][2], 0);
+        }
+        // The elbow never goes through the floor.
+        expect(rightArm[1][1]).toBeGreaterThan(10);
+      }
+      expect(new Set(drawOrders(clip)).size).toBe(1);
+    }
+    const held = solvePose(FROG_STRETCH_3D.keyframes[FROG_STRETCH_3D.stillFrame].pose);
+    expect(held.rightArm[1][1]).toBeCloseTo(11, 0);
+    // Sunk back as deep as frog rocks goes.
+    const deepestRock = Math.min(...samples(FROG_ROCKS_3D).map((pose) => solvePose(pose).spine[0][0]));
+    expect(held.spine[0][0]).toBeCloseTo(deepestRock, 0);
+    // The frog stretch is the rock held: the forearms stay planted all the way through.
+    const poses = samples(FROG_STRETCH_3D).map(solvePose);
+    for (const { rightArm } of poses) expect(distance(rightArm[2], poses[0].rightArm[2])).toBeLessThan(0.5);
+    expect(longestHold(FROG_STRETCH_3D)).toBeGreaterThanOrEqual(3000);
+  });
+
+  it('rocks the hips from ahead of the knees to behind them with the forearms planted in frog rocks', () => {
+    const poses = samples(FROG_ROCKS_3D).map(solvePose);
+    const [first] = poses;
+    for (const { rightArm } of poses) {
+      expect(distance(rightArm[1], first.rightArm[1])).toBeLessThan(0.5);
+      expect(distance(rightArm[2], first.rightArm[2])).toBeLessThan(0.5);
+    }
+    const hips = poses.map(({ spine }) => spine[0][0]);
+    expect(Math.max(...hips)).toBeGreaterThan(20);
+    expect(Math.min(...hips)).toBeLessThan(-30);
   });
 });
