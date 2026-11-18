@@ -154,10 +154,15 @@ Moved to the new engine:
 | Butterfly | Library | `BUTTERFLY_3D` |
 | Cobra to prayer | Library | `COBRA_TO_PRAYER_3D` |
 | Downward facing dog | Library | `DOWNWARD_FACING_DOG_3D` |
+| Prayer pose | Library | `PRAYER_POSE_3D` |
+| Puppy pose | Library | `PUPPY_POSE_3D` |
+| Lying knee hug | Library | `LYING_KNEE_HUG_3D` |
+| Lying hamstring stretch | Library | `LYING_HAMSTRING_STRETCH_3D` |
+| Seated pike stretch | Library | `SEATED_PIKE_STRETCH_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer and downward facing dog.
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch and seated pike stretch.
 
 Library (`src/data/exercises.ts`):
 
@@ -186,8 +191,6 @@ Library (`src/data/exercises.ts`):
 | Knight to hamstring | `KNIGHT_TO_HAMSTRING` | |
 | Lizard pose | `LIZARD_POSE` | |
 | Lying external rotation stretch | `LYING_EXTERNAL_ROTATION_STRETCH` | dumbbell |
-| Lying hamstring stretch | `LYING_HAMSTRING_STRETCH` | |
-| Lying knee hug | `LYING_KNEE_HUG` | |
 | Lying windshield wiper hold | `LYING_WINDSHIELD_WIPER_HOLD` | |
 | Manual extensor forearm stretch | `MANUAL_EXTENSOR_FOREARM_STRETCH` | |
 | Manual flexor forearm stretch | `MANUAL_FLEXOR_FOREARM_STRETCH` | |
@@ -196,15 +199,12 @@ Library (`src/data/exercises.ts`):
 | Overhead triceps stretch | `OVERHEAD_TRICEPS_STRETCH` | |
 | Pec stretch on the ground | `PEC_STRETCH_ON_THE_GROUND` | |
 | Pigeon stretch | `PIGEON_STRETCH` | |
-| Prayer pose | `PRAYER_POSE` | |
-| Puppy pose | `PUPPY_POSE` | |
 | Pyramid stretch | `PYRAMID_STRETCH` | |
 | Reverse clamshells | `REVERSE_CLAMSHELLS` | |
 | Reverse scorpion | `REVERSE_SCORPION` | |
 | Reverse tabletop | `REVERSE_TABLETOP` | |
 | Scap mobilization | `SCAP_MOBILIZATION` | |
 | Seated hip internal rotation | `SEATED_HIP_INTERNAL_ROTATION` | mini band |
-| Seated pike stretch | `SEATED_PIKE_STRETCH` | |
 | Seated shoulder extension | `SEATED_SHOULDER_EXTENSION` | |
 | Seated straddle side bend | `SEATED_STRADDLE_SIDE_BEND` | |
 | Shoulder pass-throughs | `SHOULDER_PASS_THROUGHS` | |

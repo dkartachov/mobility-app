@@ -1,4 +1,4 @@
-import { SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Vec3 } from '@/lib/rig3d';
+import { distance, SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -1831,6 +1831,7 @@ const cobraToPrayer = (t: number): Pose3 => {
 };
 const COBRA = cobraToPrayer(0);
 const PRAYER = cobraToPrayer(1);
+const ALL_FOURS_PRAYER = cobraToPrayer(0.5);
 /** The hips travel on an arc, so it takes this many keyframes for the knees to stay put between them. */
 const COBRA_TO_PRAYER_STEPS = 24;
 
@@ -1991,5 +1992,290 @@ export const DOWNWARD_FACING_DOG_3D: Clip3D = {
     ...alongArc(1500, DOG_LIFT_STEPS, dogLift),
     { ms: 3500, pose: DOWNWARD_DOG },
     ...alongArc(1800, DOG_LIFT_STEPS, (t) => dogLift(1 - t)),
+  ],
+};
+
+// --- Prayer pose: from all fours, the hips sink back onto the heels and the arms reach long, forehead to the floor ---
+
+export const PRAYER_POSE_3D: Clip3D = {
+  view: '3d',
+  // As for cobra to prayer, whose second half this is: the hips' arc back is flat on the screen,
+  // and the head drops behind the near arm.
+  camera: { yaw: 22, pitch: 12 },
+  highlight: ['torso', 'rightArm', 'leftArm'],
+  stillFrame: 1 + COBRA_TO_PRAYER_STEPS,
+  keyframes: [
+    { ms: 0, pose: ALL_FOURS_PRAYER },
+    { ms: 500, pose: ALL_FOURS_PRAYER },
+    ...alongArc(2000, COBRA_TO_PRAYER_STEPS, (t) => cobraToPrayer(0.5 + t / 2)),
+    { ms: 3500, pose: PRAYER },
+    ...alongArc(2000, COBRA_TO_PRAYER_STEPS, (t) => cobraToPrayer(1 - t / 2)),
+  ],
+};
+
+// --- Lying knee hug: the knee to chest test's pull, held ---
+
+export const LYING_KNEE_HUG_3D: Clip3D = {
+  view: '3d',
+  camera: KNEE_TO_CHEST_3D.camera,
+  highlight: ['rightLeg'],
+  stillFrame: 4,
+  // As in knee to chest: the hands open either side of the knee on the way up and close on the shin.
+  keyframes: [
+    { ms: 0, pose: KNEE_TO_CHEST_FLAT },
+    { ms: 500, pose: KNEE_TO_CHEST_FLAT },
+    { ms: 1000, pose: KNEE_TO_CHEST_LIFTED },
+    { ms: 250, pose: KNEE_TO_CHEST_HELD },
+    { ms: 1000, pose: KNEE_TO_CHEST_IN },
+    { ms: 3500, pose: KNEE_TO_CHEST_IN },
+    { ms: 1000, pose: KNEE_TO_CHEST_HELD },
+    { ms: 250, pose: KNEE_TO_CHEST_LIFTED },
+    { ms: 1000, pose: KNEE_TO_CHEST_FLAT },
+  ],
+};
+
+// --- Lying hamstring stretch: the straight leg raise's strap pull, taken a little further and held ---
+
+/** The leg pulled a little closer than the test's average, for the hold. */
+const STRAP_PULLED = strapHeldAt(84, [-110, 62, 16]);
+
+export const LYING_HAMSTRING_STRETCH_3D: Clip3D = {
+  view: '3d',
+  camera: STRAIGHT_LEG_RAISE_3D.camera,
+  highlight: ['rightLeg'],
+  trail: 'rightFoot',
+  strap: 'rightFoot',
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: STRAP_DOWN },
+    { ms: 500, pose: STRAP_DOWN },
+    { ms: 1700, pose: STRAP_UP },
+    { ms: 900, pose: STRAP_PULLED },
+    { ms: 3500, pose: STRAP_PULLED },
+    { ms: 2200, pose: STRAP_DOWN },
+  ],
+};
+
+// --- Puppy pose: from all fours, the hands walk forward and the chest melts toward the floor, the hips staying over the knees ---
+
+/** The back long on all fours, as cat cow starts from. */
+const PUPPY_START_LEAN = onAllFours(0, 0).lean!;
+/** How far the body tips and the chest sinks at the end, the upper back arched toward the floor. */
+const PUPPY_END = { lean: 128, arch: -26 };
+/** How much of an arm's length the hands step out to, so the arms are long but not locked. */
+const PUPPY_REACH = 0.995 * ARM_REACH;
+
+/** The body this far into the pose, the hands left out. */
+const puppyBody = (p: number): Pose3 => ({
+  ...ALL_FOURS,
+  lean: mix(PUPPY_START_LEAN, PUPPY_END.lean, p),
+  spine: { flex: mix(0, PUPPY_END.arch, p) },
+});
+/** How far ahead the hands can land with the body this far in: where an arm's reach from the shoulder meets the floor. */
+const puppyReach = (p: number): number => {
+  const shoulder = solvePose(puppyBody(p)).rightArm[0];
+  return shoulder[0] + Math.sqrt(PUPPY_REACH ** 2 - (shoulder[1] - WRIST_Y) ** 2);
+};
+const PUPPY_HANDS_START = ALL_FOURS.pins.rightHand.at[0];
+const PUPPY_HEAD = { start: solvePose(onAllFours(0, 0)).head[1], end: COBRA_HEAD_DOWN };
+
+/** How the body sinks over the walk: steadily, settling just as the last step lands. */
+const puppySink = (t: number) => smooth(t);
+/** How many steps each hand takes. A planted hand's elbow bends as the chest sinks toward it, until that hand steps on, so fewer, longer steps bend the arms more. */
+const PUPPY_STRIDES = 3;
+/** The walk: the right hand, then the left, in turn. */
+const PUPPY_STEPS = Array.from({ length: 2 * PUPPY_STRIDES }, (_, i) => ({
+  hand: i % 2 === 0 ? ('rightHand' as const) : ('leftHand' as const),
+  from: i / (2 * PUPPY_STRIDES),
+  to: (i + 1) / (2 * PUPPY_STRIDES),
+}));
+/** Where the hands end up: as far out as the arms reach when the right hand takes its last step. The left one lands beside it. */
+const PUPPY_HANDS_END = puppyReach(puppySink(PUPPY_STEPS[PUPPY_STEPS.length - 2].to));
+/** The shortest step a hand takes, so none is too small to read as more than a lift and drop. */
+const PUPPY_MIN_STEP = 16;
+/**
+ * Where a step lands: as far out as the arm reaches by then, but leaving the steps still to come
+ * room to be at least the shortest step each. The last one lands beside the other hand.
+ */
+const puppyLanding = (step: number) => {
+  const last = PUPPY_STEPS.length - 2;
+  const k = Math.min(step, last);
+  return Math.min(puppyReach(puppySink(PUPPY_STEPS[k].to)), PUPPY_HANDS_END - (last - k) * PUPPY_MIN_STEP);
+};
+
+/** Where a hand is this far through the walk: planted, or lifting a little off the floor on its way to the next spot. */
+const puppyHand = (hand: 'rightHand' | 'leftHand', t: number): Vec3 => {
+  let x = PUPPY_HANDS_START;
+  let lift = 0;
+  PUPPY_STEPS.forEach((step, i) => {
+    if (step.hand !== hand || t <= step.from) return;
+    const s = smooth(Math.min(1, (t - step.from) / (step.to - step.from)));
+    const from = x;
+    x = mix(from, puppyLanding(i), s);
+    // A short step barely leaves the floor, so it reads as a step forward and not a hop.
+    lift = t < step.to ? Math.sin(Math.PI * s) * Math.min(10, (puppyLanding(i) - from) / 3) : 0;
+  });
+  return [x, WRIST_Y + lift, (hand === 'rightHand' ? 1 : -1) * SKELETON.shoulder];
+};
+
+/**
+ * Puppy pose this far through the walk. The head goes down with the chest, the forehead reaching
+ * the floor as the body settles.
+ */
+const puppyAt = (t: number): Pose3 => {
+  const p = puppySink(t);
+  const body = puppyBody(p);
+  // Whatever bend the arms take goes back and out to the sides, as in a push-up.
+  const pole = (side: 1 | -1): Vec3 => [-0.7, 0, side * 0.7];
+  const posed: Pose3 = {
+    ...body,
+    pins: {
+      ...ALL_FOURS.pins,
+      rightHand: { at: puppyHand('rightHand', t), toward: [1, 0, 0], pole: pole(1) },
+      leftHand: { at: puppyHand('leftHand', t), toward: [1, 0, 0], pole: pole(-1) },
+    },
+  };
+  const target = mix(PUPPY_HEAD.start, PUPPY_HEAD.end, p);
+  const height = (flex: number) => solvePose({ ...posed, neck: { flex } }).head[1];
+  let [lifted, dropped] = [-60, 80];
+  for (let i = 0; i < 40; i++) {
+    const flex = (lifted + dropped) / 2;
+    if (height(flex) < target) dropped = flex;
+    else lifted = flex;
+  }
+  return { ...posed, neck: { flex: (lifted + dropped) / 2 } };
+};
+const PUPPY_ALL_FOURS = puppyAt(0);
+const PUPPY = puppyAt(1);
+/** Enough frames for the lifted hands to arc and the planted ones to stay put, a whole number of them to each step so a step never shares one with the next. */
+const PUPPY_WALK_FRAMES = 84;
+const puppyWalk = (ms: number, at: (t: number) => Pose3): Keyframe3[] =>
+  Array.from({ length: PUPPY_WALK_FRAMES }, (_, i) => ({ ms: ms / PUPPY_WALK_FRAMES, pose: at((i + 1) / PUPPY_WALK_FRAMES), ease: 'none' as const }));
+
+export const PUPPY_POSE_3D: Clip3D = {
+  view: '3d',
+  // As for cat cow: the chest's sink between the hips and the hands is flat on the screen, and the
+  // head goes down behind the near arm.
+  camera: { yaw: 22, pitch: 12 },
+  highlight: ['torso', 'rightArm', 'leftArm'],
+  stillFrame: 1 + PUPPY_WALK_FRAMES,
+  keyframes: [
+    { ms: 0, pose: PUPPY_ALL_FOURS },
+    { ms: 500, pose: PUPPY_ALL_FOURS },
+    ...puppyWalk(4000, puppyAt),
+    { ms: 3500, pose: PUPPY },
+    ...puppyWalk(3600, (t) => puppyAt(1 - t)),
+  ],
+};
+
+// --- Seated pike stretch: legs straight and together, toes up, folding forward from the hips as the hands reach down to wrap around the feet ---
+
+/** How far the back rounds and the neck bends for each degree the pelvis tips forward. */
+const PIKE_ROUNDING = { spine: 1.25, neck: 0.65 };
+/** The hands go against the outside of each leg and foot, this far out from its middle and up from it. */
+const PIKE_HAND_OUT = 15;
+const PIKE_HAND_UP = 3;
+/** Where the hands start, resting on top of the thighs, as a fraction of the way from the hip to the ankle. */
+const PIKE_HAND_REST = 0.3;
+/** How far up off the middle of the thigh, and out from it, a hand rests on top of it. */
+const PIKE_HAND_ON_TOP = { up: 14, out: 4 };
+/** How far up the foot, from the ankle to the toes, the hands hold it. */
+const PIKE_FOOT_HOLD = 0.6;
+/** How far the wrist sits ahead of the middle of the foot, at the sole's edge. */
+const PIKE_HAND_FORWARD = 6;
+/** The hands turn round the feet over the last part of the way: the near one in across its sole, the far one, behind its foot, on round the front of it so the fingertips show past the far side of the sole. */
+const PIKE_WRAP = { from: 0.6, near: [0.4, 0, -1] as Vec3, far: [0.85, 0, 0.5] as Vec3 };
+/** How high the hands arc over the shins on their way to the feet. */
+const PIKE_HAND_ARC = 26;
+/** How far the arms reach at the bottom of the fold, as a fraction of their length: long, holding the feet. */
+const PIKE_REACH = 0.985;
+
+/** The body with the pelvis tipped this far forward and the back and neck rounding with it, the legs flat and the toes up. */
+const pikeBody = (lean: number): Pose3 => {
+  // The ankles make up for the slope, so the toes point up.
+  const leg: LegPose = { flex: 90 - SIT_LEG_DROP + lean, ankle: SIT_LEG_DROP };
+  return {
+    pelvis: [0, SIT_PELVIS_Y, 0],
+    lean,
+    spine: { flex: PIKE_ROUNDING.spine * lean },
+    neck: { flex: PIKE_ROUNDING.neck * lean },
+    rightLeg: leg,
+    leftLeg: leg,
+  };
+};
+/** The legs don't move, so the hands' path is laid along them once. */
+const PIKE_LEGS = solvePose(pikeBody(0));
+
+/**
+ * Where a hand is this far along its way: from resting on top of the thigh, elbow soft, in one smooth
+ * arc a little up off the shin, to holding the side of the foot.
+ */
+const pikeHand = (side: 1 | -1, u: number): Vec3 => {
+  const [hip, , ankle, toes] = side === 1 ? PIKE_LEGS.rightLeg : PIKE_LEGS.leftLeg;
+  const outside = ([x, y, z]: Vec3, up = 0): Vec3 => [x, y + PIKE_HAND_UP + up, z + side * PIKE_HAND_OUT];
+  // On top of the thigh, a little toward its outside.
+  const [restX, restY, restZ] = mix3(hip, ankle, PIKE_HAND_REST);
+  const rest: Vec3 = [restX, restY + PIKE_HAND_ON_TOP.up, restZ + side * PIKE_HAND_ON_TOP.out];
+  const over = outside(mix3(hip, ankle, 0.9), PIKE_HAND_ARC);
+  // On the outside edge of the foot, toward the sole, so the hand can turn in across it.
+  const [x, y, z] = outside(mix3(ankle, toes, PIKE_FOOT_HOLD));
+  const hold: Vec3 = [x + PIKE_HAND_FORWARD, y, z];
+  return mix3(mix3(rest, over, u), mix3(over, hold, u), u);
+};
+/**
+ * Which way a hand points this far along: down the leg on the way, then turning in around the
+ * outside of the foot and across the sole as it gets there, the fingers wrapped round the ball.
+ */
+const pikeFingers = (side: 1 | -1, u: number): Vec3 =>
+  mix3([1, -0.1, 0], side === 1 ? PIKE_WRAP.near : PIKE_WRAP.far, smooth(Math.max(0, (u - PIKE_WRAP.from) / (1 - PIKE_WRAP.from))));
+
+/** How far into the reach the far arm goes from over its leg to behind it. */
+const PIKE_FAR_ARM_BEHIND_FROM = 0.4;
+
+const PIKE_REST_REACH = distance(solvePose(pikeBody(0)).rightArm[0], pikeHand(1, 0));
+
+/**
+ * The pike this far in: the hands this far along their arc, and the body folded just as far as
+ * keeps the arms' reach easing from resting to long. The hands lead and the fold follows.
+ */
+const pikeAt = (p: number): Pose3 => {
+  const right = pikeHand(1, p);
+  const reach = mix(PIKE_REST_REACH, PIKE_REACH * ARM_REACH, p);
+  // Folding further brings the shoulders nearer the hands.
+  let [upright, folded] = [-10, 70];
+  for (let i = 0; i < 40; i++) {
+    const lean = (upright + folded) / 2;
+    if (distance(solvePose(pikeBody(lean)).rightArm[0], right) > reach) upright = lean;
+    else folded = lean;
+  }
+  const body = pikeBody((upright + folded) / 2);
+  const hand = (side: 1 | -1): Pin => ({ at: pikeHand(side, p), toward: pikeFingers(side, p), pole: [0, -0.4, side] });
+  // The far hand rests on top of its thigh to start, so its arm is over the leg; reaching for the
+  // foot it goes round the outside and behind it. The change comes high in the reach, where the
+  // arm is clear of the leg on screen.
+  const far: Clip3D['behind'] = p < PIKE_FAR_ARM_BEHIND_FROM ? [['leftLeg', 'leftArm']] : [['leftArm', 'leftLeg']];
+  return { ...body, pins: { rightHand: hand(1), leftHand: hand(-1) }, behind: far };
+};
+const PIKE_TALL = pikeAt(0);
+const PIKE_FOLDED = pikeAt(1);
+const PIKE_STEPS = 16;
+
+export const SEATED_PIKE_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From the right, turned toward the front and a little above: the fold still goes across the
+  // screen, and the near hand shows turning in across the sole of its foot. Any further round and
+  // the nose shows sitting tall and goes as the head drops.
+  camera: { yaw: 30, pitch: 18 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The hands reach from the tops of the thighs round the outsides of the feet. The near arm stays
+  // in front of its leg; the far one goes behind its own partway, which each pose says.
+  behind: [['rightLeg', 'rightArm']],
+  stillFrame: 1 + PIKE_STEPS,
+  keyframes: [
+    { ms: 0, pose: PIKE_TALL },
+    { ms: 600, pose: PIKE_TALL },
+    ...alongArc(2400, PIKE_STEPS, pikeAt),
+    { ms: 3500, pose: PIKE_FOLDED },
+    ...alongArc(2200, PIKE_STEPS, (t) => pikeAt(1 - t)),
   ],
 };
