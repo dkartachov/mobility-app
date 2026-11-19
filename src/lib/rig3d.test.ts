@@ -42,6 +42,9 @@ import {
   FROG_STRETCH_3D,
   HORSE_STANCE_3D,
   KNIGHT_STRETCH_3D,
+  KNIGHT_TO_HAMSTRING_3D,
+  COUCH_STRETCH_3D,
+  PYRAMID_STRETCH_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
@@ -2187,5 +2190,101 @@ describe('3D clips', () => {
     const hips = poses.map(({ spine }) => spine[0][0]);
     expect(Math.max(...hips)).toBeGreaterThan(20);
     expect(Math.min(...hips)).toBeLessThan(-30);
+  });
+
+  it('keeps the back knee planted as the hips go from ahead of it to behind it, folding over a straight front leg with the hands on the hips, in knight to hamstring', () => {
+    const poses = samples(KNIGHT_TO_HAMSTRING_3D).map(solvePose);
+    const [first] = poses;
+    const backKnee = first.leftLeg[1];
+    for (const { leftLeg, rightLeg } of poses) {
+      expect(distance(leftLeg[1], backKnee)).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+      // The front heel stays on the floor.
+      expect(rightLeg[2][1]).toBeCloseTo(first.rightLeg[2][1], 1);
+    }
+    const hips = poses.map(({ spine }) => spine[0][0] - backKnee[0]);
+    expect(Math.max(...hips)).toBeGreaterThan(20);
+    expect(Math.min(...hips)).toBeLessThan(-50);
+    const folded = solvePose(KNIGHT_TO_HAMSTRING_3D.keyframes[KNIGHT_TO_HAMSTRING_3D.stillFrame].pose);
+    // The front leg is straight and the body folds over it.
+    expect(angleAt(folded.rightLeg[0], folded.rightLeg[1], folded.rightLeg[2])).toBeGreaterThan(165);
+    expect(tipped(folded.spine[0], folded.spine[folded.spine.length - 1])).toBeGreaterThan(50);
+    // The hands stay on the waist the whole way, folding with the body.
+    for (const { spine, rightArm, leftArm } of poses) {
+      expect(distance(rightArm[2], spine[0])).toBeCloseTo(distance(first.rightArm[2], first.spine[0]), -0.5);
+      expect(distance(leftArm[2], spine[0])).toBeCloseTo(distance(first.leftArm[2], first.spine[0]), -0.5);
+    }
+    expect(new Set(drawOrders(KNIGHT_TO_HAMSTRING_3D)).size).toBe(1);
+  });
+
+  it('keeps the back shin straight up the wall and the front foot planted while the chest lifts from the hands on the floor to upright with them on the front thigh, in the couch stretch', () => {
+    const poses = samples(COUCH_STRETCH_3D).map(solvePose);
+    const [first] = poses;
+    const wall = COUCH_STRETCH_3D.scenery![0].to[0];
+    for (const { leftLeg, rightLeg } of poses) {
+      expect(distance(leftLeg[1], first.leftLeg[1])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(tipped(leftLeg[1], leftLeg[2])).toBeLessThan(1);
+      // Against the wall, not through it.
+      expect(leftLeg[1][0] - wall).toBeGreaterThan(10);
+      expect(leftLeg[1][0] - wall).toBeLessThan(16);
+    }
+    const upright = solvePose(COUCH_STRETCH_3D.keyframes[COUCH_STRETCH_3D.stillFrame].pose);
+    expect(tipped(upright.spine[0], upright.spine[upright.spine.length - 1])).toBeLessThan(8);
+    // The back knee is bent to 145°, and the front shin is upright.
+    expect(angleAt(upright.leftLeg[0], upright.leftLeg[1], upright.leftLeg[2])).toBeCloseTo(35, 0);
+    expect(tipped(upright.rightLeg[2], upright.rightLeg[1])).toBeLessThan(1);
+    // Leaning in, the hands are on the floor either side of the front foot; upright, they rest on top of the front thigh.
+    for (const hand of [first.rightArm[2], first.leftArm[2]]) expect(hand[1]).toBeCloseTo(11, 0);
+    expect(first.rightArm[2][2]).toBeGreaterThan(first.rightLeg[2][2]);
+    expect(first.leftArm[2][2]).toBeLessThan(first.rightLeg[2][2]);
+    const [hip, knee] = upright.rightLeg;
+    for (const hand of [upright.rightArm[2], upright.leftArm[2]]) {
+      expect(hand[1]).toBeGreaterThan(Math.max(hip[1], knee[1]));
+      expect(hand[0]).toBeGreaterThan(hip[0]);
+      expect(hand[0]).toBeLessThan(knee[0]);
+      expect(Math.abs(hand[2] - knee[2])).toBeLessThan(12);
+    }
+    expect(longestHold(COUCH_STRETCH_3D)).toBeGreaterThanOrEqual(3000);
+    expect(new Set(drawOrders(COUCH_STRETCH_3D)).size).toBe(1);
+  });
+
+  it('keeps both legs straight and the feet a long step apart while the hanging arms reach down to the front shin, in the pyramid stretch', () => {
+    const poses = samples(PYRAMID_STRETCH_3D).map(solvePose);
+    const [first] = poses;
+    expect(first.rightLeg[2][0] - first.leftLeg[2][0]).toBeGreaterThan(SKELETON.thigh + SKELETON.shin - 20);
+    for (const { rightLeg, leftLeg, spine } of poses) {
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+      expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      for (const leg of [rightLeg, leftLeg]) expect(angleAt(leg[0], leg[1], leg[2])).toBeGreaterThan(165);
+    }
+    const folded = solvePose(PYRAMID_STRETCH_3D.keyframes[PYRAMID_STRETCH_3D.stillFrame].pose);
+    expect(tipped(folded.spine[0], folded.spine[folded.spine.length - 1])).toBeGreaterThan(75);
+    // The hands rest either side of the front shin.
+    const [, knee, ankle] = folded.rightLeg;
+    for (const hand of [folded.rightArm[2], folded.leftArm[2]]) {
+      expect(hand[1]).toBeLessThan(knee[1]);
+      expect(hand[1]).toBeGreaterThan(ankle[1]);
+      expect(Math.abs(hand[2] - knee[2])).toBeGreaterThan(12);
+    }
+    // Standing, the arms hang straight down by the sides.
+    for (const arm of [first.rightArm, first.leftArm]) {
+      expect(fromHanging(arm[0], arm[2])).toBeLessThan(5);
+      expect(Math.abs(arm[2][2])).toBeGreaterThan(Math.abs(arm[0][2]));
+    }
+    expect(longestHold(PYRAMID_STRETCH_3D)).toBeGreaterThanOrEqual(3000);
+    // The far arm goes from behind the far leg to in front of it, and only where the two are well
+    // apart on the screen.
+    const view = viewOf(PYRAMID_STRETCH_3D.camera);
+    const orders = drawOrders(PYRAMID_STRETCH_3D);
+    expect(new Set(orders).size).toBe(2);
+    orders.forEach((order, i) => {
+      if (i === 0 || order === orders[i - 1]) return;
+      const skeleton = solvePose(poseAt3(PYRAMID_STRETCH_3D, i * 10));
+      const seen = (points: readonly Vec3[]) => points.map((point) => project(view, point));
+      expect(boneGap(seen(skeleton.leftArm), seen(skeleton.leftLeg))).toBeGreaterThan(40);
+    });
   });
 });

@@ -169,16 +169,18 @@ Moved to the new engine:
 | Lying windshield wiper hold | Library | `LYING_WINDSHIELD_WIPER_HOLD_3D` |
 | Frog stretch | Library | `FROG_STRETCH_3D` |
 | Frog rocks | Library | `FROG_ROCKS_3D` |
+| Knight to hamstring | Library | `KNIGHT_TO_HAMSTRING_3D` |
+| Couch stretch | Library | `COUCH_STRETCH_3D` |
+| Pyramid stretch | Library | `PYRAMID_STRETCH_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch, seated pike stretch, three legged downward facing dog, standing forward fold, kneeling wrist stretch, floor angels, reverse tabletop, knight stretch, horse stance, the lying windshield wiper hold, frog stretch and frog rocks.
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch, seated pike stretch, three legged downward facing dog, standing forward fold, kneeling wrist stretch, floor angels, reverse tabletop, knight stretch, horse stance, the lying windshield wiper hold, frog stretch, frog rocks, knight to hamstring, couch stretch and pyramid stretch.
 
 Library (`src/data/exercises.ts`):
 
 | Exercise | Clip | Needs |
 |---|---|---|
-| Couch stretch | `COUCH_STRETCH` | |
 | Cow face arms | `COW_FACE_ARMS` | |
 | Cross-body shoulder stretch | `CROSS_BODY_SHOULDER_STRETCH` | |
 | Cuban rotation | `CUBAN_ROTATION` | dumbbells |
@@ -191,7 +193,6 @@ Library (`src/data/exercises.ts`):
 | Half-twisted lizard | `HALF_TWISTED_LIZARD` | |
 | Hip circles | `HIP_CIRCLES` | |
 | Inchworm | `INCHWORM` | a travelling camera |
-| Knight to hamstring | `KNIGHT_TO_HAMSTRING` | |
 | Lizard pose | `LIZARD_POSE` | |
 | Lying external rotation stretch | `LYING_EXTERNAL_ROTATION_STRETCH` | dumbbell |
 | Manual extensor forearm stretch | `MANUAL_EXTENSOR_FOREARM_STRETCH` | |
@@ -201,7 +202,6 @@ Library (`src/data/exercises.ts`):
 | Overhead triceps stretch | `OVERHEAD_TRICEPS_STRETCH` | |
 | Pec stretch on the ground | `PEC_STRETCH_ON_THE_GROUND` | |
 | Pigeon stretch | `PIGEON_STRETCH` | |
-| Pyramid stretch | `PYRAMID_STRETCH` | |
 | Reverse clamshells | `REVERSE_CLAMSHELLS` | |
 | Reverse scorpion | `REVERSE_SCORPION` | |
 | Scap mobilization | `SCAP_MOBILIZATION` | |

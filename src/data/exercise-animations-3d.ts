@@ -2604,7 +2604,7 @@ export const REVERSE_TABLETOP_3D: Clip3D = {
  */
 const KNIGHT_BACK_KNEE: Vec3 = [-SKELETON.thigh, ANKLE_Y, -SKELETON.hip];
 const knightAt = (t: number): Pose3 => {
-  const pose = ankleMobilizationAt(mix(0, 22, t), 0, KNIGHT_BACK_KNEE);
+  const pose = ankleMobilizationAt(mix(0, 30, t), 0, KNIGHT_BACK_KNEE);
   const tuck = 7 * t;
   return { ...pose, lean: -tuck, spine: { flex: tuck }, neck: { flex: 0 } };
 };
@@ -2887,5 +2887,328 @@ export const FROG_STRETCH_3D: Clip3D = {
     ...alongArc(1800, FROG_SINK_STEPS, frogSink),
     { ms: 3000, pose: FROG_SETTLED },
     ...alongArc(1600, FROG_SINK_STEPS, (t) => frogSink(1 - t)),
+  ],
+};
+
+/**
+ * The hands on the waist, as in ankle mobilization and the knight stretch, for a body with its pelvis
+ * at `pelvis` leaning this far forward: the hand, its fingers and the elbow all tip with the body.
+ * Upright (0) it's where the knight stretch puts them.
+ */
+const handOnWaist = (pelvis: Vec3, side: 1 | -1, lean = 0): Pin => {
+  // The body's own forward and up, tipped forward by the lean.
+  const r = radians(lean);
+  const forward = [Math.cos(r), -Math.sin(r)];
+  const up = [Math.sin(r), Math.cos(r)];
+  const inBody = (ahead: number, above: number, out: number): Vec3 => [ahead * forward[0] + above * up[0], ahead * forward[1] + above * up[1], out];
+  const at = inBody(4, 49, side * 30);
+  return {
+    at: [pelvis[0] + at[0], pelvis[1] + at[1], at[2]],
+    toward: inBody(1, -0.5, 0),
+    pole: inBody(-1, 0, side),
+  };
+};
+/** Partway from one hand pin to another, the direction of the hand and the elbow turning with it. */
+const mixPin = (a: Pin, b: Pin, t: number): Pin => ({
+  at: mix3(a.at, b.at, t),
+  toward: a.toward && b.toward ? mix3(a.toward, b.toward, t) : b.toward,
+  pole: a.pole && b.pole ? mix3(a.pole, b.pole, t) : b.pole,
+});
+/** The right (1) or left (-1) shoulder of a solved pose. */
+const shoulderOf = (skeleton: ReturnType<typeof solvePose>, side: 1 | -1): Vec3 => (side === 1 ? skeleton.rightArm[0] : skeleton.leftArm[0]);
+/** `at`, or as near it as an arm reaches from `shoulder`: for hands on their way between two places, which can cut the corner past the arm's length. */
+const withinReach = (shoulder: Vec3, at: Vec3, reach = ARM_REACH): Vec3 => (distance(shoulder, at) > reach ? toward(shoulder, at, reach) : at);
+
+// --- Knight to hamstring: from the knight stretch, the hips sink back past the back knee and the front leg straightens, folding over it with a flat back ---
+
+/**
+ * The knight stretch with the front knee pointed up and forward, which is where it goes anyway: the
+ * front leg straightens out ahead in the hamstring half, where a knee left to point forward would
+ * have no bend to aim.
+ */
+const KNEE_UP_FORWARD: Vec3 = [1, 1, 0];
+const knightKneeUp = (t: number): Pose3 => {
+  const pose = knightAt(t);
+  return { ...pose, pins: { ...pose.pins, rightFoot: { ...pose.pins!.rightFoot!, pole: KNEE_UP_FORWARD } } };
+};
+/**
+ * All the way back: the hips this far round behind straight over the back knee, which stays planted,
+ * so the back knee bends to about 145°. The front leg is straight with its heel planted and the toes
+ * pulled up; from the knight's 90° it's too short to reach the foot, so the heel slides forward a
+ * little as the leg straightens, as it does when you do it. The body folds over the front leg from
+ * the hips with the back flat.
+ */
+const HAMSTRING_BACK = 35;
+const HAMSTRING_FOLD = { lean: 58, spine: 4, neck: 6 };
+/** The front ankle bends up this far, heel down. */
+const HAMSTRING_TOES_UP = 35;
+
+/** The hips and the front foot this far back into the hamstring half, from the knight's upright 0. */
+const hamstringBody = (t: number): Pose3 => {
+  const back = radians(HAMSTRING_BACK * t);
+  const pelvis: Vec3 = [KNIGHT_BACK_KNEE[0] - SKELETON.thigh * Math.sin(back), KNIGHT_BACK_KNEE[1] + SKELETON.thigh * Math.cos(back), 0];
+  // From the knight's 90° bend the front leg lengthens to straight, its heel sliding forward as far as that takes it.
+  const reach = mix(Math.SQRT2 * SKELETON.thigh, 0.995 * LEG_REACH, t);
+  const ankle: Vec3 = [pelvis[0] + Math.sqrt(reach ** 2 - (pelvis[1] - ANKLE_Y) ** 2), ANKLE_Y, SKELETON.hip];
+  const up = radians(HAMSTRING_TOES_UP * t);
+  return {
+    pelvis,
+    lean: HAMSTRING_FOLD.lean * t,
+    spine: { flex: HAMSTRING_FOLD.spine * t },
+    neck: { flex: HAMSTRING_FOLD.neck * t },
+    pins: {
+      rightFoot: { at: ankle, toward: [Math.cos(up), Math.sin(up), 0], pole: KNEE_UP_FORWARD },
+      leftFoot: { at: [KNIGHT_BACK_KNEE[0] - SKELETON.shin, ANKLE_Y, KNIGHT_BACK_KNEE[2]], toward: [-1, 0, 0], pole: [1, -1, 0] },
+    },
+  };
+};
+/** The hands stay on the waist the whole way, as in the knight stretch, tipping forward with the body as it folds. */
+const hamstringAt = (t: number): Pose3 => {
+  const body = hamstringBody(t);
+  return { ...body, pins: { ...body.pins, rightHand: handOnWaist(body.pelvis, 1, body.lean), leftHand: handOnWaist(body.pelvis, -1, body.lean) } };
+};
+const KNIGHT_TO_HAMSTRING_FOLDED = hamstringAt(1);
+const KNIGHT_TO_HAMSTRING_STEPS = 12;
+
+export const KNIGHT_TO_HAMSTRING_3D: Clip3D = {
+  view: '3d',
+  // From the front leg's side, a little in front and above: the front leg straightening and the
+  // fold over it are flat on the screen, with the back knee planted beyond.
+  camera: { yaw: 18, pitch: 12 },
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: 1 + 3 * KNIGHT_TO_HAMSTRING_STEPS,
+  // The knight stretch, back through kneeling upright into the hamstring fold, and back again, without holding.
+  keyframes: [
+    { ms: 0, pose: KNIGHT_UPRIGHT },
+    ...alongArc(1300, KNIGHT_TO_HAMSTRING_STEPS, knightKneeUp),
+    { ms: 400, pose: knightKneeUp(1) },
+    ...alongArc(1300, KNIGHT_TO_HAMSTRING_STEPS, (t) => knightKneeUp(1 - t)),
+    ...alongArc(1800, KNIGHT_TO_HAMSTRING_STEPS, hamstringAt),
+    { ms: 600, pose: KNIGHT_TO_HAMSTRING_FOLDED },
+    ...alongArc(1800, KNIGHT_TO_HAMSTRING_STEPS, (t) => hamstringAt(1 - t)),
+  ],
+};
+
+// --- Couch stretch: back to a wall with the back shin up against it, the chest lifting from the hands on the floor to upright ---
+
+/** The back knee rests on the floor close to the wall, and its shin goes straight up the wall with the top of the foot against it. */
+const COUCH_KNEE: Vec3 = [-60, ANKLE_Y, -SKELETON.hip];
+const COUCH_WALL_X = COUCH_KNEE[0] - 13;
+/**
+ * The back thigh leans this far forward of upright from the knee: well forward with the hands down,
+ * and back to 35° upright, which bends the back knee to 145°, as far as the stretch goes.
+ */
+const COUCH_THIGH = { leaning: 55, upright: 35 };
+const couchPelvis = (thigh: number): Vec3 => [
+  COUCH_KNEE[0] + SKELETON.thigh * Math.sin(radians(thigh)),
+  COUCH_KNEE[1] + SKELETON.thigh * Math.cos(radians(thigh)),
+  0,
+];
+/**
+ * The front foot is planted where upright puts its shin straight up. The hips sit low, below that
+ * knee, so it bends a little past 90°.
+ */
+const COUCH_FRONT_ANKLE: Vec3 = (() => {
+  const pelvis = couchPelvis(COUCH_THIGH.upright);
+  const kneeY = ANKLE_Y + SKELETON.shin;
+  return [pelvis[0] + Math.sqrt(SKELETON.thigh ** 2 - (kneeY - pelvis[1]) ** 2), ANKLE_Y, SKELETON.hip];
+})();
+/** Leaning on the hands the chest is well forward; upright the pelvis tucks under, squeezing the glute, and the spine comes back up by as much. */
+const COUCH_LEAN = { leaning: 52, upright: -6 };
+
+const couchBody = (t: number): Pose3 => {
+  const pelvis = couchPelvis(mix(COUCH_THIGH.leaning, COUCH_THIGH.upright, t));
+  const tuck = Math.max(0, -COUCH_LEAN.upright) * t;
+  const back: Vec3 = [pelvis[0], pelvis[1], -SKELETON.hip];
+  return {
+    pelvis,
+    lean: mix(COUCH_LEAN.leaning, COUCH_LEAN.upright, t),
+    spine: { flex: tuck },
+    neck: { flex: mix(10, 0, t) },
+    pins: {
+      rightFoot: { at: COUCH_FRONT_ANKLE, toward: [1, 0, 0], pole: KNEE_UP_FORWARD },
+      leftFoot: pinVia(back, COUCH_KNEE, [COUCH_KNEE[0], COUCH_KNEE[1] + SKELETON.shin, COUCH_KNEE[2]], [0, 1, 0]),
+    },
+  };
+};
+const COUCH_LEANING_BODY = solvePose(couchBody(0));
+/** Leaning in, the hands are flat on the floor either side of the front foot, fingers forward. */
+const COUCH_FLOOR_HANDS: Record<'rightHand' | 'leftHand', Pin> = (() => {
+  const floor = (shoulder: Vec3, z: number, side: 1 | -1): Pin => {
+    // Reaching forward as far as leaves the arm a little bent.
+    const reach = 0.96 * ARM_REACH;
+    const x = shoulder[0] + Math.sqrt(Math.max(0, reach ** 2 - (shoulder[1] - WRIST_Y) ** 2 - (z - shoulder[2]) ** 2));
+    return { at: [x, WRIST_Y, z], toward: [1, 0, 0], pole: [-1, 0, side * 0.4] };
+  };
+  return {
+    rightHand: floor(COUCH_LEANING_BODY.rightArm[0], SKELETON.hip + 36, 1),
+    leftHand: floor(COUCH_LEANING_BODY.leftArm[0], SKELETON.hip - 32, -1),
+  };
+})();
+/**
+ * The hands land on top of the front thigh just above the knee, either side of its middle line, the
+ * fingers toward the knee, and slide back up it to the upper thigh as the body comes upright.
+ */
+const COUCH_HAND_ALONG = { lands: 0.8, upright: 0.45 };
+const COUCH_HAND_ON_TOP = 12;
+const COUCH_HAND_APART = 9;
+/** A hand resting on top of the front thigh of `skeleton`, this far along it from the hip. */
+const couchOnThigh = (skeleton: ReturnType<typeof solvePose>, along: number, side: 1 | -1): Pin => {
+  const [hip, knee] = skeleton.rightLeg;
+  const at = mix3(hip, knee, along);
+  return {
+    at: [at[0], at[1] + COUCH_HAND_ON_TOP, at[2] + side * COUCH_HAND_APART],
+    toward: [knee[0] - hip[0], knee[1] - hip[1] - 20, knee[2] - hip[2]],
+    // The elbows go out to the sides rather than back, where the near one would cross the shin on the wall.
+    pole: [-0.3, 0, side],
+  };
+};
+/**
+ * How far up the hands push the body before they leave the floor: as far as the arms reach, a
+ * little short of straight.
+ */
+const COUCH_PUSH_OFF = (() => {
+  let t = 0;
+  const tooFar = (at: number) => {
+    const skeleton = solvePose(couchBody(at));
+    return [1, -1].some((side) => {
+      const name = side === 1 ? 'rightHand' : 'leftHand';
+      return distance(shoulderOf(skeleton, side as 1 | -1), COUCH_FLOOR_HANDS[name].at) > 0.97 * ARM_REACH;
+    });
+  };
+  while (t < 1 && !tooFar(t + 0.01)) t += 0.01;
+  return t;
+})();
+/** How far up the body is when the hands land on the thigh, after which they slide back along it. */
+const COUCH_HANDS_LAND = Math.min(0.75, COUCH_PUSH_OFF + 0.35);
+
+/**
+ * This far up from leaning in to upright. The hands push the body up off the floor, stay planted
+ * until the arms run out of length, then lift and come up onto the front thigh above the knee:
+ * rising first and moving in only once above it, so the inside hand comes over the thigh rather
+ * than through it. From there they slide back up the thigh as the chest comes upright.
+ */
+const couchAt = (t: number): Pose3 => {
+  const body = couchBody(t);
+  const skeleton = solvePose(body);
+  const hand = (side: 1 | -1, name: 'rightHand' | 'leftHand'): Pin => {
+    const floor = COUCH_FLOOR_HANDS[name];
+    if (t <= COUCH_PUSH_OFF) return floor;
+    if (t >= COUCH_HANDS_LAND) {
+      const slide = smooth((t - COUCH_HANDS_LAND) / (1 - COUCH_HANDS_LAND));
+      return couchOnThigh(skeleton, mix(COUCH_HAND_ALONG.lands, COUCH_HAND_ALONG.upright, slide), side);
+    }
+    const s = (t - COUCH_PUSH_OFF) / (COUCH_HANDS_LAND - COUCH_PUSH_OFF);
+    const thigh = couchOnThigh(skeleton, COUCH_HAND_ALONG.lands, side);
+    const pin = mixPin(floor, thigh, smooth(s));
+    // Straight back and up toward the knee, a little above the thigh's top on the way so it comes
+    // down onto it; the inside hand moves in over it only in the second half.
+    const over = smooth(Math.max(0, (s - 0.4) / 0.6));
+    const at: Vec3 = [pin.at[0], pin.at[1] + 10 * Math.sin(Math.PI * s), mix(floor.at[2], thigh.at[2], over)];
+    return { ...pin, at: withinReach(shoulderOf(skeleton, side), at, 0.98 * ARM_REACH) };
+  };
+  return { ...body, pins: { ...body.pins, rightHand: hand(1, 'rightHand'), leftHand: hand(-1, 'leftHand') } };
+};
+const COUCH_LEANING = couchAt(0);
+const COUCH_UPRIGHT = couchAt(1);
+const COUCH_STEPS = 12;
+
+export const COUCH_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From the back leg's side, a little in front and above, as for the knight stretch: the stretch
+  // is in the front of that thigh, nearest and flat on the screen, and the camera looks past the
+  // figure at the face of the wall the shin rests on.
+  camera: { yaw: 162, pitch: 12 },
+  highlight: ['leftLeg'],
+  scenery: [{ from: [COUCH_WALL_X - 24, 0, -110], to: [COUCH_WALL_X, 340, 110] }],
+  stillFrame: 1 + COUCH_STEPS,
+  keyframes: [
+    { ms: 0, pose: COUCH_LEANING },
+    { ms: 600, pose: COUCH_LEANING },
+    ...alongArc(2000, COUCH_STEPS, couchAt),
+    { ms: 3500, pose: COUCH_UPRIGHT },
+    ...alongArc(1800, COUCH_STEPS, (t) => couchAt(1 - t)),
+  ],
+};
+
+// --- Pyramid stretch: one foot a long step ahead of the other, hips square and both legs straight, hinging forward over the front leg ---
+
+/** Each ankle is this far ahead of or behind the hips: a long step, the feet just under a leg's length apart. */
+const PYRAMID_STEP = 92;
+/** The back foot turns out this far, as it does to keep the hips square. */
+const PYRAMID_BACK_TOES_OUT = 40;
+/** Both legs straight, a hair short of locked, so the hips sit this high and stay there. */
+const PYRAMID_PELVIS: Vec3 = [0, ANKLE_Y + Math.sqrt((0.995 * LEG_REACH) ** 2 - PYRAMID_STEP ** 2), 0];
+/** Folded: the hinge at the hips with the back flat, the head in line with it. */
+const PYRAMID_FOLD = { lean: 84, spine: 8, neck: 12 };
+/** The hands rest either side of the front shin, this far down it from the knee. */
+const PYRAMID_HAND_ALONG = 0.3;
+const PYRAMID_HAND_OUT = 15;
+/** How far into the fold the far arm comes in front of the far leg. */
+const PYRAMID_ARM_CROSSES = 0.33;
+
+const pyramidBody = (t: number): Pose3 => {
+  const out = radians(PYRAMID_BACK_TOES_OUT);
+  return {
+    pelvis: PYRAMID_PELVIS,
+    lean: PYRAMID_FOLD.lean * t,
+    spine: { flex: PYRAMID_FOLD.spine * t },
+    neck: { flex: PYRAMID_FOLD.neck * t },
+    pins: {
+      rightFoot: { at: [PYRAMID_STEP, ANKLE_Y, SKELETON.hip], toward: [1, 0, 0], pole: [1, 0.2, 0] },
+      leftFoot: { at: [-PYRAMID_STEP, ANKLE_Y, -SKELETON.hip], toward: [Math.cos(out), 0, -Math.sin(out)], pole: [Math.cos(out), 0.2, -Math.sin(out)] },
+    },
+  };
+};
+const PYRAMID_LEGS = solvePose(pyramidBody(0));
+/** Where each hand rests on the front shin when folded: either side of it, a little above its middle line. */
+const PYRAMID_ON_SHIN = (() => {
+  const [, knee, ankle] = PYRAMID_LEGS.rightLeg;
+  const at = mix3(knee, ankle, PYRAMID_HAND_ALONG);
+  return { right: [at[0], at[1] + 4, at[2] + PYRAMID_HAND_OUT] as Vec3, left: [at[0], at[1] + 4, at[2] - PYRAMID_HAND_OUT] as Vec3 };
+})();
+const PYRAMID_SHIN_HANDS: Record<'rightHand' | 'leftHand', Pin> = {
+  rightHand: { at: PYRAMID_ON_SHIN.right, toward: [0.3, -1, 0], pole: [-1, 0.3, 0.6] },
+  leftHand: { at: PYRAMID_ON_SHIN.left, toward: [0.3, -1, 0], pole: [-1, 0.3, -0.6] },
+};
+/**
+ * This far into the fold. The arms start hanging by the sides, straight down from the shoulders
+ * with the elbows soft, and reach down to the front shin as the body hinges, landing as it gets
+ * there.
+ */
+const pyramidAt = (t: number): Pose3 => {
+  const body = pyramidBody(t);
+  const skeleton = solvePose(body);
+  const reach = smooth(t);
+  const hand = (side: 1 | -1, name: 'rightHand' | 'leftHand'): Pin => {
+    const shoulder = shoulderOf(skeleton, side);
+    const hanging: Pin = { at: [shoulder[0], shoulder[1] - 0.97 * ARM_REACH, shoulder[2] + side * 6], toward: [0, -1, 0], pole: [-1, 0, 0] };
+    const pin = mixPin(hanging, PYRAMID_SHIN_HANDS[name], reach);
+    // A little short of full stretch, so going straight from one frame to the next never cuts past it.
+    return { ...pin, at: withinReach(shoulder, pin.at, 0.98 * ARM_REACH) };
+  };
+  // The far arm hangs outside its leg, behind it, and ends on the inside of the front shin, in front
+  // of it. It changes over a third of the way down, once the hand has swung forward well clear of
+  // that leg on the screen; where they overlap at the hip, depth alone swapped them too early.
+  const behind: Pose3['behind'] = [t < PYRAMID_ARM_CROSSES ? ['leftArm', 'leftLeg'] : ['leftLeg', 'leftArm']];
+  return { ...body, behind, pins: { ...body.pins, rightHand: hand(1, 'rightHand'), leftHand: hand(-1, 'leftHand') } };
+};
+const PYRAMID_UP = pyramidAt(0);
+const PYRAMID_FOLDED = pyramidAt(1);
+const PYRAMID_STEPS = 14;
+
+export const PYRAMID_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From the front leg's side and a little in front: the hinge over the straight front leg is flat
+  // on the screen, with the back leg reaching away beyond it.
+  camera: { yaw: 16, pitch: 10 },
+  highlight: ['rightLeg'],
+  stillFrame: 1 + PYRAMID_STEPS,
+  keyframes: [
+    { ms: 0, pose: PYRAMID_UP },
+    { ms: 500, pose: PYRAMID_UP },
+    ...alongArc(2200, PYRAMID_STEPS, pyramidAt),
+    { ms: 3500, pose: PYRAMID_FOLDED },
+    ...alongArc(2000, PYRAMID_STEPS, (t) => pyramidAt(1 - t)),
   ],
 };
