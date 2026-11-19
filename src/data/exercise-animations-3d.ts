@@ -1,4 +1,4 @@
-import { distance, SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Vec3 } from '@/lib/rig3d';
+import { distance, SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -2908,6 +2908,20 @@ const handOnWaist = (pelvis: Vec3, side: 1 | -1, lean = 0): Pin => {
     pole: inBody(-1, 0, side),
   };
 };
+/**
+ * A direction partway round from `from` to `to`, turning at an even rate through the angle between
+ * them. Blending two far-apart directions in a straight line turns slowly at first and then all at
+ * once, which spins a hand or an elbow.
+ */
+const turnToward = (from: Vec3, to: Vec3, t: number): Vec3 => {
+  const a = toward([0, 0, 0], from, 1);
+  const b = toward([0, 0, 0], to, 1);
+  const cos = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+  const angle = Math.acos(cos);
+  if (angle < 1e-4) return b;
+  const [wa, wb] = [Math.sin((1 - t) * angle) / Math.sin(angle), Math.sin(t * angle) / Math.sin(angle)];
+  return [a[0] * wa + b[0] * wb, a[1] * wa + b[1] * wb, a[2] * wa + b[2] * wb];
+};
 /** Partway from one hand pin to another, the direction of the hand and the elbow turning with it. */
 const mixPin = (a: Pin, b: Pin, t: number): Pin => ({
   at: mix3(a.at, b.at, t),
@@ -3576,5 +3590,112 @@ export const HALF_KNEELING_FROG_STRETCH_3D: Clip3D = {
     ...alongArc(1800, HALF_FROG_STEPS, halfFrogAt),
     { ms: 1200, pose: HALF_FROG_BACK },
     ...alongArc(1600, HALF_FROG_STEPS, (t) => halfFrogAt(1 - t)),
+  ],
+};
+
+// --- Neck side stretch: standing tall, the right hand comes up over the head to rest on it, and the head tilts toward the right shoulder while the left arm reaches down ---
+
+/** All the way over: the right ear toward the right shoulder. */
+const NECK_TILT = 40;
+/**
+ * The right arm on its way up, out to the side, as angles: the shoulder lifts as the arm rises,
+ * the elbow bending until the hand is over the head.
+ */
+const NECK_ARM_UP: ArmPose = { abduct: 160, flex: 8, elbow: 115, shrug: 18 };
+/**
+ * Where the hand rests: on top of the head, this far round from the crown toward the left ear, just
+ * off the surface, the fingers draped toward the ear. Reaching any further round to the far side, the
+ * forearm crossed the face: the head is big next to the arm.
+ */
+const NECK_HAND = { round: 15, out: SKELETON.head + 4, forward: 0 };
+/** The left arm straightens and reaches down, the shoulder dropping, a little out from the side. */
+const NECK_LEFT_ARM = { hanging: { abduct: 5, elbow: 8, shrug: 0 }, reaching: { abduct: 9, elbow: 0, shrug: -14 } };
+/** How far through the move the hand settles on the head, before the head tilts the rest of the way. */
+const NECK_HAND_LANDS = 0.6;
+/** How far through the move the hand starts over toward the head. */
+const NECK_HAND_SETS_OFF = 0.15;
+
+/** The right hand's pin, resting on the head of `skeleton`. */
+const neckHandOnHead = (skeleton: Skeleton): Pin => {
+  const head = skeleton.head;
+  const up = skeleton.headUp;
+  // The head's own left, square to its up.
+  const left: Vec3 = [-skeleton.headRight[0], -skeleton.headRight[1], -skeleton.headRight[2]];
+  const r = radians(NECK_HAND.round);
+  const out: Vec3 = [up[0] * Math.cos(r) + left[0] * Math.sin(r), up[1] * Math.cos(r) + left[1] * Math.sin(r), up[2] * Math.cos(r) + left[2] * Math.sin(r)];
+  // The fingers follow the head's curve down toward the left ear.
+  const fingers: Vec3 = [
+    0.2 - up[0] * Math.sin(r) + left[0] * Math.cos(r),
+    -up[1] * Math.sin(r) + left[1] * Math.cos(r),
+    -up[2] * Math.sin(r) + left[2] * Math.cos(r),
+  ];
+  return {
+    at: [head[0] + out[0] * NECK_HAND.out + NECK_HAND.forward, head[1] + out[1] * NECK_HAND.out, head[2] + out[2] * NECK_HAND.out],
+    toward: fingers,
+    // The elbow points out to the side and back, behind the head: with an arm this long next to a
+    // head this big, an elbow straight out to the side only reached forehead height, and the
+    // forearm crossed the face.
+    pole: [-1, 0.3, 0.7],
+  };
+};
+
+/**
+ * This far into the stretch. The right arm rises out to the side and over, and the hand settles on
+ * the head as it starts to tilt; from there it rides along with the head as it tilts the rest of
+ * the way. The left arm straightens and reaches down all the while.
+ */
+const neckSideAt = (t: number): Pose3 => {
+  const tilt = NECK_TILT * smooth(Math.min(1, Math.max(0, (t - 0.25) / 0.75)));
+  const rise = smooth(Math.min(1, t / NECK_HAND_LANDS));
+  const reaching = smooth(t);
+  const hang = NECK_LEFT_ARM.hanging;
+  const reach = NECK_LEFT_ARM.reaching;
+  const leftArm: ArmPose = { abduct: mix(hang.abduct, reach.abduct, reaching), elbow: mix(hang.elbow, reach.elbow, reaching), shrug: mix(hang.shrug, reach.shrug, reaching) };
+  const rightArm: ArmPose = {
+    abduct: mix(STANDING.rightArm!.abduct!, NECK_ARM_UP.abduct!, rise),
+    flex: mix(0, NECK_ARM_UP.flex!, rise),
+    elbow: mix(STANDING.rightArm!.elbow!, NECK_ARM_UP.elbow!, rise),
+    shrug: mix(0, NECK_ARM_UP.shrug!, rise),
+  };
+  const body: Pose3 = { ...STANDING, neck: { side: tilt }, rightArm, leftArm };
+  const skeleton = solvePose(body);
+  // Where the arm's angles put the hand and elbow, and the hand on the head.
+  const [shoulder, elbow, wrist] = skeleton.rightArm;
+  const onHead = neckHandOnHead(skeleton);
+  // The hand comes over onto the head through the second half of the rise. The way the fingers point
+  // and the elbow sticks out turn steadily from where the arm's angles have them to where they rest,
+  // rather than being blended in a straight line: the two are far apart, and blended straight they
+  // turned slowly and then all at once, a sudden spin of the wrist.
+  const land = smooth(Math.min(1, Math.max(0, (t - NECK_HAND_SETS_OFF) / (NECK_HAND_LANDS - NECK_HAND_SETS_OFF))));
+  const forearm: Vec3 = [wrist[0] - elbow[0], wrist[1] - elbow[1], wrist[2] - elbow[2]];
+  const bend: Vec3 = [elbow[0] - (shoulder[0] + wrist[0]) / 2, elbow[1] - (shoulder[1] + wrist[1]) / 2, elbow[2] - (shoulder[2] + wrist[2]) / 2];
+  const at = withinReach(shoulder, mix3(wrist, onHead.at, land), 0.98 * ARM_REACH);
+  return { ...body, pins: { rightHand: { at, toward: turnToward(forearm, onHead.toward!, land), pole: turnToward(bend, onHead.pole!, land) } } };
+};
+const NECK_UP = neckSideAt(0);
+const NECK_TILTED = neckSideAt(1);
+const NECK_STEPS = 28;
+
+export const NECK_SIDE_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From in front, close on the upper body: the tilt goes across the screen, with the hand resting
+  // on the head on one side and the other reaching down on the other.
+  camera: { yaw: 90, pitch: 8, fit: 'head' },
+  // No highlight: the stretch is in the neck, which has no part of its own to color, and coloring
+  // the torso marked the chest.
+  // The elbow goes back behind the head, so the arm passes behind it, and the hand resting on top
+  // of the head is drawn again over it.
+  behind: [['rightArm', 'head']],
+  holds: [{ hand: 'rightHand', limb: 'head' }],
+  // The left arm hangs down the side of the body facing the camera, so it stays over the torso; as
+  // its shoulder dropped, it went under it, the top of the arm vanishing into the shoulder.
+  over: ['leftArm'],
+  stillFrame: 1 + NECK_STEPS,
+  keyframes: [
+    { ms: 0, pose: NECK_UP },
+    { ms: 500, pose: NECK_UP },
+    ...alongArc(2600, NECK_STEPS, neckSideAt),
+    { ms: 3500, pose: NECK_TILTED },
+    ...alongArc(2200, NECK_STEPS, (t) => neckSideAt(1 - t)),
   ],
 };

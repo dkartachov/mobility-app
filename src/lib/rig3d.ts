@@ -50,6 +50,12 @@ export type ArmPose = {
   rotate?: number;
   /** Bending the elbow. */
   elbow?: number;
+  /**
+   * Lifting the shoulder toward the ear, as an angle at the collarbone, which carries the whole arm
+   * up with it; negative pulls it down. The shoulder rises a little as an arm goes overhead, and
+   * drops as a hand reaches for the floor. It moves a pinned arm's shoulder too.
+   */
+  shrug?: number;
 };
 
 /** A leg standing straight with the foot pointing ahead is all zeros. */
@@ -116,9 +122,31 @@ export type Camera = {
   yaw: number;
   /** How far the camera is raised: 0 is level with the floor, 90 looks straight down. */
   pitch: number;
-  /** Frame the whole body, or move in on everything from the pelvis up, or on the pelvis and legs. */
-  fit?: 'body' | 'upper' | 'lower';
+  /**
+   * Frame the whole body, or move in on everything from the pelvis up, on the pelvis and legs, or
+   * on the head and shoulders (see `framedJoints`).
+   */
+  fit?: 'body' | 'upper' | 'lower' | 'head';
 };
+
+/**
+ * The joints a camera's `fit` keeps in the frame. `'head'` takes the head, the top third of the
+ * spine and whatever of the arms is up there with it: for a stretch of the neck, where the rest of
+ * the body only stands still, and an arm reaching up to the head is all of it in view but one
+ * hanging down the side is cut off.
+ */
+export function framedJoints(skeleton: Skeleton, fit: Camera['fit']): Vec3[] {
+  const body = [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm];
+  const legs = [...skeleton.rightLeg, ...skeleton.leftLeg];
+  if (fit === 'upper') return body;
+  if (fit === 'lower') return [skeleton.spine[0], ...legs];
+  if (fit === 'head') {
+    const chest = skeleton.spine.slice((2 * SPINE_SEGMENTS) / 3);
+    const cut = chest[0][1];
+    return [...chest, skeleton.head, ...[...skeleton.rightArm, ...skeleton.leftArm].filter((joint) => joint[1] >= cut)];
+  }
+  return [...body, ...legs];
+}
 
 /**
  * Something in the room the figure uses, like a wall, a box or a table top: a block with its sides
@@ -148,7 +176,9 @@ export type Clip3D = {
    * Pairs of limbs where the first is drawn behind the second all the way through, whenever both
    * are on the same side of the torso. For limbs that stay against each other, like an arm inside
    * its knee in a squat: which is nearer where they touch is too close to call from their depths,
-   * and they'd swap places from one frame to the next.
+   * and they'd swap places from one frame to the next. A pair can name the head and a limb too,
+   * which holds whatever side of the body the limb is on: `['head', 'rightArm']` keeps a hand
+   * resting on the head, its forearm over the crown, drawn over it (neck side stretch).
    */
   behind?: readonly (readonly [Part, Part])[];
   /**
@@ -379,6 +409,7 @@ function lerpArm(a: ArmPose | undefined, b: ArmPose | undefined, t: number): Arm
     abduct: lerp(a?.abduct ?? 0, b?.abduct ?? 0, t),
     rotate: lerp(a?.rotate ?? 0, b?.rotate ?? 0, t),
     elbow: lerp(a?.elbow ?? 0, b?.elbow ?? 0, t),
+    shrug: lerp(a?.shrug ?? 0, b?.shrug ?? 0, t),
   };
 }
 
@@ -512,8 +543,10 @@ export function solvePose(pose: Pose3): Skeleton {
   const skull = mul(mul(mul(chest, rotY(pose.neck?.twist ?? 0)), rotZ(-(pose.neck?.flex ?? 0))), rotX(pose.neck?.side ?? 0));
   const head = add(neckBase, turned(skull, [0, SKELETON.neck, 0]));
 
-  const rightShoulder = add(neckBase, turned(chest, [0, 0, SKELETON.shoulder]));
-  const leftShoulder = add(neckBase, turned(chest, [0, 0, -SKELETON.shoulder]));
+  // The collarbone swings up from the top of the spine as the shoulder shrugs, and down as it drops.
+  const collarbone = (arm: ArmPose | undefined, side: number) => turned(mul(chest, rotX(-side * (arm?.shrug ?? 0))), [0, 0, side * SKELETON.shoulder]);
+  const rightShoulder = add(neckBase, collarbone(pose.rightArm, 1));
+  const leftShoulder = add(neckBase, collarbone(pose.leftArm, -1));
   const rightHip = add(pose.pelvis, turned(pelvis, [0, 0, SKELETON.hip]));
   const leftHip = add(pose.pelvis, turned(pelvis, [0, 0, -SKELETON.hip]));
 
@@ -1364,6 +1397,15 @@ export function traceFigure(
       else if (firstInFront === parts.length) firstInFront = i;
       continue;
     }
+    // A clip's own word on the head and a limb settles which side it goes, touching or not: for a
+    // hand resting on the head, whose forearm lies over the crown about as deep as its middle.
+    const forced = forcedBehind?.find(([a, b]) => (a === 'head' && b === part) || (b === 'head' && a === part));
+    if (forced) {
+      if (forced[0] === 'head') {
+        if (firstInFront === parts.length) firstInFront = i;
+      } else lastBehind = i;
+      continue;
+    }
     const near = nearestOnScreen(points, head);
     if (near.gap > HEAD_REACH) continue;
     if (near.depth < head[2]) lastBehind = i;
@@ -1630,8 +1672,8 @@ function tapeShape(tape: Clip3D['tape'], view: Mat3): Staging['tape'] {
  */
 export function stageClip(clip: Clip3D): Staging {
   const view = viewOf(clip.camera);
-  const upper = clip.camera.fit === 'upper';
-  const lower = clip.camera.fit === 'lower';
+  // Framed from somewhere up the body, the floor needn't be in the frame.
+  const upper = clip.camera.fit === 'upper' || clip.camera.fit === 'head';
   let left = Infinity;
   let right = -Infinity;
   let top = Infinity;
@@ -1645,7 +1687,7 @@ export function stageClip(clip: Clip3D): Staging {
     const skeleton = solvePose(poseAt3(clip, (total * step) / steps));
     const body = [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm];
     const legs = [...skeleton.rightLeg, ...skeleton.leftLeg];
-    for (const joint of upper ? body : lower ? [skeleton.spine[0], ...legs] : [...body, ...legs]) {
+    for (const joint of framedJoints(skeleton, clip.camera.fit)) {
       const [x, y] = project(view, joint);
       left = Math.min(left, x);
       right = Math.max(right, x);

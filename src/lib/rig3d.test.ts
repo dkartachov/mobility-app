@@ -50,6 +50,7 @@ import {
   SEATED_STRADDLE_SIDE_BEND_3D,
   SEATED_SHOULDER_EXTENSION_3D,
   HALF_KNEELING_FROG_STRETCH_3D,
+  NECK_SIDE_STRETCH_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
@@ -62,6 +63,7 @@ import { MARCHING_EXERCISE } from '@/data/test-warmup';
 import {
   distance,
   frameAt,
+  framedJoints,
   poseAt3,
   project,
   SKELETON,
@@ -219,6 +221,24 @@ describe('solvePose', () => {
     expect(skeleton.rightArm[3][1]).toBeCloseTo(neckBase[1] - SKELETON.upperArm - SKELETON.forearm - SKELETON.hand);
     expect(skeleton.rightLeg[2][1]).toBeCloseTo(13);
     expect(skeleton.rightLeg[3][0]).toBeCloseTo(SKELETON.foot);
+  });
+
+  it('lifts or drops a shoulder with its shrug, swinging on the collarbone and carrying the arm with it, pinned or not', () => {
+    const standing = solvePose(STANDING);
+    const neckBase = standing.spine[standing.spine.length - 1];
+    const shrugged = solvePose({ ...STANDING, rightArm: { shrug: 20 }, leftArm: { shrug: -15 } });
+    // The collarbone keeps its length, so the shoulder comes in a little as it rises.
+    expect(distance(shrugged.rightArm[0], neckBase)).toBeCloseTo(SKELETON.shoulder);
+    expect(shrugged.rightArm[0][1] - neckBase[1]).toBeCloseTo(SKELETON.shoulder * Math.sin((20 * Math.PI) / 180));
+    expect(shrugged.leftArm[0][1] - neckBase[1]).toBeCloseTo(-SKELETON.shoulder * Math.sin((15 * Math.PI) / 180));
+    expect(shrugged.rightArm[0][2]).toBeLessThan(SKELETON.shoulder);
+    // A hanging arm goes up with its shoulder.
+    expect(shrugged.rightArm[2][1] - standing.rightArm[2][1]).toBeCloseTo(shrugged.rightArm[0][1] - standing.rightArm[0][1]);
+    // A pinned arm's shoulder moves too, its hand staying on the pin.
+    const pin = { at: [40, 270, 40] as Vec3 };
+    const pinned = solvePose({ ...STANDING, rightArm: { shrug: 20 }, pins: { rightHand: pin } });
+    expect(pinned.rightArm[0]).toEqual(shrugged.rightArm[0]);
+    expect(distance(pinned.rightArm[2], pin.at)).toBeLessThan(0.01);
   });
 
   it('mirrors the same angles on the left and the right', () => {
@@ -487,13 +507,7 @@ describe('3D clips', () => {
       const [x, y, width, height] = stage.viewBox.split(' ').map(Number);
       expect(width / height).toBeCloseTo(16 / 9, 1);
       for (const skeleton of skeletons) {
-        const shown =
-          clip.camera.fit === 'upper'
-            ? [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm]
-            : clip.camera.fit === 'lower'
-              ? [skeleton.spine[0], ...skeleton.rightLeg, ...skeleton.leftLeg]
-              : joints(skeleton);
-        for (const joint of shown) {
+        for (const joint of framedJoints(skeleton, clip.camera.fit)) {
           const [sx, sy] = project(stage.view, joint);
           expect(sx).toBeGreaterThan(x + SKELETON.head);
           expect(sx).toBeLessThan(x + width - SKELETON.head);
@@ -2438,5 +2452,41 @@ describe('3D clips', () => {
     expect(Math.max(...hips)).toBeGreaterThan(10);
     expect(Math.min(...hips)).toBeLessThan(-55);
     expect(new Set(drawOrders(HALF_KNEELING_FROG_STRETCH_3D)).size).toBe(1);
+  });
+
+  it('rests the right hand on top of the head with the elbow out behind it while the head tilts toward the raised shoulder and the left arm reaches down, in the neck side stretch', () => {
+    const poses = samples(NECK_SIDE_STRETCH_3D).map(solvePose);
+    const [first] = poses;
+    for (const { spine, rightLeg, leftLeg } of poses) {
+      expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+    }
+    const held = solvePose(NECK_SIDE_STRETCH_3D.keyframes[NECK_SIDE_STRETCH_3D.stillFrame].pose);
+    const neckBase = held.spine[held.spine.length - 1];
+    // The head has gone over toward the right shoulder, the body staying upright.
+    expect(held.head[2] - neckBase[2]).toBeGreaterThan(25);
+    expect(tipped(held.spine[0], neckBase)).toBeLessThan(2);
+    // The hand rests on top of the head, just off it.
+    expect(distance(held.rightArm[2], held.head)).toBeCloseTo(SKELETON.head + 4, 0);
+    expect(held.rightArm[2][1]).toBeGreaterThan(held.head[1]);
+    // The elbow is out behind the head, clear of the face.
+    expect(held.rightArm[1][0]).toBeLessThan(held.head[0] - 10);
+    // The right shoulder lifts with the arm and the left drops as its hand reaches down.
+    expect(held.rightArm[0][1]).toBeGreaterThan(first.rightArm[0][1] + 5);
+    expect(held.leftArm[0][1]).toBeLessThan(first.leftArm[0][1] - 5);
+    expect(held.leftArm[2][1]).toBeLessThan(first.leftArm[2][1]);
+    expect(longestHold(NECK_SIDE_STRETCH_3D)).toBeGreaterThanOrEqual(3000);
+    // The arm is behind the head and its hand over it the whole way, and the reaching arm over the
+    // torso. The arms only change places with each other, on opposite sides of the body.
+    const orders = drawOrders(NECK_SIDE_STRETCH_3D).map((order) => order.split(' '));
+    for (const order of orders) {
+      const at = (part: string) => order.indexOf(part);
+      expect(at('rightArm')).toBeLessThan(at('head'));
+      // The hand drawn again on its own comes in as 'rightArm hand', the last 'hand'.
+      expect(at('head')).toBeLessThan(order.lastIndexOf('hand'));
+      expect(at('torso')).toBeLessThan(at('leftArm'));
+    }
+    expect(new Set(orders.map((order) => order.filter((part) => part !== 'leftArm').join(' '))).size).toBe(1);
   });
 });
