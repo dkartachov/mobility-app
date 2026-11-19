@@ -175,10 +175,12 @@ Moved to the new engine:
 | Wrist rocks | Library | `WRIST_ROCKS_3D` |
 | Elephant walk | Library | `ELEPHANT_WALK_3D` |
 | Seated straddle side bend | Library | `SEATED_STRADDLE_SIDE_BEND_3D` |
+| Seated shoulder extension | Library | `SEATED_SHOULDER_EXTENSION_3D` |
+| Half kneeling frog stretch | Library | `HALF_KNEELING_FROG_STRETCH_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch, seated pike stretch, three legged downward facing dog, standing forward fold, kneeling wrist stretch, floor angels, reverse tabletop, knight stretch, horse stance, the lying windshield wiper hold, frog stretch, frog rocks, knight to hamstring, couch stretch, pyramid stretch, wrist rocks, elephant walk and the seated straddle side bend.
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch, seated pike stretch, three legged downward facing dog, standing forward fold, kneeling wrist stretch, floor angels, reverse tabletop, knight stretch, horse stance, the lying windshield wiper hold, frog stretch, frog rocks, knight to hamstring, couch stretch, pyramid stretch, wrist rocks, elephant walk, the seated straddle side bend, seated shoulder extension and the half kneeling frog stretch.
 
 Library (`src/data/exercises.ts`):
 
@@ -190,7 +192,6 @@ Library (`src/data/exercises.ts`):
 | Downward facing dog to cobra | `DOWNWARD_FACING_DOG_TO_COBRA` | |
 | Figure four stretch | `FIGURE_FOUR_STRETCH` | |
 | Finger tendon glides | `FINGER_TENDON_GLIDES` | the hand view |
-| Half kneeling frog stretch | `HALF_KNEELING_FROG_STRETCH` | |
 | Half spinal twist | `HALF_SPINAL_TWIST` | |
 | Half-twisted lizard | `HALF_TWISTED_LIZARD` | |
 | Hip circles | `HIP_CIRCLES` | |
@@ -208,7 +209,6 @@ Library (`src/data/exercises.ts`):
 | Reverse scorpion | `REVERSE_SCORPION` | |
 | Scap mobilization | `SCAP_MOBILIZATION` | |
 | Seated hip internal rotation | `SEATED_HIP_INTERNAL_ROTATION` | mini band |
-| Seated shoulder extension | `SEATED_SHOULDER_EXTENSION` | |
 | Shoulder pass-throughs | `SHOULDER_PASS_THROUGHS` | |
 | Side-lying external rotation | `SIDE_LYING_EXTERNAL_ROTATION` | dumbbell |
 | Sleeper stretch | `SLEEPER_STRETCH` | |

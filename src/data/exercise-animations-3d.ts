@@ -3453,3 +3453,128 @@ export const SEATED_STRADDLE_SIDE_BEND_3D: Clip3D = {
     ...alongArc(1800, STRADDLE_STEPS, (t) => straddleAt(1 - t)),
   ],
 };
+
+/**
+ * The lean, between upright and as far over as brings the shoulders nearest the hand at `hand`,
+ * that leaves the arms straight: the most upright one, as in the kneeling wrist stretch. Positive
+ * leans tip forward, negative back.
+ */
+const straightArmLean = (body: (lean: number) => Pose3, hand: Vec3, direction: 1 | -1 = 1): number => {
+  const gap = (lean: number) => distance(solvePose(body(lean)).rightArm[0], hand);
+  let nearest = 0;
+  for (let tip = 0; Math.abs(tip) <= 150; tip += 2 * direction) if (gap(tip) < gap(nearest)) nearest = tip;
+  let [upright, over] = [0, nearest];
+  const reach = 0.998 * ARM_REACH;
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + over) / 2;
+    if (gap(tip) > reach) upright = tip;
+    else over = tip;
+  }
+  return (upright + over) / 2;
+};
+
+// --- Seated shoulder extension: sitting with the knees bent and the hands planted behind, fingers back, the hips lift, move forward away from the hands and sit back down ---
+
+/** The hands stay planted behind, shoulder-width apart, the fingers pointing back. */
+const SHOULDER_EXT_HANDS: Vec3 = [-105, WRIST_Y, SKELETON.shoulder];
+/** The feet stay planted flat ahead, hip-width apart, the knees bent and pointing up. */
+const SHOULDER_EXT_FEET_X = 150;
+/** How far forward the hips sit down again, away from the hands. */
+const SHOULDER_EXT_SHIFT = 55;
+/** How high the hips lift at the top of their arc: just clear of the floor. */
+const SHOULDER_EXT_LIFT = 14;
+/** Sitting in the stretch the chest lifts: the upper back arches a little, and the head stays in line. */
+const SHOULDER_EXT_ARCH = -14;
+
+/**
+ * This far through a move from sitting back by the hands (0) to sitting forward in the stretch (1).
+ * The hips travel in one low arc, coming off the floor as they set off, highest halfway, and
+ * settling back down as they arrive, so they never drag along it; going back the other way is the
+ * same arc in reverse. Lifting, moving and sitting one after the other looked mechanical. The body
+ * tips back as far as keeps the arms straight to the planted hands, so the further forward the hips
+ * sit, the further the arms reach back behind the body.
+ */
+const shoulderExtensionAt = (t: number): Pose3 => {
+  const up = Math.sin(Math.PI * t);
+  // Moving starts just after the hips leave the floor and ends just before they're down.
+  const forward = smooth(Math.min(1, Math.max(0, (t - 0.08) / 0.84)));
+  const pelvis: Vec3 = [SHOULDER_EXT_SHIFT * forward, SIT_PELVIS_Y + SHOULDER_EXT_LIFT * up, 0];
+  const hand = (side: 1 | -1): Pin => ({ at: [SHOULDER_EXT_HANDS[0], SHOULDER_EXT_HANDS[1], side * SHOULDER_EXT_HANDS[2]], toward: [-1, 0, 0], pole: [-1, 0, side * 0.2] });
+  const foot = (side: 1 | -1): Pin => ({ at: [SHOULDER_EXT_FEET_X, ANKLE_Y, side * SKELETON.hip], toward: [1, 0, 0], pole: [0.3, 1, 0] });
+  const body = (lean: number): Pose3 => ({
+    pelvis,
+    lean,
+    spine: { flex: SHOULDER_EXT_ARCH * forward },
+    neck: { flex: -SHOULDER_EXT_ARCH * forward },
+    pins: { rightHand: hand(1), leftHand: hand(-1), rightFoot: foot(1), leftFoot: foot(-1) },
+  });
+  return body(straightArmLean(body, SHOULDER_EXT_HANDS, -1));
+};
+const SHOULDER_EXT_BACK = shoulderExtensionAt(0);
+const SHOULDER_EXT_FORWARD = shoulderExtensionAt(1);
+const SHOULDER_EXT_STEPS = 18;
+
+export const SEATED_SHOULDER_EXTENSION_3D: Clip3D = {
+  view: '3d',
+  // As for reverse tabletop: from the side, a little in front and above, the hips' lift and move
+  // and the arms reaching back behind the body are flat on the screen.
+  camera: { yaw: 16, pitch: 10 },
+  highlight: ['rightArm', 'leftArm'],
+  stillFrame: 1 + SHOULDER_EXT_STEPS,
+  keyframes: [
+    { ms: 0, pose: SHOULDER_EXT_BACK },
+    { ms: 600, pose: SHOULDER_EXT_BACK },
+    ...alongArc(2200, SHOULDER_EXT_STEPS, shoulderExtensionAt),
+    { ms: 3500, pose: SHOULDER_EXT_FORWARD },
+    ...alongArc(2200, SHOULDER_EXT_STEPS, (t) => shoulderExtensionAt(1 - t)),
+  ],
+};
+
+// --- Half kneeling frog stretch: on hands and one knee, the other leg straight out to the side, the hips rock back ---
+
+/**
+ * The straight leg's foot sits flat on the floor out to the side, level with the planted knee. The
+ * hips swing on a circle around that knee as they rock, and the foot is on that circle's axis, so it
+ * stays the same distance from the hip the whole way and the leg stays straight.
+ */
+const HALF_FROG_FOOT: Vec3 = [WRIST_KNEE_X, ANKLE_Y, SKELETON.hip + Math.sqrt((0.998 * LEG_REACH) ** 2 - SKELETON.thigh ** 2)];
+/** The hips start a little forward of the knee and rock back this far round it. */
+const HALF_FROG_THIGH = { forward: -8, back: 42 };
+
+const halfFrogAt = (t: number): Pose3 => {
+  const thigh = radians(90 + mix(HALF_FROG_THIGH.forward, HALF_FROG_THIGH.back, t));
+  const pelvis: Vec3 = [WRIST_KNEE_X + SKELETON.thigh * Math.cos(thigh), ANKLE_Y + SKELETON.thigh * Math.sin(thigh), 0];
+  const hand = (side: 1 | -1): Pin => ({ at: [WRIST_HANDS[0], WRIST_HANDS[1], side * WRIST_HANDS[2]], toward: [1, 0, 0], pole: [-1, 0, side * 0.3] });
+  const body = (lean: number): Pose3 => ({
+    pelvis,
+    lean,
+    neck: { flex: 12 },
+    pins: {
+      // The kneecap faces forward and up, the toes forward.
+      rightFoot: { at: HALF_FROG_FOOT, toward: [1, 0, 0], pole: [0.3, 1, 0] },
+      leftFoot: pinVia([pelvis[0], pelvis[1], -SKELETON.hip], [WRIST_KNEE_X, ANKLE_Y, -SKELETON.hip], [WRIST_KNEE_X - SKELETON.shin, ANKLE_Y, -SKELETON.hip], [-1, 0, 0]),
+      rightHand: hand(1),
+      leftHand: hand(-1),
+    },
+  });
+  return body(straightArmLean(body, [WRIST_HANDS[0], WRIST_HANDS[1], WRIST_HANDS[2]]));
+};
+const HALF_FROG_FORWARD = halfFrogAt(0);
+const HALF_FROG_BACK = halfFrogAt(1);
+const HALF_FROG_STEPS = 14;
+
+export const HALF_KNEELING_FROG_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From in front of the straight leg and above: the leg lies out to the side across the screen,
+  // and the hips' rock back shows beyond it.
+  camera: { yaw: 50, pitch: 28 },
+  highlight: ['rightLeg'],
+  stillFrame: 1 + HALF_FROG_STEPS,
+  keyframes: [
+    { ms: 0, pose: HALF_FROG_FORWARD },
+    { ms: 400, pose: HALF_FROG_FORWARD },
+    ...alongArc(1800, HALF_FROG_STEPS, halfFrogAt),
+    { ms: 1200, pose: HALF_FROG_BACK },
+    ...alongArc(1600, HALF_FROG_STEPS, (t) => halfFrogAt(1 - t)),
+  ],
+};

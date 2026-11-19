@@ -48,6 +48,8 @@ import {
   WRIST_ROCKS_3D,
   ELEPHANT_WALK_3D,
   SEATED_STRADDLE_SIDE_BEND_3D,
+  SEATED_SHOULDER_EXTENSION_3D,
+  HALF_KNEELING_FROG_STRETCH_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
@@ -2380,5 +2382,61 @@ describe('3D clips', () => {
         }
       }
     });
+  });
+
+  it('lifts the hips off the floor to move them forward away from the hands, sits down in the stretch, and lifts again to go back, the knees bent and the hands and feet planted, in the seated shoulder extension', () => {
+    const poses = samples(SEATED_SHOULDER_EXTENSION_3D).map(solvePose);
+    const [first] = poses;
+    const floor = first.spine[0][1];
+    let lifted = false;
+    for (const { spine, rightArm, leftArm, rightLeg, leftLeg } of poses) {
+      expect(distance(rightArm[2], first.rightArm[2])).toBeLessThan(0.5);
+      expect(distance(leftArm[2], first.leftArm[2])).toBeLessThan(0.5);
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+      expect(angleAt(rightArm[0], rightArm[1], rightArm[2])).toBeGreaterThan(170);
+      // The knees stay bent, pointing up.
+      expect(angleAt(rightLeg[0], rightLeg[1], rightLeg[2])).toBeLessThan(110);
+      expect(rightLeg[1][1]).toBeGreaterThan(rightLeg[0][1]);
+      // The hips are either down on the floor where they sit or lifted clear of it: they only move
+      // forward or back while they're up, never dragging along the floor.
+      const height = spine[0][1] - floor;
+      expect(height).toBeGreaterThan(-0.5);
+      if (height > 10) lifted = true;
+      // Only just off the floor, not pressed up.
+      expect(height).toBeLessThan(20);
+    }
+    expect(lifted).toBe(true);
+    for (let i = 1; i < poses.length; i++) {
+      const moved = Math.abs(poses[i].spine[0][0] - poses[i - 1].spine[0][0]);
+      if (moved > 0.5) expect(Math.min(poses[i].spine[0][1], poses[i - 1].spine[0][1]) - floor).toBeGreaterThan(1);
+    }
+    const forward = solvePose(SEATED_SHOULDER_EXTENSION_3D.keyframes[SEATED_SHOULDER_EXTENSION_3D.stillFrame].pose);
+    expect(forward.spine[0][0] - first.spine[0][0]).toBeGreaterThan(45);
+    expect(forward.spine[0][1]).toBeCloseTo(floor, 1);
+    // The arms reach further back behind the body: the hands are further behind the shoulders.
+    expect(forward.rightArm[0][0] - forward.rightArm[2][0]).toBeGreaterThan(first.rightArm[0][0] - first.rightArm[2][0] + 20);
+    expect(SEATED_SHOULDER_EXTENSION_3D.keyframes[0].pose.pins!.rightHand!.toward![0]).toBe(-1);
+    expect(longestHold(SEATED_SHOULDER_EXTENSION_3D)).toBeGreaterThanOrEqual(3000);
+    expect(new Set(drawOrders(SEATED_SHOULDER_EXTENSION_3D)).size).toBe(1);
+  });
+
+  it('keeps the side leg straight with its foot planted and the knee and hands planted while the hips rock back, in the half kneeling frog stretch', () => {
+    const poses = samples(HALF_KNEELING_FROG_STRETCH_3D).map(solvePose);
+    const [first] = poses;
+    for (const { rightLeg, leftLeg, rightArm, leftArm } of poses) {
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(angleAt(rightLeg[0], rightLeg[1], rightLeg[2])).toBeGreaterThan(170);
+      expect(distance(leftLeg[1], first.leftLeg[1])).toBeLessThan(0.5);
+      expect(distance(rightArm[2], first.rightArm[2])).toBeLessThan(0.5);
+      expect(distance(leftArm[2], first.leftArm[2])).toBeLessThan(0.5);
+      expect(angleAt(rightArm[0], rightArm[1], rightArm[2])).toBeGreaterThan(165);
+    }
+    // The leg lies out to the side, and the hips rock back behind the knee.
+    expect(first.rightLeg[2][2]).toBeGreaterThan(150);
+    const hips = poses.map(({ spine }) => spine[0][0] - first.leftLeg[1][0]);
+    expect(Math.max(...hips)).toBeGreaterThan(10);
+    expect(Math.min(...hips)).toBeLessThan(-55);
+    expect(new Set(drawOrders(HALF_KNEELING_FROG_STRETCH_3D)).size).toBe(1);
   });
 });
