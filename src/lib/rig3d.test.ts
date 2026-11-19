@@ -45,6 +45,9 @@ import {
   KNIGHT_TO_HAMSTRING_3D,
   COUCH_STRETCH_3D,
   PYRAMID_STRETCH_3D,
+  WRIST_ROCKS_3D,
+  ELEPHANT_WALK_3D,
+  SEATED_STRADDLE_SIDE_BEND_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
@@ -2285,6 +2288,97 @@ describe('3D clips', () => {
       const skeleton = solvePose(poseAt3(PYRAMID_STRETCH_3D, i * 10));
       const seen = (points: readonly Vec3[]) => points.map((point) => project(view, point));
       expect(boneGap(seen(skeleton.leftArm), seen(skeleton.leftLeg))).toBeGreaterThan(40);
+    });
+  });
+
+  it('rocks the shoulders from ahead of the planted hands to behind them with the arms straight, the hands lifting one at a time to turn out partway, in wrist rocks', () => {
+    const samplePoses = samples(WRIST_ROCKS_3D);
+    const poses = samplePoses.map(solvePose);
+    const [first] = poses;
+    const floor = first.rightArm[2][1];
+    let [ahead, behind, lifted] = [false, false, false];
+    poses.forEach(({ rightArm, leftArm, rightLeg, leftLeg, spine }, i) => {
+      // The hands only ever go straight up off their spots, never sliding along the floor.
+      for (const [arm, start] of [[rightArm, first.rightArm], [leftArm, first.leftArm]]) {
+        expect(Math.hypot(arm[2][0] - start[2][0], arm[2][2] - start[2][2])).toBeLessThan(0.5);
+      }
+      expect(distance(rightLeg[1], first.rightLeg[1])).toBeLessThan(0.5);
+      expect(distance(leftLeg[1], first.leftLeg[1])).toBeLessThan(0.5);
+      const up = [rightArm[2][1] - floor, leftArm[2][1] - floor];
+      // Never both hands off the floor at once.
+      expect(Math.min(...up)).toBeLessThan(0.5);
+      if (Math.max(...up) > 0.5) {
+        lifted = true;
+        // The body stays still over the planted hand while the other turns.
+        expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      }
+      // A hand on the floor keeps its arm straight, and only turns while it's lifted.
+      for (const [arm, hand, height] of [[rightArm, samplePoses[i].pins!.rightHand!, up[0]], [leftArm, samplePoses[i].pins!.leftHand!, up[1]]] as const) {
+        if (height > 0.5) continue;
+        expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(165);
+        const [x, , z] = hand.toward!;
+        expect(Math.abs(x) > 0.99 || Math.abs(z) > 0.99).toBe(true);
+      }
+      if (rightArm[0][0] - rightArm[2][0] > 25) ahead = true;
+      if (rightArm[0][0] - rightArm[2][0] < -25) behind = true;
+    });
+    expect([ahead, behind, lifted]).toEqual([true, true, true]);
+    // The fingers point forward for one rock and out to the sides for the next.
+    const fingers = samplePoses.map((pose) => pose.pins!.rightHand!.toward!);
+    expect(fingers.some(([x]) => x > 0.99)).toBe(true);
+    expect(fingers.some(([x, , z]) => x < 0.01 && z > 0.99)).toBe(true);
+    expect(new Set(drawOrders(WRIST_ROCKS_3D)).size).toBe(1);
+  });
+
+  it('bends one knee with its heel lifting while the other leg is straight with its heel down, folded with the hands on the floor, in the elephant walk', () => {
+    const poses = samples(ELEPHANT_WALK_3D).map(solvePose);
+    const [first] = poses;
+    const ankleY = Math.min(first.rightLeg[2][1], first.leftLeg[2][1]);
+    for (const { spine, rightArm, leftArm, rightLeg, leftLeg } of poses) {
+      expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      expect(rightArm[2][1]).toBeCloseTo(11, 0);
+      expect(leftArm[2][1]).toBeCloseTo(11, 0);
+      // The toes stay planted, the foot pivoting on them.
+      for (const [leg, start] of [[rightLeg, first.rightLeg], [leftLeg, first.leftLeg]]) expect(distance(leg[3], start[3])).toBeLessThan(0.5);
+    }
+    for (const [bent, straight] of [[poses[0].rightLeg, poses[0].leftLeg], [solvePose(ELEPHANT_WALK_3D.keyframes[12].pose).leftLeg, solvePose(ELEPHANT_WALK_3D.keyframes[12].pose).rightLeg]]) {
+      expect(angleAt(bent[0], bent[1], bent[2])).toBeLessThan(140);
+      expect(bent[2][1] - ankleY).toBeGreaterThan(15);
+      expect(angleAt(straight[0], straight[1], straight[2])).toBeGreaterThan(165);
+      expect(straight[2][1]).toBeCloseTo(ankleY, 1);
+    }
+    expect(new Set(drawOrders(ELEPHANT_WALK_3D)).size).toBe(1);
+  });
+
+  it('leans sideways over the right leg with the left arm overhead and the right hand inside the knee, sitting in the straddle, in the seated straddle side bend', () => {
+    const poses = samples(SEATED_STRADDLE_SIDE_BEND_3D).map(solvePose);
+    const [first] = poses;
+    for (const { spine, rightLeg, leftLeg } of poses) {
+      expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+    }
+    const over = solvePose(SEATED_STRADDLE_SIDE_BEND_3D.keyframes[SEATED_STRADDLE_SIDE_BEND_3D.stillFrame].pose);
+    const top = over.spine[over.spine.length - 1];
+    // The chest has gone over to the right, and the left hand is above the head.
+    expect(top[2] - over.spine[0][2]).toBeGreaterThan(30);
+    expect(over.leftArm[2][1]).toBeGreaterThan(over.head[1]);
+    expect(over.rightArm[2][1]).toBeCloseTo(11, 0);
+    expect(over.rightArm[2][2]).toBeLessThan(over.rightLeg[1][2]);
+    expect(longestHold(SEATED_STRADDLE_SIDE_BEND_3D)).toBeGreaterThanOrEqual(3000);
+    // Parts change places only where they're well clear of each other on the screen.
+    const view = viewOf(SEATED_STRADDLE_SIDE_BEND_3D.camera);
+    const orders = drawOrders(SEATED_STRADDLE_SIDE_BEND_3D).map((order) => order.split(' '));
+    orders.forEach((order, i) => {
+      if (i === 0) return;
+      const skeleton = solvePose(poseAt3(SEATED_STRADDLE_SIDE_BEND_3D, i * 10));
+      const seen = (part: string) => (part === 'head' ? [skeleton.head, skeleton.head] : part === 'torso' ? skeleton.spine : skeleton[part as 'rightArm']).map((point) => project(view, point));
+      for (const a of order) {
+        for (const b of order) {
+          const swapped = order.indexOf(a) < order.indexOf(b) && orders[i - 1].indexOf(a) > orders[i - 1].indexOf(b);
+          if (swapped) expect(boneGap(seen(a), seen(b))).toBeGreaterThan(45);
+        }
+      }
     });
   });
 });

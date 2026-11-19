@@ -3212,3 +3212,244 @@ export const PYRAMID_STRETCH_3D: Clip3D = {
     ...alongArc(2000, PYRAMID_STEPS, (t) => pyramidAt(1 - t)),
   ],
 };
+
+// --- Wrist rocks: on all fours, the shoulders rock forward past the hands and back toward the heels, the hands turning out partway through ---
+
+/**
+ * The hips this far round the knees from straight over them, back toward the heels for a positive
+ * number and forward for a negative one, the knees and feet planted as on all fours. The body tips
+ * as far forward as keeps the arms straight with the hands planted under where the shoulders
+ * start, so the shoulders travel past the hands rocking forward and behind them rocking back.
+ */
+const ROCK_THIGH = { forward: -26, back: 36 };
+/** Fingers pointing forward, or turned out to the sides. */
+const ROCK_FINGERS = { forward: 0, out: 90 };
+/** How far a hand lifts off the floor to turn. */
+const ROCK_HAND_LIFT = 6;
+/** One hand: how far its fingers are turned out, and how far off the floor it is, from 0 (planted) to 1. */
+type RockHand = { out: number; lift?: number };
+const wristRockAt = (thighBack: number, right: RockHand, left: RockHand = right): Pose3 => {
+  const thigh = radians(90 + thighBack);
+  const pelvis: Vec3 = [WRIST_KNEE_X + SKELETON.thigh * Math.cos(thigh), ANKLE_Y + SKELETON.thigh * Math.sin(thigh), 0];
+  const leg = (side: 1 | -1): Pin =>
+    pinVia([pelvis[0], pelvis[1], side * SKELETON.hip], [WRIST_KNEE_X, ANKLE_Y, side * SKELETON.hip], [WRIST_KNEE_X - SKELETON.shin, ANKLE_Y, side * SKELETON.hip], [-1, 0, 0]);
+  const hand = (side: 1 | -1, { out, lift = 0 }: RockHand): Pin => {
+    const turn = radians(out);
+    // A lifted hand hangs a little from the wrist, the fingers dipping toward the floor.
+    const dip = -0.35 * lift;
+    return {
+      at: [WRIST_HANDS[0], WRIST_HANDS[1] + ROCK_HAND_LIFT * lift, side * WRIST_HANDS[2]],
+      toward: [Math.cos(turn), dip, side * Math.sin(turn)],
+      pole: [-1, 0, side * 0.3],
+    };
+  };
+  const body = (lean: number): Pose3 => ({
+    pelvis,
+    lean,
+    neck: { flex: 12 },
+    pins: { rightFoot: leg(1), leftFoot: leg(-1), rightHand: hand(1, right), leftHand: hand(-1, left) },
+  });
+  const gap = (lean: number) => distance(solvePose(body(lean)).rightArm[0], [WRIST_HANDS[0], WRIST_HANDS[1], WRIST_HANDS[2]]);
+  // As in the kneeling wrist stretch: the most upright lean that brings the shoulders within an arm of the hands.
+  let nearest = 0;
+  for (let tip = 0; tip <= 150; tip += 2) if (gap(tip) < gap(nearest)) nearest = tip;
+  let [upright, tipped] = [0, nearest];
+  const reach = 0.998 * ARM_REACH;
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + tipped) / 2;
+    if (gap(tip) > reach) upright = tip;
+    else tipped = tip;
+  }
+  return body((upright + tipped) / 2);
+};
+/** This far through one rock, from the middle forward, back past the middle toward the heels, and to the middle again. */
+const wristRock = (u: number, turnedOut: number): Pose3 => {
+  const swing = Math.sin(2 * Math.PI * u);
+  return wristRockAt(swing > 0 ? ROCK_THIGH.forward * swing : ROCK_THIGH.back * -swing, { out: turnedOut });
+};
+const ROCK_MS = 3600;
+const ROCK_FRAMES = 32;
+/**
+ * One rock forward and back, flowing through each end rather than stopping there, as the
+ * instructions keep it going. It sets off from the middle and settles back into it gently, since
+ * the hands turn there: arriving at full speed, it stopped with a snap.
+ */
+const wristRockCycle = (turnedOut: number): Keyframe3[] =>
+  Array.from({ length: ROCK_FRAMES }, (_, i) => ({ ms: ROCK_MS / ROCK_FRAMES, pose: wristRock(smooth((i + 1) / ROCK_FRAMES), turnedOut), ease: 'none' as const }));
+const ROCK_TURN_STEPS = 10;
+/**
+ * Turning the hands from pointing one way to the other, in the middle of the rock: one hand at a
+ * time lifts a little off the floor, turns at the wrist while it's up, and sets back down, so the
+ * palm never slides on the floor. The body stays still over the other hand.
+ */
+const wristTurn = (from: number, to: number): Keyframe3[] => {
+  const turning = (t: number): RockHand => ({
+    lift: Math.sin(Math.PI * t),
+    // Turned only while it's well off the floor.
+    out: mix(from, to, smooth(Math.min(1, Math.max(0, (t - 0.2) / 0.6)))),
+  });
+  return [
+    ...alongArc(650, ROCK_TURN_STEPS, (t) => wristRockAt(0, turning(t), { out: from })),
+    ...alongArc(650, ROCK_TURN_STEPS, (t) => wristRockAt(0, { out: to }, turning(t))),
+  ];
+};
+
+export const WRIST_ROCKS_3D: Clip3D = {
+  view: '3d',
+  // As for the kneeling wrist stretch: the rock is flat on the screen, and from above the hands
+  // turning out to the sides show.
+  camera: { yaw: 22, pitch: 22 },
+  highlight: ['rightArm', 'leftArm'],
+  // Rocked all the way forward, the fingers forward, where the wrists bend most: the frame of the
+  // first rock nearest a quarter of the way through it, once eased.
+  stillFrame: Array.from({ length: ROCK_FRAMES }, (_, i) => i + 1).reduce((best, frame) =>
+    Math.abs(smooth(frame / ROCK_FRAMES) - 0.25) < Math.abs(smooth(best / ROCK_FRAMES) - 0.25) ? frame : best
+  ),
+  keyframes: [
+    { ms: 0, pose: wristRockAt(0, { out: ROCK_FINGERS.forward }) },
+    ...wristRockCycle(ROCK_FINGERS.forward),
+    ...wristTurn(ROCK_FINGERS.forward, ROCK_FINGERS.out),
+    ...wristRockCycle(ROCK_FINGERS.out),
+    ...wristTurn(ROCK_FINGERS.out, ROCK_FINGERS.forward),
+  ],
+};
+
+// --- Elephant walk: folded forward with the hands on the floor, one knee bends with its heel lifting while the other leg straightens and presses its heel down ---
+
+/** The feet stay where they stand, hip-width apart; folded, the hips sit back over the heels as in the standing forward fold. */
+const ELEPHANT_HIPS_BACK = FOLD.hipsBack;
+/** High enough that a leg with its heel down is straight, a hair short of locked. */
+const ELEPHANT_PELVIS: Vec3 = (() => {
+  const ankle = FOLD_STANDING.rightLeg[2];
+  const dx = ankle[0] + ELEPHANT_HIPS_BACK;
+  const dz = ankle[2] - SKELETON.hip;
+  return [-ELEPHANT_HIPS_BACK, ankle[1] + Math.sqrt((0.995 * LEG_REACH) ** 2 - dx ** 2 - dz ** 2), 0];
+})();
+/** The bent leg's heel lifts this far, the foot pivoting on its toes, which lets that knee bend. */
+const ELEPHANT_HEEL_UP = 38;
+/**
+ * Folded as in the standing forward fold, but deeper, since the legs are straight: only as deep as
+ * lets the straight arms reach the floor. Any shallower and the hands lift off it.
+ */
+const ELEPHANT_FOLD = { lean: 88, spine: 54, neck: 30 };
+/** The hands rest flat on the floor ahead of the toes, either side of the feet, the arms straight. The body stays still, so they can be, without the hands slipping between frames. */
+const ELEPHANT_HAND_Z = 26;
+
+/** A foot planted at its standing place with its heel lifted this far, pivoting on the toes. */
+const elephantFoot = (side: 1 | -1, heelUp: number): Pin => {
+  const ankle = side === 1 ? FOLD_STANDING.rightLeg[2] : FOLD_STANDING.leftLeg[2];
+  const r = radians(heelUp);
+  const toes: Vec3 = [ankle[0] + SKELETON.foot, ankle[1], ankle[2]];
+  return { at: [toes[0] - SKELETON.foot * Math.cos(r), toes[1] + SKELETON.foot * Math.sin(r), toes[2]], toward: [Math.cos(r), -Math.sin(r), 0], pole: [1, 0, 0] };
+};
+const elephantBody = (rightHeel: number, leftHeel: number): Pose3 => ({
+  pelvis: ELEPHANT_PELVIS,
+  lean: ELEPHANT_FOLD.lean,
+  spine: { flex: ELEPHANT_FOLD.spine },
+  neck: { flex: ELEPHANT_FOLD.neck },
+  pins: { rightFoot: elephantFoot(1, rightHeel), leftFoot: elephantFoot(-1, leftHeel) },
+});
+const ELEPHANT_SHOULDERS = solvePose(elephantBody(0, 0));
+const ELEPHANT_HANDS = (() => {
+  const hand = (side: 1 | -1): Pin => {
+    const shoulder = shoulderOf(ELEPHANT_SHOULDERS, side);
+    const reach = 0.995 * ARM_REACH;
+    const z = side * ELEPHANT_HAND_Z;
+    const ahead = Math.sqrt(Math.max(0, reach ** 2 - (shoulder[1] - WRIST_Y) ** 2 - (z - shoulder[2]) ** 2));
+    return { at: [shoulder[0] + ahead, WRIST_Y, z], toward: [1, 0, 0], pole: [-1, 0, side * 0.3] };
+  };
+  return { rightHand: hand(1), leftHand: hand(-1) };
+})();
+/** From the right knee bent (0) to the left one bent (1), each heel lifting as its knee bends and pressing down as it straightens. */
+const elephantAt = (t: number): Pose3 => {
+  const body = elephantBody(ELEPHANT_HEEL_UP * (1 - t), ELEPHANT_HEEL_UP * t);
+  return { ...body, pins: { ...body.pins, ...ELEPHANT_HANDS } };
+};
+const ELEPHANT_RIGHT = elephantAt(0);
+const ELEPHANT_LEFT = elephantAt(1);
+const ELEPHANT_STEPS = 10;
+
+export const ELEPHANT_WALK_3D: Clip3D = {
+  view: '3d',
+  // From the right and a little in front, as for the standing forward fold: the knee bending forward
+  // and the heel lifting show in profile, with the arms planted clear ahead of the legs. Further
+  // round in front the arms stood over the legs and hid the knees, and from behind the folded body
+  // and head went out of sight behind the legs.
+  camera: { yaw: 15, pitch: 10 },
+  highlight: ['rightLeg', 'leftLeg'],
+  stillFrame: 0,
+  keyframes: [
+    { ms: 0, pose: ELEPHANT_RIGHT },
+    { ms: 400, pose: ELEPHANT_RIGHT },
+    ...alongArc(1400, ELEPHANT_STEPS, elephantAt),
+    { ms: 400, pose: ELEPHANT_LEFT },
+    ...alongArc(1400, ELEPHANT_STEPS, (t) => elephantAt(1 - t)),
+  ],
+};
+
+// --- Seated straddle side bend: sitting tall in the pancake's straddle, leaning sideways over the right leg as the left arm reaches overhead ---
+
+/** All the way over: the spine and neck bent this far to the right, the chest still facing forward. */
+const STRADDLE_BEND = { spine: 40, neck: 12 };
+/** Sitting tall, the arms reach down to the floor ahead between the legs; the left one sweeps up the side and overhead. */
+const STRADDLE_LEFT_ARM = { down: { flex: 38, abduct: 10, elbow: 10 }, up: { flex: 8, abduct: 165, elbow: 14 } };
+/** The right hand slides along the floor to rest just inside the right knee. */
+const STRADDLE_HAND_INSIDE = 30;
+
+const straddleBody = (t: number): Pose3 => ({
+  ...pancakeBody(0),
+  spine: { flex: PANCAKE_TALL_ROUNDING, side: STRADDLE_BEND.spine * t },
+  neck: { side: STRADDLE_BEND.neck * t },
+});
+/** Where the right hand rests on the floor sitting tall: where an arm reaching down like the left one would put it. */
+const STRADDLE_RIGHT_START: Vec3 = (() => {
+  const wrist = solvePose({ ...straddleBody(0), rightArm: STRADDLE_LEFT_ARM.down }).rightArm[2];
+  return [wrist[0], WRIST_Y, wrist[2]];
+})();
+const STRADDLE_RIGHT_END: Vec3 = (() => {
+  const knee = solvePose(straddleBody(1)).rightLeg[1];
+  return [knee[0], WRIST_Y, knee[2] - STRADDLE_HAND_INSIDE];
+})();
+const straddleAt = (t: number): Pose3 => {
+  const body = straddleBody(t);
+  const skeleton = solvePose(body);
+  const arm = STRADDLE_LEFT_ARM;
+  // The arm swings back out of the way first and rises out to the side, rather than up in front of
+  // the face, which it crossed going up the front.
+  const back = smooth(Math.min(1, t / 0.5));
+  const out = smooth(Math.min(1, t / 0.85));
+  return {
+    ...body,
+    leftArm: { flex: mix(arm.down.flex, arm.up.flex, back), abduct: mix(arm.down.abduct, arm.up.abduct, out), elbow: mix(arm.down.elbow, arm.up.elbow, out) },
+    pins: {
+      rightHand: {
+        at: withinReach(shoulderOf(skeleton, 1), mix3(STRADDLE_RIGHT_START, STRADDLE_RIGHT_END, t), 0.98 * ARM_REACH),
+        toward: [1, 0, 0.3],
+        pole: [-1, 0.3, 0.4],
+      },
+    },
+  };
+};
+const STRADDLE_TALL = straddleAt(0);
+const STRADDLE_OVER = straddleAt(1);
+const STRADDLE_STEPS = 12;
+
+export const SEATED_STRADDLE_SIDE_BEND_3D: Clip3D = {
+  view: '3d',
+  // From in front and above: the side bend and the arm reaching over go across the screen, and the
+  // legs open out toward the camera.
+  camera: { yaw: 90, pitch: 24 },
+  highlight: ['torso', 'leftArm'],
+  // The right arm reaches down in front of the body to the floor inside the knee, so it stays over
+  // the torso and over the thigh it rests beside.
+  over: ['rightArm'],
+  behind: [['rightLeg', 'rightArm']],
+  stillFrame: 1 + STRADDLE_STEPS,
+  keyframes: [
+    { ms: 0, pose: STRADDLE_TALL },
+    { ms: 500, pose: STRADDLE_TALL },
+    ...alongArc(2000, STRADDLE_STEPS, straddleAt),
+    { ms: 3500, pose: STRADDLE_OVER },
+    ...alongArc(1800, STRADDLE_STEPS, (t) => straddleAt(1 - t)),
+  ],
+};

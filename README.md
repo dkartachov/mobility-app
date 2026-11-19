@@ -172,10 +172,13 @@ Moved to the new engine:
 | Knight to hamstring | Library | `KNIGHT_TO_HAMSTRING_3D` |
 | Couch stretch | Library | `COUCH_STRETCH_3D` |
 | Pyramid stretch | Library | `PYRAMID_STRETCH_3D` |
+| Wrist rocks | Library | `WRIST_ROCKS_3D` |
+| Elephant walk | Library | `ELEPHANT_WALK_3D` |
+| Seated straddle side bend | Library | `SEATED_STRADDLE_SIDE_BEND_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 
-All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch, seated pike stretch, three legged downward facing dog, standing forward fold, kneeling wrist stretch, floor angels, reverse tabletop, knight stretch, horse stance, the lying windshield wiper hold, frog stretch, frog rocks, knight to hamstring, couch stretch and pyramid stretch.
+All ten flexibility tests are on the new engine. The last six to move (knee to wall, the two seated hip rotations, sit and reach, knee to chest and straight leg raise) haven't been checked on a device yet, so their old clips are still in `exercise-animations.ts`; delete them once they have. The same goes for the three 90 to 90 clips in the library (`NINETY_TO_NINETY_ROTATIONS` has to stay either way: windshield wipers with knee lift is built on it), and for the two pancake clips (`PANCAKE_UP` has to stay either way: the seated straddle side bend is built on it), and for the active straight leg raise, ankle mobilization, the behind the back chest opener, back lying reverse pigeon, belly down foot splay, the five squats (bottom squat, bottom squat rotation, squat to stand, Cossack squat and resting Cossack squat), Blackburn, butterfly, cobra to prayer, downward facing dog, prayer pose, puppy pose, lying knee hug, lying hamstring stretch, seated pike stretch, three legged downward facing dog, standing forward fold, kneeling wrist stretch, floor angels, reverse tabletop, knight stretch, horse stance, the lying windshield wiper hold, frog stretch, frog rocks, knight to hamstring, couch stretch, pyramid stretch, wrist rocks, elephant walk and the seated straddle side bend.
 
 Library (`src/data/exercises.ts`):
 
@@ -185,7 +188,6 @@ Library (`src/data/exercises.ts`):
 | Cross-body shoulder stretch | `CROSS_BODY_SHOULDER_STRETCH` | |
 | Cuban rotation | `CUBAN_ROTATION` | dumbbells |
 | Downward facing dog to cobra | `DOWNWARD_FACING_DOG_TO_COBRA` | |
-| Elephant walk | `ELEPHANT_WALK` | |
 | Figure four stretch | `FIGURE_FOUR_STRETCH` | |
 | Finger tendon glides | `FINGER_TENDON_GLIDES` | the hand view |
 | Half kneeling frog stretch | `HALF_KNEELING_FROG_STRETCH` | |
@@ -207,7 +209,6 @@ Library (`src/data/exercises.ts`):
 | Scap mobilization | `SCAP_MOBILIZATION` | |
 | Seated hip internal rotation | `SEATED_HIP_INTERNAL_ROTATION` | mini band |
 | Seated shoulder extension | `SEATED_SHOULDER_EXTENSION` | |
-| Seated straddle side bend | `SEATED_STRADDLE_SIDE_BEND` | |
 | Shoulder pass-throughs | `SHOULDER_PASS_THROUGHS` | |
 | Side-lying external rotation | `SIDE_LYING_EXTERNAL_ROTATION` | dumbbell |
 | Sleeper stretch | `SLEEPER_STRETCH` | |
@@ -216,7 +217,6 @@ Library (`src/data/exercises.ts`):
 | Thread the needle | `THREAD_THE_NEEDLE` | limbs split in front of and behind the torso |
 | Windshield wipers with knee lift | `WINDSHIELD_WIPERS_WITH_KNEE_LIFT` | mini band |
 | World's greatest stretch | `WORLDS_GREATEST_STRETCH` | |
-| Wrist rocks | `WRIST_ROCKS` | |
 
 ## Exercise reminders
 

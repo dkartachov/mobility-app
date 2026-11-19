@@ -28,6 +28,22 @@ import {
 const animated = [...EXERCISES, MARCHING_EXERCISE, ...FLEXIBILITY_TESTS].flatMap((e) =>
   e.animation && e.animation.view !== 'hand' && e.animation.view !== '3d' ? [{ id: e.id, animation: e.animation }] : []
 );
+
+/**
+ * Standing tall with the arms hanging, as the old engine's clips start (y runs down, the floor at
+ * 456). The tests below build on it rather than on an exercise's pose: which exercises are still on
+ * this engine changes as they move to the 3D one, and the first left once had its elbows set by hand.
+ */
+const STAND: Pose = {
+  hip: [482, 259],
+  torso: 90,
+  arch: 0,
+  neck: 90,
+  nearHand: [488, 282, -85],
+  farHand: [496, 282, -85],
+  nearFoot: [480, 456, 0],
+  farFoot: [488, 456, 0],
+};
 const hands = EXERCISES.flatMap((e) => (e.animation?.view === 'hand' ? [{ id: e.id, animation: e.animation }] : []));
 const ARM_REACH = BONES.upperArm + BONES.forearm;
 const LEG_REACH = BONES.thigh + BONES.shin;
@@ -61,7 +77,7 @@ describe('solveJoint', () => {
 });
 
 describe('poseAt', () => {
-  const stand = animated[0].animation.keyframes[0].pose;
+  const stand = STAND;
   const moved: Pose = { ...stand, hip: [stand.hip[0] + 100, stand.hip[1]] };
   const clip: FigureClip = {
     view: 'side',
@@ -93,7 +109,7 @@ describe('poseAt', () => {
 });
 
 describe('dumbbells', () => {
-  const stand = animated[0].animation.keyframes[0].pose;
+  const stand = STAND;
   const clip: FigureClip = { view: 'side', stillFrame: 0, keyframes: [{ ms: 0, pose: stand }] };
 
   it('draws nothing for a clip without them', () => {
@@ -110,7 +126,7 @@ describe('dumbbells', () => {
 });
 
 describe('body shapes', () => {
-  const stand = animated[0].animation.keyframes[0].pose;
+  const stand = STAND;
   const clip: FigureClip = { view: 'side', stillFrame: 0, keyframes: [{ ms: 0, pose: stand }] };
 
   it('never draws a broken path', () => {
@@ -136,7 +152,7 @@ describe('body shapes', () => {
 });
 
 describe('a clip the camera follows', () => {
-  const stand = animated[0].animation.keyframes[0].pose;
+  const stand = STAND;
   const ahead: Pose = {
     ...stand,
     hip: [stand.hip[0] + 100, stand.hip[1]],
@@ -168,7 +184,7 @@ describe('a clip the camera follows', () => {
 });
 
 describe('livePoseAt', () => {
-  const stand = animated[0].animation.keyframes[0].pose;
+  const stand = STAND;
   const freeHands: Pose = { ...stand, nearHand: [stand.hip[0] + 20, stand.hip[1], -90], farHand: [stand.hip[0] + 20, stand.hip[1], -90] };
   const nod: Pose = { ...freeHands, neck: freeHands.neck - 40 };
   const clip: FigureClip = {

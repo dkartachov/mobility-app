@@ -20,6 +20,7 @@ import {
   COSSACK_SQUAT_3D,
   COUCH_STRETCH_3D,
   DOWNWARD_FACING_DOG_3D,
+  ELEPHANT_WALK_3D,
   FLOOR_ANGELS_3D,
   FROG_ROCKS_3D,
   FROG_STRETCH_3D,
@@ -41,9 +42,11 @@ import {
   RESTING_COSSACK_SQUAT_3D,
   REVERSE_TABLETOP_3D,
   SEATED_PIKE_STRETCH_3D,
+  SEATED_STRADDLE_SIDE_BEND_3D,
   SQUAT_TO_STAND_3D,
   STANDING_FORWARD_FOLD_3D,
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
+  WRIST_ROCKS_3D,
 } from './exercise-animations-3d';
 
 import {
@@ -51,7 +54,6 @@ import {
   CROSS_BODY_SHOULDER_STRETCH,
   CUBAN_ROTATION,
   DOWNWARD_FACING_DOG_TO_COBRA,
-  ELEPHANT_WALK,
   FIGURE_FOUR_STRETCH,
   FINGER_TENDON_GLIDES,
   HALF_KNEELING_FROG_STRETCH,
@@ -73,7 +75,6 @@ import {
   SCAP_MOBILIZATION,
   SEATED_HIP_INTERNAL_ROTATION,
   SEATED_SHOULDER_EXTENSION,
-  SEATED_STRADDLE_SIDE_BEND,
   SHOULDER_PASS_THROUGHS,
   SIDE_LYING_EXTERNAL_ROTATION,
   SLEEPER_STRETCH,
@@ -82,7 +83,6 @@ import {
   THREAD_THE_NEEDLE,
   WINDSHIELD_WIPERS_WITH_KNEE_LIFT,
   WORLDS_GREATEST_STRETCH,
-  WRIST_ROCKS,
 } from './exercise-animations';
 
 export const POSITIONS = ['standing', 'seated'] as const;
@@ -638,7 +638,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep rocking, now and then turning your hands to point sideways or backward',
     ],
     photo: require('@/assets/images/exercises/wrist-rocks.png'),
-    animation: WRIST_ROCKS,
+    animation: WRIST_ROCKS_3D,
     active: true,
     oneMinuteOnly: true,
   },
@@ -798,7 +798,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/seated-straddle-side-bend.png'),
-    animation: SEATED_STRADDLE_SIDE_BEND,
+    animation: SEATED_STRADDLE_SIDE_BEND_3D,
     twoSided: true,
   },
   {
@@ -1104,7 +1104,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep slowly alternating, as if walking on the spot',
     ],
     photo: require('@/assets/images/exercises/elephant-walk.png'),
-    animation: ELEPHANT_WALK,
+    animation: ELEPHANT_WALK_3D,
     active: true,
     oneMinuteOnly: true,
   },
