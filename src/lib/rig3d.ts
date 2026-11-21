@@ -209,7 +209,16 @@ export type Clip3D = {
   partner?: boolean;
 };
 
-export type HeldLimb = { hand: 'rightHand' | 'leftHand'; limb: Part };
+export type HeldLimb = {
+  hand: 'rightHand' | 'leftHand';
+  limb: Part;
+  /**
+   * Draw the forearm again with the hand, for an arm hooked round the limb: in the cross-body
+   * shoulder stretch the right arm rests in the crook of the left elbow, the left upper arm behind
+   * it and the forearm in front, so the arm goes behind and its forearm and hand come over it.
+   */
+  forearm?: boolean;
+};
 
 /**
  * Where the phone goes. Strapped to a limb, it lies on the bone's surface with its long side along
@@ -1475,11 +1484,21 @@ export function traceFigure(
       }
       if (own < 0) continue;
       const [wide, narrow] = ARM_RADII[2];
-      const from = lerpVec(arm[2], arm[3], HELD_HAND_OUTLINE_FROM);
+      let d = capsule(arm[2], wide, arm[3], narrow);
+      let outline = capsule(lerpVec(arm[2], arm[3], HELD_HAND_OUTLINE_FROM), lerp(wide, narrow, HELD_HAND_OUTLINE_FROM), arm[3], narrow);
+      // With its forearm, as a hand resting on the body is drawn: the outline starts partway along
+      // the forearm, clear of the elbow where it joins the rest of the arm.
+      if (holds[i].forearm) {
+        const [forearmWide, forearmNarrow] = ARM_RADII[1];
+        d = limbShape(arm.slice(1), ARM_RADII.slice(1));
+        outline =
+          capsule(lerpVec(arm[1], arm[2], RESTING_FOREARM_OUTLINE_FROM), lerp(forearmWide, forearmNarrow, RESTING_FOREARM_OUTLINE_FROM), arm[2], forearmNarrow) +
+          capsule(arm[2], wide, arm[3], narrow);
+      }
       slots.splice(at + 1, 0, {
         part: armPart,
-        d: capsule(arm[2], wide, arm[3], narrow),
-        outline: capsule(from, lerp(wide, narrow, HELD_HAND_OUTLINE_FROM), arm[3], narrow),
+        d,
+        outline,
         hand: true,
         shade: slots[own].shade,
         accent: slots[own].accent,

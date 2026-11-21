@@ -34,6 +34,9 @@ import {
   LYING_KNEE_HUG_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   NECK_SIDE_STRETCH_3D,
+  CROSS_BODY_SHOULDER_STRETCH_3D,
+  OVERHEAD_TRICEPS_STRETCH_3D,
+  COW_FACE_ARMS_3D,
   NINETY_TO_NINETY_3D,
   NINETY_TO_NINETY_ROTATIONS_3D,
   NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
@@ -53,8 +56,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  COW_FACE_ARMS,
-  CROSS_BODY_SHOULDER_STRETCH,
   CUBAN_ROTATION,
   DOWNWARD_FACING_DOG_TO_COBRA,
   FIGURE_FOUR_STRETCH,
@@ -68,7 +69,6 @@ import {
   MANUAL_EXTENSOR_FOREARM_STRETCH,
   MANUAL_FLEXOR_FOREARM_STRETCH,
   OPEN_BOOK,
-  OVERHEAD_TRICEPS_STRETCH,
   PEC_STRETCH_ON_THE_GROUND,
   PIGEON_STRETCH,
   REVERSE_CLAMSHELLS,
@@ -846,7 +846,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/cross-body-shoulder-stretch.png'),
-    animation: CROSS_BODY_SHOULDER_STRETCH,
+    animation: CROSS_BODY_SHOULDER_STRETCH_3D,
     twoSided: true,
   },
   {
@@ -862,7 +862,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keep your ribs down and hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/overhead-triceps-stretch.png'),
-    animation: OVERHEAD_TRICEPS_STRETCH,
+    animation: OVERHEAD_TRICEPS_STRETCH_3D,
     twoSided: true,
   },
   {
@@ -878,7 +878,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Stand tall and hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/cow-face-arms.png'),
-    animation: COW_FACE_ARMS,
+    animation: COW_FACE_ARMS_3D,
     twoSided: true,
   },
   {

@@ -51,6 +51,9 @@ import {
   SEATED_SHOULDER_EXTENSION_3D,
   HALF_KNEELING_FROG_STRETCH_3D,
   NECK_SIDE_STRETCH_3D,
+  CROSS_BODY_SHOULDER_STRETCH_3D,
+  OVERHEAD_TRICEPS_STRETCH_3D,
+  COW_FACE_ARMS_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
@@ -2488,5 +2491,116 @@ describe('3D clips', () => {
       expect(at('torso')).toBeLessThan(at('leftArm'));
     }
     expect(new Set(orders.map((order) => order.filter((part) => part !== 'leftArm').join(' '))).size).toBe(1);
+  });
+
+  /** Standing still: the pelvis and both feet stay where they are all the way through. */
+  function standsStill(clip: Clip3D) {
+    const poses = samples(clip).map(solvePose);
+    const [first] = poses;
+    for (const { spine, rightLeg, leftLeg } of poses) {
+      expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      expect(distance(rightLeg[2], first.rightLeg[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], first.leftLeg[2])).toBeLessThan(0.5);
+    }
+    return first;
+  }
+
+  it('brings a straight arm across the chest at shoulder height to rest in the crook of the other elbow, which pulls it in, the shoulder kept down, in the cross-body shoulder stretch', () => {
+    const clip = CROSS_BODY_SHOULDER_STRETCH_3D;
+    const first = standsStill(clip);
+    const pulled = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const held = solvePose(clip.keyframes[0].pose);
+    for (const skeleton of [held, pulled]) {
+      const [shoulder, , wrist] = skeleton.rightArm;
+      const [leftShoulder, leftElbow, leftWrist] = skeleton.leftArm;
+      // Straight, level with the shoulder, and reaching past the other shoulder.
+      expect(distance(shoulder, wrist)).toBeGreaterThan(SKELETON.upperArm + SKELETON.forearm - 1);
+      expect(Math.abs(wrist[1] - shoulder[1])).toBeLessThan(5);
+      expect(wrist[2]).toBeLessThan(leftShoulder[2]);
+      // It rests in the crook of the left elbow: the elbow just under it, the upper arm going back
+      // to its shoulder on the chest side of it, and the forearm standing up in front of it.
+      const arm = unitBetween(shoulder, wrist);
+      const front: Vec3 = [-arm[2], 0, arm[0]];
+      const offset = (point: Vec3) => {
+        const from: Vec3 = [point[0] - shoulder[0], point[1] - shoulder[1], point[2] - shoulder[2]];
+        const along = from[0] * arm[0] + from[1] * arm[1] + from[2] * arm[2];
+        const off: Vec3 = [from[0] - arm[0] * along, from[1] - arm[1] * along, from[2] - arm[2] * along];
+        return { out: off[0] * front[0] + off[2] * front[2], up: off[1], gap: Math.hypot(...off) };
+      };
+      expect(offset(leftElbow).gap).toBeGreaterThan(15);
+      expect(offset(leftElbow).gap).toBeLessThan(25);
+      expect(offset(leftElbow).up).toBeLessThan(-12);
+      expect(Math.abs(offset(leftElbow).out)).toBeLessThan(20);
+      expect(offset(leftShoulder).out).toBeLessThan(-20);
+      // Where the forearm passes the right arm's height it's in front of it, clear of it.
+      const rise = -offset(leftElbow).up / (offset(leftWrist).up - offset(leftElbow).up);
+      const passing = offset(leftElbow).out + (offset(leftWrist).out - offset(leftElbow).out) * rise;
+      expect(passing).toBeGreaterThan(19);
+      expect(offset(leftWrist).up).toBeGreaterThan(SKELETON.forearm / 2);
+      // The shoulder stays down, away from the ear.
+      expect(shoulder[1]).toBeLessThanOrEqual(first.rightArm[0][1]);
+    }
+    // The pull brings the arm further across and in toward the chest.
+    expect(pulled.rightArm[2][2]).toBeLessThan(held.rightArm[2][2] - 10);
+    expect(pulled.rightArm[1][0]).toBeLessThan(held.rightArm[1][0]);
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    // The left arm is behind the right one, as its upper arm is, and its forearm and hand are drawn
+    // again over it; the arms never swap.
+    for (const order of drawOrders(clip).map((parts) => parts.split(' '))) {
+      expect(order.indexOf('leftArm')).toBeLessThan(order.indexOf('rightArm'));
+      expect(order.indexOf('rightArm')).toBeLessThan(order.lastIndexOf('hand'));
+    }
+  });
+
+  it('folds the raised arm so the hand drops behind the neck, the elbow at the ceiling, while the other hand draws that elbow back and in, in the overhead triceps stretch', () => {
+    const clip = OVERHEAD_TRICEPS_STRETCH_3D;
+    standsStill(clip);
+    const pulled = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const held = solvePose(clip.keyframes[clip.stillFrame - 1].pose);
+    for (const skeleton of [held, pulled]) {
+      const [, elbow, wrist] = skeleton.rightArm;
+      const neckBase = skeleton.spine[skeleton.spine.length - 1];
+      // The elbow points up past the top of the head, and the hand hangs behind the neck.
+      expect(elbow[1]).toBeGreaterThan(skeleton.head[1] + SKELETON.head - 5);
+      expect(wrist[0]).toBeLessThan(neckBase[0] - 25);
+      expect(wrist[1]).toBeLessThan(skeleton.head[1]);
+      expect(wrist[1]).toBeGreaterThan(neckBase[1] - 20);
+      expect(Math.abs(wrist[2])).toBeLessThan(15);
+      // The left hand has hold of the elbow.
+      expect(distance(skeleton.leftArm[2], elbow)).toBeLessThan(30);
+    }
+    // The pull draws the elbow back and in toward the head.
+    expect(pulled.rightArm[1][2]).toBeLessThan(held.rightArm[1][2] - 5);
+    expect(pulled.rightArm[1][0]).toBeLessThan(held.rightArm[1][0]);
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    // Seen from behind, the raised arm is in front of the head wherever they overlap.
+    for (const order of drawOrders(clip).map((parts) => parts.split(' '))) {
+      expect(order.indexOf('head')).toBeLessThan(order.indexOf('rightArm'));
+    }
+  });
+
+  it('links the hands between the shoulder blades, the top elbow at the ceiling and the bottom one at the floor, in cow face arms', () => {
+    const clip = COW_FACE_ARMS_3D;
+    standsStill(clip);
+    const linked = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const [, topElbow, topWrist, topFingers] = linked.rightArm;
+    const [leftShoulder, bottomElbow, bottomWrist, bottomFingers] = linked.leftArm;
+    expect(topElbow[1]).toBeGreaterThan(linked.head[1] + 20);
+    expect(bottomElbow[1]).toBeLessThan(leftShoulder[1] - 50);
+    // Both hands are on the back, the top one above, their fingers hooked past each other.
+    expect(topWrist[0]).toBeLessThan(-25);
+    expect(bottomWrist[0]).toBeLessThan(-25);
+    expect(topWrist[1]).toBeGreaterThan(bottomWrist[1]);
+    expect(topFingers[1]).toBeLessThan(bottomFingers[1]);
+    expect(distance(topWrist, bottomWrist)).toBeLessThan(2 * SKELETON.hand + 5);
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    // The top arm is in front of the head the whole way, and once the bottom hand is on the back,
+    // over the torso, it's over the top one.
+    const orders = drawOrders(clip).map((parts) => parts.split(' '));
+    for (const order of orders) {
+      expect(order.indexOf('head')).toBeLessThan(order.indexOf('rightArm'));
+      if (order.indexOf('leftArm') > order.indexOf('torso')) expect(order.indexOf('rightArm')).toBeLessThan(order.indexOf('leftArm'));
+    }
+    expect(orders.filter((order) => order.indexOf('leftArm') > order.indexOf('torso')).length).toBeGreaterThan(orders.length / 2);
   });
 });

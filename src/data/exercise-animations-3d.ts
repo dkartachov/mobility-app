@@ -3699,3 +3699,314 @@ export const NECK_SIDE_STRETCH_3D: Clip3D = {
     ...alongArc(2200, NECK_STEPS, (t) => neckSideAt(1 - t)),
   ],
 };
+
+// --- Shoulder stretches standing tall: what the cross-body, overhead triceps and cow face clips share ---
+
+const unit3 = (v: Vec3): Vec3 => toward([0, 0, 0], v, 1);
+const sub3 = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const along3 = (from: Vec3, direction: Vec3, length: number): Vec3 => [from[0] + direction[0] * length, from[1] + direction[1] * length, from[2] + direction[2] * length];
+/** `t` mapped from `from`..`to` onto 0..1, eased, and held at the ends outside it. */
+const phase = (t: number, from: number, to: number) => smooth(Math.min(1, Math.max(0, (t - from) / (to - from))));
+/** The arm of `skeleton` on this side, from the shoulder: shoulder, elbow, wrist, fingertips. */
+const armOf = (skeleton: Skeleton, side: 1 | -1) => (side === 1 ? skeleton.rightArm : skeleton.leftArm);
+type HandTarget = Pin & { toward: Vec3; pole: Vec3 };
+
+/**
+ * A hand pin partway from where the arm's angles in `skeleton` put the hand to `target`. The way
+ * the fingers point and the elbow sticks out turn steadily from one to the other (see `turnToward`),
+ * and the hand stays within the arm's reach on the way. The arm's angles need the elbow bent a
+ * little, so that the hand is where they put it and the elbow has a way to point: a straight arm is
+ * past `ARM_REACH`, and was pulled in and bent.
+ */
+const handToward = (skeleton: Skeleton, side: 1 | -1, target: HandTarget, t: number): Pin => {
+  const [shoulder, elbow, wrist] = armOf(skeleton, side);
+  const forearm = sub3(wrist, elbow);
+  const bend = sub3(elbow, mix3(shoulder, wrist, 0.5));
+  return {
+    at: withinReach(shoulder, mix3(wrist, target.at, t)),
+    toward: turnToward(forearm, target.toward, t),
+    pole: turnToward(bend, target.pole, t),
+  };
+};
+
+// --- Cross-body shoulder stretch: a straight arm comes across the chest and the other hand pulls it closer at the elbow ---
+
+/**
+ * How far the straight right arm comes across from pointing straight ahead at shoulder height, when
+ * the left hand takes hold of it, and once it's pulled in close to the chest.
+ */
+const CROSS_BODY = { across: 30, pulled: 42 };
+
+/**
+ * How the right arm rests in the crook of the left elbow: the left elbow this far below the middle
+ * of the right arm and out in front of it, which leaves the two arms just touching, with the left
+ * upper arm going back behind the right arm to its shoulder and the forearm coming up in front of
+ * it. With the elbow tucked in toward the chest, the forearm rose through the right arm.
+ */
+const CROSS_BODY_CROOK = { below: 16, out: 19 };
+/**
+ * How far the left forearm leans forward, the way the body faces, and out to the body's left, for
+ * each unit it rises. Leaning square to the right arm instead, it leant toward the right shoulder
+ * too, more the less far across the arm was, and lay along the arm on screen, hiding it.
+ */
+const CROSS_BODY_FOREARM = { forward: 0.8, left: 0.4 };
+
+/**
+ * The left arm hooked round the right one: the right arm lies between the left forearm and upper
+ * arm, resting on the inside of the left elbow, and the forearm stands up in front of it and pulls
+ * it in toward the chest, the hand beside the face. The left elbow goes as near the right
+ * elbow as the left upper arm reaches from its shoulder, which is just past it, on the forearm.
+ */
+const crossBodyGrip = (skeleton: Skeleton): HandTarget => {
+  const [shoulder, elbow] = skeleton.rightArm;
+  const leftShoulder = skeleton.leftArm[0];
+  const arm = unit3(sub3(elbow, shoulder));
+  // Square to the arm and level: the front of the arm lying across the chest, away from it.
+  const front = unit3([-arm[2], 0, arm[0]]);
+  const crookAt = (along: number): Vec3 => along3(along3(along3(shoulder, arm, along), [0, -1, 0], CROSS_BODY_CROOK.below), front, CROSS_BODY_CROOK.out);
+  // How far along the right arm the crook is, found where the left upper arm reaches exactly.
+  let [near, far] = [0, SKELETON.upperArm + SKELETON.forearm];
+  for (let i = 0; i < 30; i++) {
+    const mid = (near + far) / 2;
+    if (distance(leftShoulder, crookAt(mid)) < SKELETON.upperArm) near = mid;
+    else far = mid;
+  }
+  const crook = crookAt((near + far) / 2);
+  // The forearm stands up in front of the right arm, crossing it, and a little out to the left so
+  // the hand comes up beside the face rather than over it.
+  const { forward, left } = CROSS_BODY_FOREARM;
+  const forearm = unit3([forward, 1, -left]);
+  const wrist = along3(crook, forearm, SKELETON.forearm);
+  // The hand carries straight on from the forearm. Curled in toward the right shoulder, it came over
+  // the chin and covered the nose, which showed again as the pull drew the hand away.
+  return { ...pinVia(leftShoulder, crook, wrist), toward: forearm };
+};
+
+/**
+ * The straight right arm across the chest at shoulder height, resting in the crook of the left
+ * elbow, and this far into the pull (0 to 1) as the left forearm draws it in toward the chest, the
+ * right shoulder kept down away from the ear. The clip starts with the arms already crossed.
+ */
+const crossBodyAt = (pull: number): Pose3 => {
+  const body: Pose3 = {
+    ...STANDING,
+    rightArm: { flex: 90, abduct: -mix(CROSS_BODY.across, CROSS_BODY.pulled, pull), elbow: 0, shrug: -4 },
+  };
+  return { ...body, pins: { leftHand: crossBodyGrip(solvePose(body)) } };
+};
+const CROSS_BODY_HELD = crossBodyAt(0);
+const CROSS_BODY_PULLED = crossBodyAt(1);
+/** The crook rides along the arm as it's pulled in, so the pull is drawn in this many frames rather than one straight move of the hand. */
+const CROSS_BODY_STEPS = 10;
+
+export const CROSS_BODY_SHOULDER_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From in front and a little above: the arm lies across the chest across the screen, and looking
+  // down shows it in front of the chest and closing on it with the pull. Square to the camera, both
+  // arms go over the torso; turned toward the right, the left arm's far shoulder came over the chest.
+  camera: { yaw: 90, pitch: 25, fit: 'head' },
+  highlight: ['rightArm'],
+  // The right arm rests in the crook of the left elbow: the left upper arm is behind it and the
+  // forearm in front. Limbs are ordered whole, so the left arm goes behind the right one, as its
+  // upper arm is, and its forearm and hand are drawn again over it. Ordered whole in front, the
+  // upper arm came over the arm it's behind.
+  behind: [['leftArm', 'rightArm']],
+  holds: [{ hand: 'leftHand', limb: 'rightArm', forearm: true }],
+  // Square to the camera, the arms are over the torso.
+  over: ['leftArm'],
+  stillFrame: 2 + CROSS_BODY_STEPS,
+  keyframes: [
+    { ms: 0, pose: CROSS_BODY_HELD },
+    { ms: 800, pose: CROSS_BODY_HELD },
+    ...alongArc(1400, CROSS_BODY_STEPS, crossBodyAt),
+    { ms: 3000, pose: CROSS_BODY_PULLED },
+    ...alongArc(1200, CROSS_BODY_STEPS, (t) => crossBodyAt(1 - t)),
+  ],
+};
+
+// --- Overhead triceps stretch: one arm reaches overhead and the hand drops behind the head; the other hand pulls that elbow back and in ---
+
+/**
+ * The right arm, from hanging (0), reaches straight overhead and then folds at the elbow, the hand
+ * swinging down behind the head, and settles at `target` (1). The fold swings the hand back round
+ * behind the head on the elbow, so it never passes through it; only the last of the way is the hand
+ * drawn in to the target. The arm is straight up, the elbow over the shoulder, before the elbow
+ * bends much: folding from an arm still a little forward, the forearm went over the crown in front
+ * of the middle of the head, and came out from behind the head to in front of it partway over.
+ */
+const topArmAt = (body: Pose3, t: number, target: (shoulder: Vec3) => HandTarget): { body: Pose3; pin: Pin } => {
+  const reach = phase(t, 0, 0.5);
+  const fold = phase(t, 0.42, 0.9);
+  const hang = STANDING.rightArm!;
+  const arms: Pose3 = {
+    ...body,
+    rightArm: { flex: 180 * reach, abduct: mix(hang.abduct!, 0, reach), elbow: mix(hang.elbow!, 140, fold), shrug: 14 * reach },
+  };
+  const skeleton = solvePose(arms);
+  return { body: arms, pin: handToward(skeleton, 1, target(skeleton.rightArm[0]), phase(t, 0.6, 1)) };
+};
+
+/**
+ * A hand target with the elbow placed exactly: the upper arm leaves `shoulder` along `upper`, and
+ * the forearm runs from the elbow toward `aim`, the hand pointing along `fingers`. A pole alone
+ * puts the elbow wherever the line from the shoulder to the hand leaves room for it, which for a
+ * hand behind the neck was out behind the head rather than up at the ceiling.
+ */
+const foldedArm = (shoulder: Vec3, upper: Vec3, aim: Vec3, fingers: Vec3): HandTarget => {
+  const elbow = along3(shoulder, unit3(upper), SKELETON.upperArm);
+  const wrist = along3(elbow, unit3(sub3(aim, elbow)), SKELETON.forearm);
+  return { ...pinVia(shoulder, elbow, wrist), toward: fingers };
+};
+
+/**
+ * Where the right hand rests behind the neck, the fingers pointing down the spine and the elbow at
+ * the ceiling, and where the pull takes it: the elbow drawn back and in, which slides the hand a
+ * little further down the back.
+ */
+const TRICEPS_ARM = {
+  held: { upper: [-0.2, 1, -0.05], aim: [-40, 340, 6] },
+  pulled: { upper: [-0.3, 1, -0.22], aim: [-36, 330, -8] },
+} satisfies Record<string, { upper: Vec3; aim: Vec3 }>;
+const TRICEPS_FINGERS: Vec3 = [-0.15, -1, -0.1];
+
+/** Where the left hand holds the right elbow: on its far side, over the top of the head, the fingers wrapped round it. */
+const tricepsGrip = (skeleton: Skeleton): HandTarget => {
+  const elbow = skeleton.rightArm[1];
+  return { at: [elbow[0] + 4, elbow[1] + 4, elbow[2] - 22], toward: [0, 0.35, 1], pole: [0.5, 0.4, -1] };
+};
+
+/**
+ * From standing with the arms hanging (0), the right arm reaches overhead and folds, the hand
+ * dropping behind the head, while the left hand comes up the left side and over the head to take
+ * hold of the elbow (1); then it draws the elbow back and in (`pull` 1).
+ */
+const tricepsAt = (t: number, pull: number): Pose3 => {
+  const p = smooth(pull);
+  const { held, pulled } = TRICEPS_ARM;
+  const top = topArmAt(STANDING, t, (shoulder) => foldedArm(shoulder, mix3(held.upper, pulled.upper, p), mix3(held.aim, pulled.aim, p), TRICEPS_FINGERS));
+  const skeleton = solvePose({ ...top.body, pins: { rightHand: top.pin } });
+  // The left hand goes up the left side, clear of the face, before coming over the head.
+  const hanging = solvePose(STANDING).leftArm[2];
+  const grip = tricepsGrip(skeleton);
+  const lift = phase(t, 0.25, 1);
+  const via: Vec3 = [hanging[0] + 10, skeleton.head[1] + 20, -70];
+  const at = mix3(mix3(hanging, via, lift), mix3(via, grip.at, lift), lift);
+  return { ...top.body, pins: { rightHand: top.pin, leftHand: handToward(skeleton, -1, { ...grip, at }, lift) } };
+};
+const TRICEPS_DOWN = tricepsAt(0, 0);
+const TRICEPS_HELD = tricepsAt(1, 0);
+const TRICEPS_PULLED = tricepsAt(1, 1);
+const TRICEPS_STEPS = 24;
+
+export const OVERHEAD_TRICEPS_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From behind and a little to the right: the hand dropping behind the head shows rather than
+  // being hidden by it, and the elbow drawn in toward the head moves across the screen.
+  camera: { yaw: -75, pitch: 12, fit: 'head' },
+  highlight: ['rightArm'],
+  // From behind and to its side, the right arm is nearer than the head wherever the two overlap:
+  // up beside the ear, and folded down behind it. By depth they swapped as the arm went overhead,
+  // the upper arm popping from behind the head to in front of it.
+  behind: [['head', 'rightArm']],
+  stillFrame: 2 + TRICEPS_STEPS,
+  keyframes: [
+    { ms: 0, pose: TRICEPS_DOWN },
+    { ms: 500, pose: TRICEPS_DOWN },
+    ...alongArc(2200, TRICEPS_STEPS, (t) => tricepsAt(t, 0)),
+    { ms: 1000, pose: TRICEPS_PULLED },
+    { ms: 3000, pose: TRICEPS_PULLED },
+    { ms: 800, pose: TRICEPS_HELD },
+    ...alongArc(2000, TRICEPS_STEPS, (t) => tricepsAt(1 - t, 0)),
+  ],
+};
+
+// --- Cow face arms: the top hand drops down behind the neck and the bottom hand climbs the back to link fingers with it ---
+
+/**
+ * Where the hands link, between the shoulder blades just off the back: the right wrist on top with
+ * the fingers down the spine, the left wrist below with its fingers up, the fingers hooked over
+ * each other. The top elbow points up at the ceiling, the bottom one down at the floor.
+ */
+const COW_FACE: { top: { upper: Vec3; aim: Vec3; fingers: Vec3 }; bottom: { upper: Vec3; fingers: Vec3 }; overlap: number } = {
+  top: { upper: [-0.25, 1, -0.1], aim: [-30, 335, 0], fingers: [-0.1, -1, -0.05] },
+  bottom: { upper: [-0.25, -1, -0.12], fingers: [-0.1, 1, 0.05] },
+  /** How far the fingers of the two hands overlap where they hook together. */
+  overlap: 16,
+};
+
+/** Both hands linked, for a body whose shoulders are at `right` and `left`. */
+const cowFaceHands = (right: Vec3, left: Vec3): { right: HandTarget; left: HandTarget } => {
+  const { top, bottom, overlap } = COW_FACE;
+  const high = foldedArm(right, top.upper, top.aim, top.fingers);
+  const low = high.at[1] - (2 * SKELETON.hand - overlap);
+  return { right: high, left: foldedArm(left, bottom.upper, [high.at[0], low, high.at[2] - 4], bottom.fingers) };
+};
+
+/**
+ * Where the left hand first goes behind the back: on the lower back beside the spine, the back of
+ * the hand against it, the fingers toward the spine and the elbow bent back and a little out.
+ */
+const COW_FACE_LOW_BACK: HandTarget = { at: [-32, 262, -18], toward: [-0.1, 0.4, 1], pole: [-1, -0.3, -0.6] };
+/**
+ * The way there leaves the hanging hand heading straight back, toward this point behind the thigh,
+ * before it rises and comes in: straight to the lower back, it went up past the hip still beside
+ * the thigh, and crossed in front of it while the two overlapped on screen.
+ */
+const COW_FACE_PAST_HIP: Vec3 = [-55, 150, -48];
+
+/**
+ * From standing with the arms hanging (0), the right arm reaches overhead and folds, the hand coming
+ * down behind the neck, while the left hand goes round behind the hip to the lower back and climbs
+ * up the spine to meet it (1). Bent by its angles alone, the left forearm swung across the belly or
+ * out to the side; a hand gets behind the back by turning the arm in further than angles from
+ * hanging reach without passing through the body.
+ */
+const cowFaceAt = (t: number): Pose3 => {
+  const top = topArmAt(STANDING, t, (shoulder) => cowFaceHands(shoulder, solvePose(STANDING).leftArm[0]).right);
+  const skeleton = solvePose(top.body);
+  const linked = cowFaceHands(skeleton.rightArm[0], skeleton.leftArm[0]).left;
+  const climb = phase(t, 0.5, 1);
+  const behind: HandTarget = {
+    at: mix3(COW_FACE_LOW_BACK.at, linked.at, climb),
+    toward: turnToward(COW_FACE_LOW_BACK.toward, linked.toward, climb),
+    pole: turnToward(COW_FACE_LOW_BACK.pole, linked.pole, climb),
+  };
+  // Round behind the hip on a curve from the hanging hand, pulled toward the point past the hip.
+  const round = phase(t, 0.1, 0.5);
+  const [, , hanging] = skeleton.leftArm;
+  const at = mix3(mix3(hanging, COW_FACE_PAST_HIP, round), mix3(COW_FACE_PAST_HIP, behind.at, round), round);
+  const pin = handToward(skeleton, -1, behind, round);
+  return { ...top.body, pins: { rightHand: top.pin, leftHand: { ...pin, at: withinReach(skeleton.leftArm[0], at) } } };
+};
+const COW_FACE_DOWN = cowFaceAt(0);
+const COW_FACE_LINKED = cowFaceAt(1);
+const COW_FACE_STEPS = 28;
+
+export const COW_FACE_ARMS_3D: Clip3D = {
+  view: '3d',
+  // From behind and a little to the right, where both hands show meeting on the back: from the
+  // front they're hidden behind the body. Turned further to the side, the hanging left hand was
+  // behind the thigh on screen, and crossed in front of it as it went behind the back.
+  camera: { yaw: -75, pitch: 10, fit: 'head' },
+  highlight: ['rightArm', 'leftArm'],
+  // The top arm is nearer than the head wherever the two overlap, as in the overhead triceps
+  // stretch. Where the hands link the fingers lie over each other about as deep, and the arms
+  // swapped as they met and as they parted, so the bottom hand stays over the top one.
+  behind: [
+    ['head', 'rightArm'],
+    ['rightArm', 'leftArm'],
+  ],
+  // The left arm hangs at the back of the body as the camera sees it, over the shoulder blade, and
+  // stays over the back as the hand goes behind it. By depth it started under the torso and came
+  // over it as the hand went behind the hip, its shoulder end jumping from behind the shoulder
+  // blade to in front of it.
+  over: ['leftArm'],
+  stillFrame: 1 + COW_FACE_STEPS,
+  keyframes: [
+    { ms: 0, pose: COW_FACE_DOWN },
+    { ms: 500, pose: COW_FACE_DOWN },
+    ...alongArc(2600, COW_FACE_STEPS, cowFaceAt),
+    { ms: 3500, pose: COW_FACE_LINKED },
+    ...alongArc(2200, COW_FACE_STEPS, (t) => cowFaceAt(1 - t)),
+  ],
+};
