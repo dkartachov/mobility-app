@@ -54,6 +54,7 @@ import {
   CROSS_BODY_SHOULDER_STRETCH_3D,
   OVERHEAD_TRICEPS_STRETCH_3D,
   COW_FACE_ARMS_3D,
+  PIGEON_STRETCH_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
@@ -2602,5 +2603,47 @@ describe('3D clips', () => {
       if (order.indexOf('leftArm') > order.indexOf('torso')) expect(order.indexOf('rightArm')).toBeLessThan(order.indexOf('leftArm'));
     }
     expect(orders.filter((order) => order.indexOf('leftArm') > order.indexOf('torso')).length).toBeGreaterThan(orders.length / 2);
+  });
+
+  it('stretches the back leg straight behind from all fours, then brings the front knee forward behind the wrist with the shin across, and folds forward onto the forearms, in the pigeon stretch', () => {
+    const clip = PIGEON_STRETCH_3D;
+    const first = solvePose(clip.keyframes[0].pose);
+    // The hands stay planted from all fours until the body folds forward.
+    const upAt = clip.keyframes.findIndex((frame, i) => i > 1 && frame.ms === 600);
+    const settingUp = samples({ ...clip, keyframes: clip.keyframes.slice(0, upAt + 1) }).map(solvePose);
+    for (const { rightArm, leftArm, rightLeg } of settingUp) {
+      expect(distance(rightArm[2], first.rightArm[2])).toBeLessThan(0.5);
+      expect(distance(leftArm[2], first.leftArm[2])).toBeLessThan(0.5);
+      // The right foot comes off the floor on its way forward, rather than dragging through the left leg.
+      expect(rightLeg[2][1]).toBeGreaterThanOrEqual(12.5);
+    }
+    // The back leg is straight before the front knee leaves the floor.
+    const kneeLifts = settingUp.find(({ rightLeg }) => rightLeg[1][1] > 16)!;
+    expect(angleAt(kneeLifts.leftLeg[0], kneeLifts.leftLeg[1], kneeLifts.leftLeg[2])).toBeGreaterThan(170);
+    const folded = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const [rightHip, frontKnee, frontAnkle] = folded.rightLeg;
+    const [leftHip, backKnee, backAnkle] = folded.leftLeg;
+    // The front knee rests on the floor behind the right wrist's starting spot, and the shin lies
+    // across in front of the hips, the foot toward the left hip.
+    expect(frontKnee[1]).toBeLessThan(15);
+    expect(frontAnkle[1]).toBeLessThan(15);
+    expect(frontKnee[0]).toBeLessThan(first.rightArm[2][0]);
+    expect(frontKnee[2]).toBeGreaterThan(rightHip[2]);
+    expect(frontAnkle[2]).toBeLessThan(leftHip[2]);
+    expect(frontAnkle[0]).toBeGreaterThan(leftHip[0]);
+    // The back leg lies straight behind, the knee down.
+    expect(angleAt(leftHip, backKnee, backAnkle)).toBeGreaterThan(170);
+    expect(backAnkle[0]).toBeLessThan(leftHip[0] - 180);
+    expect(backKnee[1]).toBeLessThan(30);
+    // The hips are square and low, and the forearms are flat on the floor in front of the shin.
+    expect(rightHip[0]).toBeCloseTo(leftHip[0], 0);
+    expect(folded.spine[0][1]).toBeLessThan(50);
+    for (const [, elbow, wrist] of [folded.rightArm, folded.leftArm]) {
+      expect(elbow[1]).toBeLessThan(15);
+      expect(wrist[1]).toBeCloseTo(11, 0);
+      expect(elbow[0]).toBeGreaterThan(frontKnee[0]);
+    }
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    expect(new Set(drawOrders(clip)).size).toBe(1);
   });
 });

@@ -4010,3 +4010,191 @@ export const COW_FACE_ARMS_3D: Clip3D = {
     ...alongArc(2200, COW_FACE_STEPS, (t) => cowFaceAt(1 - t)),
   ],
 };
+
+// --- From all fours, the left leg stretching straight back, and leaning onto the hands or forearms: for the pigeon stretch ---
+
+/** On all fours the hips are over the knees, the right one here on the floor. */
+const ALL_FOURS_RIGHT_KNEE: Vec3 = [0, ANKLE_Y, SKELETON.hip];
+/** With the back leg stretched out, the hips have rolled back this far around the planted right knee. */
+const LEG_BACK_HIPS_BACK = 25;
+/** The hips this far (0 to 1) into rolling back around the right knee as the left leg stretches out. */
+const hipsRolledBack = (extend: number): Vec3 => {
+  const back = radians(LEG_BACK_HIPS_BACK * extend);
+  return [ALL_FOURS_RIGHT_KNEE[0] - SKELETON.thigh * Math.sin(back), ANKLE_Y + SKELETON.thigh * Math.cos(back), 0];
+};
+/** The direction a straight back leg runs in from a hip at this height down to the top of its foot on the floor. */
+const backLineFrom = (hipY: number): Vec3 => {
+  const drop = hipY - ANKLE_Y;
+  const length = SKELETON.thigh + SKELETON.shin;
+  return [-Math.sqrt(length ** 2 - drop ** 2) / length, -drop / length, 0];
+};
+/**
+ * The left foot, from the leg kneeling on all fours (0) to stretched straight back behind `pelvis`
+ * (1), the toes on the floor. The knee slides back along the floor a thigh's length behind the hip
+ * and the shin swings into line with the thigh, so the knee lifts off the floor only as the leg
+ * straightens. Left to its pole, the knee dropped through the floor while the hips were still high.
+ */
+const leftLegBack = (pelvis: Vec3, extend: number): Pin => {
+  const hip: Vec3 = [pelvis[0], pelvis[1], -SKELETON.hip];
+  const line = backLineFrom(hip[1]);
+  const kneeY = mix(ANKLE_Y, hip[1] + SKELETON.thigh * line[1], extend);
+  const knee: Vec3 = [hip[0] - Math.sqrt(Math.max(0, SKELETON.thigh ** 2 - (hip[1] - kneeY) ** 2)), kneeY, -SKELETON.hip];
+  const shin = turnToward([-1, 0, 0], line, extend);
+  // The knee is always below the line from the hip to the foot, so pointing it at the floor puts it
+  // there; aimed at the knee itself, the pole came to nothing once the leg was straight.
+  return { at: along3(knee, shin, 0.998 * SKELETON.shin), toward: [-1, 0, 0], pole: [0, -1, 0] };
+};
+/** A direction as a unit vector, from any list of three numbers. */
+const unitOf = (v: readonly number[]): Vec3 => {
+  const length = Math.hypot(...v);
+  return [v[0] / length, v[1] / length, v[2] / length];
+};
+
+/**
+ * The lean, between `from` and `to`, at which `gap(lean)` comes to zero, for a body tipping forward
+ * until its shoulders are where the arms reach. `gap` has to grow (or shrink) steadily across it.
+ */
+const leanWhere = (gap: (lean: number) => number, from: number, to: number): number => {
+  let [a, b] = [from, to];
+  const rising = gap(b) > gap(a);
+  for (let i = 0; i < 40; i++) {
+    const middle = (a + b) / 2;
+    if (gap(middle) > 0 === rising) b = middle;
+    else a = middle;
+  }
+  return (a + b) / 2;
+};
+/** An elbow resting on the floor sits this high, and a forearm flat on it. */
+const ELBOW_Y = 10;
+/**
+ * The forearm flat on the floor, pointing ahead from an elbow on the floor at `elbow`, the palm down.
+ * Its wrist goes where the forearm reaches, with the elbow bending down to the floor.
+ */
+const forearmDown = (shoulder: Vec3, elbow: Vec3, inward: number): Pin => {
+  const along = Math.sqrt(SKELETON.forearm ** 2 - (ELBOW_Y - WRIST_Y) ** 2);
+  const turn = radians(inward);
+  const wrist: Vec3 = [elbow[0] + along * Math.cos(turn), WRIST_Y, elbow[2] - along * Math.sin(turn)];
+  return pinVia(shoulder, elbow, wrist, [Math.cos(turn), 0, -Math.sin(turn)]);
+};
+
+// --- Pigeon stretch: from all fours, the right knee comes forward behind the wrist with the shin across, the left leg slides back, and the body folds over the front shin ---
+
+/**
+ * In the pigeon the hips sit low and square, resting on the front shin's side. The front knee rests
+ * on the floor behind the right wrist, out a little to the side, and the shin lies across in front
+ * of the hips, the foot in front of the left hip.
+ */
+const PIGEON_PELVIS: Vec3 = [-35, 36, 0];
+const PIGEON_KNEE: Vec3 = [60, ANKLE_Y, 38];
+const PIGEON_ANKLE: Vec3 = toward(PIGEON_KNEE, [-2, ANKLE_Y, -42], SKELETON.shin);
+/** Folded, the back rounds and the forehead comes down toward the hands. */
+const PIGEON_FOLD = { spine: 18, neck: 24 };
+/** The forearms come down angled in a little toward each other, in front of the shin. */
+const PIGEON_FOREARMS_IN = 18;
+
+/** The back leg is straight by this far into the setup, before the front knee comes forward. */
+const PIGEON_EXTEND_ENDS = 0.45;
+/**
+ * The legs, from all fours (0) to the pigeon (1). First the left leg stretches straight back, its
+ * knee sliding back along the floor and then lifting as the leg straightens onto the toes, while
+ * the hips ease back and down around the right knee, which stays planted and bends further. Then
+ * the right knee lifts and comes forward, the shin swinging round to lie across, as the hips sink
+ * to the floor and the back leg slides on out behind.
+ */
+const pigeonLegs = (t: number): { pelvis: Vec3; rightFoot: Pin; leftFoot: Pin } => {
+  const extend = phase(t, 0, PIGEON_EXTEND_ENDS);
+  const knee = phase(t, PIGEON_EXTEND_ENDS, 1);
+  const lift = Math.sin(Math.PI * knee);
+  // The right knee slides forward just off the floor to behind the wrist, and the hips come down
+  // with it, a thigh's length from it the whole way. Swung up through the air under the chest
+  // instead, the shin flipped up and back behind the knee.
+  const kneeLine = mix3(ALL_FOURS_RIGHT_KNEE, PIGEON_KNEE, knee);
+  const kneeAt: Vec3 = [kneeLine[0], kneeLine[1] + 10 * lift, kneeLine[2]];
+  const hipX = mix(hipsRolledBack(1)[0], PIGEON_PELVIS[0], knee);
+  const reach = SKELETON.thigh ** 2 - (kneeAt[0] - hipX) ** 2 - (kneeAt[2] - SKELETON.hip) ** 2;
+  const pelvis: Vec3 = knee > 0 ? [hipX, kneeAt[1] + Math.sqrt(Math.max(0, reach)), 0] : hipsRolledBack(extend);
+  const rightHip: Vec3 = [pelvis[0], pelvis[1], SKELETON.hip];
+  // The shin sweeps round low under the body, from lying straight back to lying across, the foot
+  // just off the floor on the way.
+  const shinTo: Vec3 = [(PIGEON_ANKLE[0] - PIGEON_KNEE[0]) / SKELETON.shin, 0, (PIGEON_ANKLE[2] - PIGEON_KNEE[2]) / SKELETON.shin];
+  const shin = unitOf(turnToward([-1, 0, 0], shinTo, knee).map((v, i) => v + (i === 1 ? 0.12 * lift : 0)));
+  const ankle = along3(kneeAt, shin, 0.999 * SKELETON.shin);
+  return {
+    pelvis,
+    rightFoot: { ...pinVia(rightHip, kneeAt, ankle), toward: turnToward([-1, 0, 0], [0.2, 0, -1], knee) },
+    leftFoot: leftLegBack(pelvis, extend),
+  };
+};
+
+/**
+ * From all fours (0) into the pigeon on straight arms, the hands planted where they were (1), then
+ * folded forward onto the forearms (2). The body tips forward as far as keeps the shoulders where
+ * the arms reach.
+ */
+const pigeonAt = (t: number): Pose3 => {
+  const legs = pigeonLegs(Math.min(1, t));
+  const fold = phase(t, 1, 2);
+  const spine = PIGEON_FOLD.spine * fold;
+  const body = (lean: number): Pose3 => ({
+    pelvis: legs.pelvis,
+    lean,
+    spine: { flex: spine },
+    neck: { flex: mix(-lean * 0.35, PIGEON_FOLD.neck, fold) },
+    pins: { rightFoot: legs.rightFoot, leftFoot: legs.leftFoot },
+  });
+  const planted = (side: 1 | -1): Vec3 => [112, WRIST_Y, side * 30];
+  // Up on the hands the arms are a little bent; folded, the shoulders are an upper arm above the floor.
+  const reach = 0.97 * ARM_REACH;
+  const upLean = leanWhere((l) => distance(solvePose(body(l)).rightArm[0], planted(1)) - reach, -20, 95);
+  const downLean = fold > 0 ? leanWhere((l) => solvePose(body(l)).rightArm[0][1] - (SKELETON.upperArm + ELBOW_Y), 20, 110) : upLean;
+  const pose = body(mix(upLean, downLean, fold));
+  const skeleton = solvePose(pose);
+  const hand = (side: 1 | -1): Pin => {
+    const shoulder = shoulderOf(skeleton, side);
+    const onHand: Pin = { at: planted(side), toward: [1, 0, 0], pole: [-1, 0, side * 0.4] };
+    const forearm = forearmDown(shoulder, [shoulder[0] + 8, ELBOW_Y, side * 30], side * PIGEON_FOREARMS_IN);
+    const pin = mixPin(onHand, forearm, fold);
+    return { ...pin, at: withinReach(shoulder, pin.at, 0.999 * ARM_REACH) };
+  };
+  return { ...pose, pins: { ...pose.pins, rightHand: hand(1), leftHand: hand(-1) } };
+};
+const PIGEON_ALL_FOURS = pigeonAt(0);
+const PIGEON_UP = pigeonAt(1);
+const PIGEON_FOLDED = pigeonAt(2);
+const PIGEON_SETUP_STEPS = 24;
+const PIGEON_FOLD_STEPS = 16;
+
+export const PIGEON_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From the front leg's side, a little in front and only just above the floor: the knee coming
+  // forward and the back leg sliding out are flat on the screen, and folded, the front knee shows
+  // beside the chest rather than under it. From higher up the chest came down over the knee.
+  camera: { yaw: 30, pitch: 10 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The front leg is on the camera's side of the body the whole way. By depth, the knee lifting
+  // forward went under the hips it's in front of, and the leg flipped under the chest partway
+  // into the fold.
+  over: ['rightLeg'],
+  // The right shin crosses in front of the left hip, and the foot swings over the left leg on its
+  // way there; the two swapped back and forth as it passed.
+  //
+  // The right knee comes forward just inside the right arm, about as deep as it, and lands behind
+  // the wrist with the arm in front of it; they swapped as the knee went past.
+  behind: [
+    ['leftLeg', 'rightLeg'],
+    ['rightLeg', 'rightArm'],
+  ],
+  // Folded onto the forearms.
+  stillFrame: 3 + PIGEON_SETUP_STEPS + PIGEON_FOLD_STEPS,
+  keyframes: [
+    { ms: 0, pose: PIGEON_ALL_FOURS },
+    { ms: 500, pose: PIGEON_ALL_FOURS },
+    ...alongArc(2600, PIGEON_SETUP_STEPS, (t) => pigeonAt(t)),
+    { ms: 600, pose: PIGEON_UP },
+    ...alongArc(2000, PIGEON_FOLD_STEPS, (t) => pigeonAt(1 + t)),
+    { ms: 3500, pose: PIGEON_FOLDED },
+    ...alongArc(1800, PIGEON_FOLD_STEPS, (t) => pigeonAt(2 - t)),
+    { ms: 300, pose: PIGEON_UP },
+    ...alongArc(2400, PIGEON_SETUP_STEPS, (t) => pigeonAt(1 - t)),
+  ],
+};
