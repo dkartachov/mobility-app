@@ -178,7 +178,12 @@ export type Clip3D = {
    * its knee in a squat: which is nearer where they touch is too close to call from their depths,
    * and they'd swap places from one frame to the next. A pair can name the head and a limb too,
    * which holds whatever side of the body the limb is on: `['head', 'rightArm']` keeps a hand
-   * resting on the head, its forearm over the crown, drawn over it (neck side stretch).
+   * resting on the head, its forearm over the crown, drawn over it (neck side stretch). And
+   * `['torso', 'head']` keeps the head over its own body where it would go under as tipped away from
+   * the camera: seen from behind and above, the crown covers the base of the neck (hip circles).
+   * A limb paired with the torso stays on that side of it all the way through: `['leftLeg', 'torso']`
+   * keeps a leg coming off the far hip under the pelvis though its raised thigh would come over it
+   * (the Breakdancer), as `over` does the other way.
    */
   behind?: readonly (readonly [Part, Part])[];
   /**
@@ -1339,7 +1344,11 @@ export function traceFigure(
   const limb = (part: Part, points: Vec3[], isLeg: boolean) => {
     const depth = meanDepth(points);
     const resting = handsOnBody ? (part === 'rightArm' && handsOnBody.includes('rightHand')) || (part === 'leftArm' && handsOnBody.includes('leftHand')) : false;
-    const over = !resting && ((forcedOver ? forcedOver.includes(part) : false) || overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg));
+    // A clip can pair a limb with the torso to keep it on one side all the way through.
+    const forcedSide = forcedBehind?.find(([a, b]) => (a === part && b === 'torso') || (a === 'torso' && b === part));
+    const over = forcedSide
+      ? forcedSide[0] === 'torso'
+      : !resting && ((forcedOver ? forcedOver.includes(part) : false) || overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg));
     return { part, d: limbShape(points, isLeg ? LEG_RADII : ARM_RADII), depth, points, layer: over ? 2 : 0 };
   };
   const parts: { part: Part; d: string; depth: number; points: Vec3[]; layer: number }[] = [
@@ -1401,8 +1410,12 @@ export function traceFigure(
     // body, like a forward fold seen from behind, goes under. The torso's average depth is no
     // guide: a body lying away from the camera puts it in front of the head. A limb is measured
     // against the head itself.
+    // A clip can say otherwise, for a head seen from behind and above whose crown, wider than the
+    // neck, covers the base of it though the head's middle is the further away (hip circles).
     if (part === 'torso') {
-      if ((head[2] - neckBase[2]) / SKELETON.neck > HEAD_TIPPED_AWAY) lastBehind = i;
+      const forcedTorso = forcedBehind?.find(([a, b]) => (a === 'torso' && b === 'head') || (a === 'head' && b === 'torso'));
+      const torsoBehind = forcedTorso ? forcedTorso[0] === 'torso' : (head[2] - neckBase[2]) / SKELETON.neck > HEAD_TIPPED_AWAY;
+      if (torsoBehind) lastBehind = i;
       else if (firstInFront === parts.length) firstInFront = i;
       continue;
     }

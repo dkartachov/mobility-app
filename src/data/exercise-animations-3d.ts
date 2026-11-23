@@ -4198,3 +4198,242 @@ export const PIGEON_STRETCH_3D: Clip3D = {
     ...alongArc(2400, PIGEON_SETUP_STEPS, (t) => pigeonAt(1 - t)),
   ],
 };
+
+// --- Hip circles: on all fours, one knee lifts and draws a big circle, forward, out to the side and back, then the other way round ---
+
+/** All fours with a flat back and the head in line, as cat cow starts from. */
+const HIP_CIRCLE_BODY = onAllFours(0, 0);
+const HIP_CIRCLE_HIP: Vec3 = [ALL_FOURS.pelvis[0], ALL_FOURS.pelvis[1], SKELETON.hip];
+/**
+ * The knee's circle, as the angle the thigh swings forward from hanging straight down (back when
+ * negative) and out to the side: the middle of it, and how far it goes either way. Forward the knee
+ * comes up under the chest, out to the side the thigh is nearly level, back it reaches up behind
+ * the hip, and at the bottom it's still just off the floor.
+ */
+const HIP_CIRCLE = { forward: 8, forwardBy: 42, out: 44, outBy: 22 };
+/** The shin points back from the knee, tipped up a little so the foot stays off the floor. */
+const HIP_CIRCLE_SHIN = unitOf([-1, 0.15, 0]);
+
+/** The knee a thigh's length from the hip, the thigh swung this far forward and out from hanging. */
+const hipCircleKnee = (forward: number, out: number): Vec3 => {
+  const [f, o] = [radians(forward), radians(out)];
+  return along3(HIP_CIRCLE_HIP, unitOf([Math.sin(f) * Math.cos(o), -Math.cos(f) * Math.cos(o), Math.sin(o)]), SKELETON.thigh);
+};
+/** The leg with its knee and shin here, the top of the foot flat on the floor kneeling (0) and the toes pointing once the knee is up (1). */
+const hipCircleLeg = (knee: Vec3, shin: Vec3, lifted = 1): Pose3 => ({
+  ...HIP_CIRCLE_BODY,
+  pins: {
+    ...HIP_CIRCLE_BODY.pins,
+    rightFoot: { ...pinVia(HIP_CIRCLE_HIP, knee, along3(knee, shin, 0.999 * SKELETON.shin)), toward: unitOf([shin[0], shin[1] - 0.5 * lifted, shin[2]]) },
+  },
+});
+/** Round the circle: 0 at the bottom, a quarter forward, a half out to the side, three quarters back. */
+const hipCircleAt = (turn: number): Pose3 => {
+  const a = 2 * Math.PI * turn;
+  return hipCircleLeg(hipCircleKnee(HIP_CIRCLE.forward + HIP_CIRCLE.forwardBy * Math.sin(a), HIP_CIRCLE.out - HIP_CIRCLE.outBy * Math.cos(a)), HIP_CIRCLE_SHIN);
+};
+/** From kneeling (0) to the bottom of the circle (1), the knee lifting and the shin with it. */
+const hipCircleLift = (t: number): Pose3 => {
+  const bottom = hipCircleKnee(HIP_CIRCLE.forward, HIP_CIRCLE.out - HIP_CIRCLE.outBy);
+  // On the arc the knee sweeps a thigh's length from the hip, from straight down on the floor.
+  const knee = along3(HIP_CIRCLE_HIP, turnToward([0, -1, 0], unit3(sub3(bottom, HIP_CIRCLE_HIP)), t), SKELETON.thigh);
+  return hipCircleLeg(knee, turnToward([-1, 0, 0], HIP_CIRCLE_SHIN, t), t);
+};
+const HIP_CIRCLE_KNEELING = hipCircleLift(0);
+/**
+ * Each circle is drawn in this many steps. It eases in and out, so the knee slows to a stop at the
+ * bottom before going round the other way, rather than snapping back.
+ */
+const HIP_CIRCLE_STEPS = 36;
+const HIP_CIRCLE_MS = 3200;
+
+export const HIP_CIRCLES_3D: Clip3D = {
+  view: '3d',
+  // From behind and to the other side, a little above. The knee's circle is tilted, facing down
+  // and out past the circling leg, so from that leg's own side it was seen almost edge on and
+  // looked like a swing back and forth; from here it's seen nearly face on, out past the body.
+  camera: { yaw: -120, pitch: 30 },
+  highlight: ['rightLeg'],
+  // The circling leg is on the far side of the kneeling one; they swapped as it passed behind.
+  // From behind and above, the back of the head covers the base of the neck, though by the middle
+  // of it the head is further away, and the neck showed over it.
+  behind: [
+    ['rightLeg', 'leftLeg'],
+    ['torso', 'head'],
+  ],
+  // Out to the side.
+  stillFrame: 1 + 6 + HIP_CIRCLE_STEPS / 2,
+  keyframes: [
+    { ms: 0, pose: HIP_CIRCLE_KNEELING },
+    { ms: 500, pose: HIP_CIRCLE_KNEELING },
+    ...alongArc(700, 6, hipCircleLift),
+    ...alongArc(HIP_CIRCLE_MS, HIP_CIRCLE_STEPS, hipCircleAt),
+    // Back round the other way.
+    ...alongArc(HIP_CIRCLE_MS, HIP_CIRCLE_STEPS, (t) => hipCircleAt(1 - t)),
+    ...alongArc(700, 6, (t) => hipCircleLift(1 - t)),
+  ],
+};
+
+// --- The Breakdancer: from sitting back on the hands with both legs straight, one foot draws in against the other's inner thigh, then folding forward to hold the straight leg's foot ---
+
+/**
+ * The bent leg's foot lies along the inside of the straight thigh, sole against it, toes toward the
+ * knee, its heel this far ahead of the hips, and the knee drops out to the side toward the floor.
+ */
+const BREAKDANCER_HEEL_AHEAD = 52;
+/** The chest turns this far toward the straight leg as it folds, squaring up over it. */
+const BREAKDANCER_TWIST = 14;
+/** How far the arms reach at the bottom of the fold: long, holding the foot. */
+const BREAKDANCER_REACH = 0.97;
+
+/**
+ * The left foot as the leg bends in, from lying straight beside the other with the toes up (0):
+ * the heel draws in along the floor toward the hips, the knee rising, and then the knee drops out
+ * to the side as the foot rolls onto its outer edge, its sole against the inside of the straight
+ * thigh, toes toward its knee (1).
+ */
+const breakdancerLeftFoot = (bend: number): Pin => {
+  const [hip, , ankle, toes] = PIKE_LEGS.leftLeg;
+  const straight = PIKE_LEGS.rightLeg;
+  const thigh = mix3(straight[0], straight[1], BREAKDANCER_HEEL_AHEAD / SKELETON.thigh);
+  const against: Vec3 = [thigh[0], ANKLE_Y + 2, straight[0][2] - 21];
+  // Drawn in, the foot is out to the side, so the raised shin stays clear of the straight leg; it
+  // only comes in against the thigh as the knee drops, low enough to go behind it.
+  const drawnIn: Vec3 = [against[0] + 6, ANKLE_Y, hip[2] - 22];
+  const drawIn = phase(bend, 0, 0.6);
+  const drop = phase(bend, 0.45, 1);
+  return {
+    at: mix3(mix3(ankle, drawnIn, drawIn), against, drop),
+    toward: turnToward(turnToward(unit3(sub3(toes, ankle)), [1, 0, 0], drawIn), unit3([1, 0.1, 0.12]), drop),
+    pole: mix3(mix3([0, 1, 0], [0.2, 1, -0.35], drawIn), [0.25, 0.2, -1], drop),
+  };
+};
+/** Seated with the left leg bent this far in, and folded forward with the pelvis tipped this far, the straight leg flat with its toes up. */
+const breakdancerBody = (lean: number, fold: number, bend = 1): Pose3 => ({
+  pelvis: [0, SIT_PELVIS_Y, 0],
+  lean,
+  spine: { flex: PIKE_ROUNDING.spine * lean, twist: -BREAKDANCER_TWIST * fold },
+  // Leaning back, the head stays upright, looking down the legs: tipped back with the body, the face
+  // turned up to the camera and the nose showed, then went as the head dropped into the fold.
+  neck: { flex: lean < 0 ? -lean : PIKE_ROUNDING.neck * lean },
+  rightLeg: { flex: 90 - SIT_LEG_DROP + lean, ankle: SIT_LEG_DROP },
+  pins: { leftFoot: breakdancerLeftFoot(bend) },
+});
+/** Where the hands hold the straight leg's foot: either side of it, toward the sole. */
+const breakdancerHold = (side: 1 | -1): Vec3 => {
+  const [, , ankle, toes] = PIKE_LEGS.rightLeg;
+  const [x, y, z] = mix3(ankle, toes, PIKE_FOOT_HOLD);
+  return [x + PIKE_HAND_FORWARD, y + PIKE_HAND_UP, z + side * PIKE_HAND_OUT];
+};
+/** Sitting up, the body leans back a little onto the hands, planted on the floor behind the hips, fingers forward. */
+const BREAKDANCER_LEAN_BACK = -8;
+/** The arms are nearly straight down to the hands, the elbows bending a little back and out. */
+const BREAKDANCER_PLANTED_REACH = 0.96 * ARM_REACH;
+const BREAKDANCER_HANDS_OUT = 36;
+const BREAKDANCER_PLANTED_X = (() => {
+  const shoulder = solvePose(breakdancerBody(BREAKDANCER_LEAN_BACK, 0, 0)).rightArm[0];
+  const across = BREAKDANCER_HANDS_OUT - shoulder[2];
+  return shoulder[0] - Math.sqrt(BREAKDANCER_PLANTED_REACH ** 2 - (shoulder[1] - WRIST_Y) ** 2 - across ** 2);
+})();
+const breakdancerPlanted = (side: 1 | -1): Pin => ({
+  at: [BREAKDANCER_PLANTED_X, WRIST_Y, side * BREAKDANCER_HANDS_OUT],
+  toward: [1, 0, 0],
+  pole: [-1, 0, side * 0.5],
+});
+/** A point this far along the curve that starts at `a`, heads toward `b` and ends at `c`. */
+const curve = (a: Vec3, b: Vec3, c: Vec3, u: number): Vec3 => mix3(mix3(a, b, u), mix3(b, c, u), u);
+/** Lifting off the floor, a hand comes round beside the hip and up over the thigh before reaching on. */
+const BREAKDANCER_HAND_LIFT_ENDS = 0.4;
+/**
+ * Where a hand is this far along its way to the foot: up off the floor behind, round beside the
+ * hip and over its thigh, then in an arc a little up off the straight shin to hold the foot, the
+ * right on the outside of it and the left, coming over the bent leg, on the inside.
+ */
+const breakdancerHand = (side: 1 | -1, p: number): Vec3 => {
+  const [hip, , ankle] = PIKE_LEGS.rightLeg;
+  const planted = breakdancerPlanted(side).at;
+  const beside: Vec3 = [35, 40, side * 46];
+  const [overX, overY, overZ] = mix3(hip, ankle, 0.9);
+  const over: Vec3 = [overX, overY + PIKE_HAND_UP + PIKE_HAND_ARC, overZ + side * PIKE_HAND_OUT];
+  // Low round past the hip: lifted high on the way, the far arm flung up past its shoulder.
+  if (p < BREAKDANCER_HAND_LIFT_ENDS) return curve(planted, [planted[0] + 40, 38, side * 48], beside, p / BREAKDANCER_HAND_LIFT_ENDS);
+  return curve(beside, over, breakdancerHold(side), (p - BREAKDANCER_HAND_LIFT_ENDS) / (1 - BREAKDANCER_HAND_LIFT_ENDS));
+};
+/** The fingers point forward on the floor and down the leg on the way, then turn in round the foot, the right across the sole. */
+const breakdancerFingers = (side: 1 | -1, p: number): Vec3 =>
+  mix3(mix3([1, 0, 0], [1, -0.1, 0], phase(p, 0, BREAKDANCER_HAND_LIFT_ENDS)), side === 1 ? PIKE_WRAP.near : [0.6, 0, 0.8], phase(p, 0.8, 1));
+/** Folded, the pelvis tips forward as far as brings the shoulders where both arms reach the foot, long. */
+const BREAKDANCER_FOLD_LEAN = leanWhere((lean) => {
+  const s = solvePose(breakdancerBody(lean, 1));
+  return Math.max(
+    distance(s.rightArm[0], breakdancerHold(1)) - BREAKDANCER_REACH * ARM_REACH,
+    distance(s.leftArm[0], breakdancerHold(-1)) - BREAKDANCER_REACH * ARM_REACH
+  );
+}, -10, 80);
+
+/**
+ * Leaning back on the hands with the left leg this far bent in (0 to 1), and this far into the
+ * reach (0 to 1): the hands come up off the floor and reach for the foot as the body comes up and
+ * folds forward over the straight leg, from the start of it.
+ */
+const breakdancerPose = (bend: number, p: number): Pose3 => {
+  const body = breakdancerBody(mix(BREAKDANCER_LEAN_BACK, BREAKDANCER_FOLD_LEAN, p), p, bend);
+  const skeleton = solvePose(body);
+  const hand = (side: 1 | -1): Pin => {
+    if (p === 0) return breakdancerPlanted(side);
+    return {
+      at: withinReach(shoulderOf(skeleton, side), breakdancerHand(side, p), 0.999 * ARM_REACH),
+      toward: breakdancerFingers(side, p),
+      // The elbows point back and out, level, while the hands come round low under the shoulders, and
+      // turn down and out as the arms reach along the leg. Pointed down while the hands were under the
+      // shoulders, the elbow's direction lay along the arm, and the elbows whipped round.
+      pole: mix3(mix3(breakdancerPlanted(side).pole!, [-0.8, 0, side * 0.5], phase(p, 0, BREAKDANCER_HAND_LIFT_ENDS)), [0, -0.4, side], phase(p, BREAKDANCER_HAND_LIFT_ENDS, 0.85)),
+    };
+  };
+  return { ...body, pins: { ...body.pins, rightHand: hand(1), leftHand: hand(-1) } };
+};
+/** The reach starts this far into the leg's bend, so the two run on into each other without a pause between. */
+const BREAKDANCER_REACH_FROM = 0.55;
+/** Going in, the left leg bends in and runs straight on into the reach, from 0 to 1. */
+const breakdancerIn = (u: number): Pose3 => {
+  // The bend takes 1.6s and the reach 2.4s, half as long again, starting near the end of the bend.
+  const split = 1 / (BREAKDANCER_REACH_FROM + 1.5);
+  return breakdancerPose(phase(u, 0, split), phase(u, BREAKDANCER_REACH_FROM * split, 1));
+};
+const BREAKDANCER_STRAIGHT = breakdancerPose(0, 0);
+const BREAKDANCER_FOLDED = breakdancerPose(1, 1);
+const BREAKDANCER_STEPS = 16;
+
+export const THE_BREAKDANCER_3D: Clip3D = {
+  view: '3d',
+  // From the straight leg's side and well above: the bent knee shows dropped out to the far side
+  // with its foot against the straight thigh, and the fold goes down along the straight leg. From
+  // lower down the bent leg was hidden behind the straight one and the body.
+  camera: { yaw: 30, pitch: 60 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // Reaching for the foot, both arms come over the legs: the right over its own, the left over the
+  // bent leg and across. Planted behind, the arms are clear of the legs, but by depth they swapped
+  // back and forth with them as the leg bent in.
+  behind: [
+    ['rightLeg', 'rightArm'],
+    ['leftLeg', 'leftArm'],
+    ['leftLeg', 'rightArm'],
+    // The straight leg is on the camera's side of the bent one throughout. With the feet still
+    // together, the bending leg came over it as the knee started to rise.
+    ['leftLeg', 'rightLeg'],
+    // The bent leg comes off the far hip, under the pelvis; by depth its thigh came over the hips as
+    // the knee rose, and went back under as it dropped out.
+    ['leftLeg', 'torso'],
+  ],
+  // Holding the foot.
+  stillFrame: 1 + 2 * BREAKDANCER_STEPS,
+  keyframes: [
+    { ms: 0, pose: BREAKDANCER_STRAIGHT },
+    { ms: 600, pose: BREAKDANCER_STRAIGHT },
+    // The bend and the reach as one move, about 1.6s bending in and 2.4s reaching, overlapping.
+    ...alongArc(3800, 2 * BREAKDANCER_STEPS, breakdancerIn),
+    { ms: 3500, pose: BREAKDANCER_FOLDED },
+    ...alongArc(2200, BREAKDANCER_STEPS, (t) => breakdancerPose(1, 1 - t)),
+    ...alongArc(1400, BREAKDANCER_STEPS, (t) => breakdancerPose(1 - t, 0)),
+  ],
+};

@@ -55,6 +55,8 @@ import {
   OVERHEAD_TRICEPS_STRETCH_3D,
   COW_FACE_ARMS_3D,
   PIGEON_STRETCH_3D,
+  HIP_CIRCLES_3D,
+  THE_BREAKDANCER_3D,
   LYING_WINDSHIELD_WIPER_HOLD_3D,
   REVERSE_TABLETOP_3D,
   KNEELING_WRIST_STRETCH_3D,
@@ -2645,5 +2647,126 @@ describe('3D clips', () => {
     }
     expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
     expect(new Set(drawOrders(clip)).size).toBe(1);
+  });
+
+  it('lifts one knee off the floor and circles it forward, out to the side and back, then the other way round, the rest of the body still, in hip circles', () => {
+    const clip = HIP_CIRCLES_3D;
+    const poses = samples(clip).map(solvePose);
+    const [first] = poses;
+    const hip = first.rightLeg[0];
+    for (const { spine, rightArm, leftArm, leftLeg, rightLeg } of poses) {
+      // The torso, the hands and the other knee stay put.
+      expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      expect(distance(spine[spine.length - 1], first.spine[first.spine.length - 1])).toBeLessThan(0.5);
+      expect(distance(rightArm[2], first.rightArm[2])).toBeLessThan(0.5);
+      expect(distance(leftArm[2], first.leftArm[2])).toBeLessThan(0.5);
+      expect(distance(leftLeg[1], first.leftLeg[1])).toBeLessThan(0.5);
+      // The foot never goes into the floor.
+      expect(rightLeg[2][1]).toBeGreaterThanOrEqual(12.5);
+    }
+    // Kneeling to start with.
+    expect(first.rightLeg[1][1]).toBeLessThan(15);
+    // Circling, the knee stays off the floor and reaches well forward of the hip, out to the side
+    // and back behind it.
+    const circling = samples({ ...clip, keyframes: clip.keyframes.slice(8, 8 + 72) }).map(solvePose);
+    const knees = circling.map(({ rightLeg }) => rightLeg[1]);
+    for (const knee of knees) expect(knee[1]).toBeGreaterThan(18);
+    expect(Math.max(...knees.map((knee) => knee[0] - hip[0]))).toBeGreaterThan(50);
+    expect(Math.min(...knees.map((knee) => knee[0] - hip[0]))).toBeLessThan(-40);
+    expect(Math.max(...knees.map((knee) => knee[2] - hip[2]))).toBeGreaterThan(80);
+    // Out to the side the thigh is nearly level.
+    const out = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(out.rightLeg[1][1]).toBeGreaterThan(hip[1] - 45);
+    // Going round the other way, the knee slows to a stop at the bottom rather than snapping back:
+    // it moves far less in the 100ms either side of the turn than in the middle of a circle.
+    let turnAt = 0;
+    for (let i = 1; i <= 8 + 36; i++) turnAt += clip.keyframes[i].ms;
+    const kneeAt = (t: number) => solvePose(poseAt3(clip, t)).rightLeg[1];
+    const atTurn = distance(kneeAt(turnAt - 100), kneeAt(turnAt + 100));
+    const midCircle = distance(kneeAt(turnAt - 1700), kneeAt(turnAt - 1500));
+    expect(atTurn).toBeLessThan(midCircle / 4);
+    // One order all the way through, the head over the neck it hides from behind.
+    const orders = new Set(drawOrders(clip));
+    expect(orders.size).toBe(1);
+    const [order] = [...orders].map((o) => o.split(' '));
+    expect(order.indexOf('torso')).toBeLessThan(order.indexOf('head'));
+  });
+
+  it('starts leaning back on the hands with both legs straight, draws one foot in against the other inner thigh with the knee out, and folds forward to hold the straight foot from either side, in the Breakdancer', () => {
+    const clip = THE_BREAKDANCER_3D;
+    const poses = samples(clip).map(solvePose);
+    const [first] = poses;
+    for (const { spine, rightLeg } of poses) {
+      expect(distance(spine[0], first.spine[0])).toBeLessThan(0.5);
+      for (let i = 0; i < 3; i++) expect(distance(rightLeg[i], first.rightLeg[i])).toBeLessThan(0.5);
+    }
+    // Both legs straight to start with, leaning back on the hands, planted on the floor behind the hips.
+    for (const leg of [first.rightLeg, first.leftLeg]) expect(angleAt(leg[0], leg[1], leg[2])).toBeGreaterThan(175);
+    const neckBase = first.spine[first.spine.length - 1];
+    expect(neckBase[0]).toBeLessThan(first.spine[0][0] - 20);
+    for (const [, , wrist] of [first.rightArm, first.leftArm]) {
+      expect(wrist[1]).toBeCloseTo(11, 0);
+      expect(wrist[0]).toBeLessThan(first.spine[0][0] - 40);
+    }
+    // The hands stay planted while the leg is still well short of bent in; once bent, the leg stays
+    // put through the fold.
+    const bent = solvePose(clip.keyframes[clip.stillFrame].pose);
+    for (const frame of clip.keyframes.slice(0, clip.stillFrame)) {
+      const skeleton = solvePose(frame.pose);
+      if (distance(skeleton.leftLeg[2], bent.leftLeg[2]) < 20) continue;
+      expect(distance(skeleton.rightArm[2], first.rightArm[2])).toBeLessThan(0.5);
+      expect(distance(skeleton.leftArm[2], first.leftArm[2])).toBeLessThan(0.5);
+    }
+    // The bend runs straight on into the reach, with no pause between: every keyframe from the start
+    // of the bend to the fold is a new pose.
+    for (let i = 2; i <= clip.stillFrame - 1; i++) expect(JSON.stringify(clip.keyframes[i].pose)).not.toBe(JSON.stringify(clip.keyframes[i - 1].pose));
+    for (const frame of clip.keyframes.slice(clip.stillFrame, clip.keyframes.length - 16)) {
+      const { leftLeg } = solvePose(frame.pose);
+      expect(distance(leftLeg[1], bent.leftLeg[1])).toBeLessThan(0.5);
+      expect(distance(leftLeg[2], bent.leftLeg[2])).toBeLessThan(0.5);
+    }
+    const [rightHip, rightKnee, rightAnkle, rightToes] = first.rightLeg;
+    const [leftHip, leftKnee, leftAnkle, leftToes] = bent.leftLeg;
+    // The straight leg lies flat, toes up.
+    expect(angleAt(rightHip, rightKnee, rightAnkle)).toBeGreaterThan(175);
+    expect(rightToes[1]).toBeGreaterThan(rightAnkle[1] + 30);
+    // The bent leg's foot lies along the inside of the straight thigh, toes toward its knee, and
+    // its knee drops out to the side, low.
+    const alongThigh = (point: Vec3) => {
+      const t = (point[0] - rightHip[0]) / (rightKnee[0] - rightHip[0]);
+      return Math.hypot(point[1] - (rightHip[1] + (rightKnee[1] - rightHip[1]) * t), point[2] - rightHip[2]);
+    };
+    expect(alongThigh(leftAnkle)).toBeLessThan(25);
+    expect(alongThigh(leftToes)).toBeLessThan(25);
+    expect(leftToes[0]).toBeGreaterThan(leftAnkle[0] + 30);
+    expect(leftAnkle[2]).toBeLessThan(rightHip[2]);
+    expect(leftKnee[2]).toBeLessThan(leftHip[2] - 60);
+    expect(leftKnee[1]).toBeLessThan(50);
+    // Folded, the chest comes down over the straight leg and the hands hold its foot from either side.
+    const folded = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(folded.head[0]).toBeGreaterThan(first.head[0] + 80);
+    expect(folded.head[1]).toBeLessThan(first.head[1] - 50);
+    const [, , rightWrist] = folded.rightArm;
+    const [, , leftWrist] = folded.leftArm;
+    for (const wrist of [rightWrist, leftWrist]) expect(distance(wrist, rightAnkle)).toBeLessThan(40);
+    expect(rightWrist[2]).toBeGreaterThan(rightAnkle[2] + 5);
+    expect(leftWrist[2]).toBeLessThan(rightAnkle[2] - 5);
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    // The elbows move smoothly with the hands, never whipping round: no more than a little further
+    // than the hands themselves go in any 10ms.
+    let previous = solvePose(poseAt3(clip, 0));
+    for (let t = 10; t <= durationOf(clip); t += 10) {
+      const skeleton = solvePose(poseAt3(clip, t));
+      for (const arm of ['rightArm', 'leftArm'] as const) {
+        const hand = distance(skeleton[arm][2], previous[arm][2]);
+        expect(distance(skeleton[arm][1], previous[arm][1])).toBeLessThan(1.5 * hand + 2);
+      }
+      previous = skeleton;
+    }
+    // One order all the way through, the bent leg under the pelvis it comes off the far side of.
+    const orders = new Set(drawOrders(clip));
+    expect(orders.size).toBe(1);
+    const [order] = [...orders].map((o) => o.split(' '));
+    expect(order.indexOf('leftLeg')).toBeLessThan(order.indexOf('torso'));
   });
 });
