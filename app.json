@@ -49,7 +49,7 @@
         {
           "microphonePermission": false,
           "recordAudioAndroid": false,
-          "enableBackgroundPlayback": true
+          "enableBackgroundPlayback": false
         }
       ],
       "expo-video",
