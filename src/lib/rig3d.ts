@@ -86,6 +86,12 @@ export type Pin = {
   toward?: Vec3;
   /** The direction the elbow or knee sticks out in. Elbows go back and knees forward by default. */
   pole?: Vec3;
+  /**
+   * For a hand, the way its palm faces, which gives it a thumb (see `thumbPoints`): for exercises
+   * that differ only by which way the palm faces, which a hand without one doesn't show (the manual
+   * forearm stretches). Give it in every pose of a clip or in none.
+   */
+  palm?: Vec3;
 };
 
 export type Pose3 = {
@@ -273,6 +279,9 @@ export type Skeleton = {
   leftArm: Vec3[];
   rightLeg: Vec3[];
   leftLeg: Vec3[];
+  /** The way each palm faces, for a hand pinned with one (see `Pin.palm`), which gives it a thumb. */
+  rightPalm?: Vec3;
+  leftPalm?: Vec3;
 };
 
 export type FigureSlot = {
@@ -288,6 +297,8 @@ export type FigureSlot = {
   /** From 0, furthest from the camera, to 1, nearest. */
   shade: number;
   accent: boolean;
+  /** Lines between the fingers of a hand with a thumb, stroked in the background color over the hand. Empty otherwise. */
+  fingers: string;
 };
 
 export type FigureFrame = {
@@ -453,6 +464,7 @@ function lerpPin(a: Pin | undefined, b: Pin | undefined, t: number): Pin | undef
     at: lerpVec(a.at, b.at, t),
     toward: a.toward && b.toward ? lerpVec(a.toward, b.toward, t) : b.toward,
     pole: a.pole && b.pole ? lerpVec(a.pole, b.pole, t) : b.pole,
+    palm: a.palm && b.palm ? lerpVec(a.palm, b.palm, t) : b.palm,
   };
 }
 
@@ -596,6 +608,8 @@ export function solvePose(pose: Pose3): Skeleton {
     leftArm: arm(leftShoulder, pose.leftArm, pose.pins?.leftHand, -1),
     rightLeg: leg(rightHip, pose.rightLeg, pose.pins?.rightFoot, 1),
     leftLeg: leg(leftHip, pose.leftLeg, pose.pins?.leftFoot, -1),
+    rightPalm: pose.pins?.rightHand?.palm,
+    leftPalm: pose.pins?.leftHand?.palm,
   };
 }
 
@@ -661,6 +675,93 @@ function limbShape(points: readonly Vec3[], radii: readonly (readonly [number, n
   let path = '';
   for (let i = 1; i < points.length; i++) path += capsule(points[i - 1], radii[i - 1][0], points[i], radii[i - 1][1]);
   return path;
+}
+
+/**
+ * A thumb: where it leaves the hand, this far along it from the wrist and out to its side, how long
+ * it is, how far it leans from straight out toward the fingers (degrees), and its half thickness
+ * at the root and the tip.
+ */
+const THUMB = { along: 6, out: 6, length: 18, lean: 45, radii: [5.5, 4.5] as const };
+/**
+ * How far nearer the camera than the middle of the hand the thumb's tip has to be for the thumb to
+ * be drawn over the hand. Nearer than the hand's own surface, it lies across the front of it.
+ */
+const THUMB_OVER = 8;
+/** How far along a thumb drawn over its hand its outline starts, so it joins the hand at the root rather than sitting in a ring. */
+const THUMB_OUTLINE_FROM = 0.45;
+
+/**
+ * The root and tip of the thumb of a hand whose palm faces `palm`. It comes out of the side of the
+ * hand, the side the forearm turns toward to put the palm down: forward with the arm hanging palm
+ * in, up with the arm held out palm in, toward the body's middle palm down, away from it palm up.
+ * `side` is 1 for the right hand and -1 for the left, which mirrors it.
+ */
+export function thumbPoints(arm: readonly Vec3[], palm: Vec3, side: number): [Vec3, Vec3] {
+  'worklet';
+  const along = unit(sub(arm[3], arm[2]), [0, -1, 0]);
+  // Only the part of the palm's direction square to the hand counts.
+  const facing = unit(sub(palm, scaled(along, dot(palm, along))), [1, 0, 0]);
+  const out = scaled(cross(along, facing), side);
+  const root = add(arm[2], add(scaled(along, THUMB.along), scaled(out, THUMB.out)));
+  const lean = (THUMB.lean * Math.PI) / 180;
+  return [root, add(root, scaled(add(scaled(out, Math.cos(lean)), scaled(along, Math.sin(lean))), THUMB.length))];
+}
+
+/** How far along the hand from the wrist the lines between the fingers start, where the knuckles are. */
+const KNUCKLES = 0.45;
+
+/**
+ * How much of a hand's width has to face the camera for the lines between its fingers to be drawn.
+ * Turned edge on, the fingers are one behind the other and the lines close up into one.
+ */
+const FINGERS_MIN_SPREAD = 0.3;
+
+/**
+ * Three lines along a hand whose palm faces `palm`, from the knuckles into the round of the
+ * fingertips, that split it into four fingers. They're spread across the hand's width, from the
+ * thumb's side to the little finger's, so they turn with the hand: wide apart with the back of the
+ * hand or the palm to the camera, closing up as it turns edge on, and gone once they're one
+ * behind the other.
+ */
+export function fingerLines(view: Mat3, wrist: Vec3, fingertips: Vec3, palm: Vec3): string {
+  'worklet';
+  const along = unit(sub(fingertips, wrist), [0, -1, 0]);
+  const facing = unit(sub(palm, scaled(along, dot(palm, along))), [1, 0, 0]);
+  const across = cross(along, facing);
+  const a = project(view, wrist);
+  const b = project(view, fingertips);
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const length = Math.hypot(dx, dy);
+  if (length < 4) return '';
+  // How much of the hand's width the camera sees, square to the hand on screen.
+  const seen = project(view, across);
+  if (Math.abs((seen[0] * -dy + seen[1] * dx) / length) < FINGERS_MIN_SPREAD) return '';
+  const [wide, narrow] = ARM_RADII[2];
+  const knuckleRadius = lerp(wide, narrow, KNUCKLES);
+  const knuckles = lerpVec(wrist, fingertips, KNUCKLES);
+  let path = '';
+  for (let i = 1; i < 4; i++) {
+    // Across the hand from one edge (-1) to the other (1), at the quarters.
+    const k = -1 + i / 2;
+    const from = project(view, add(knuckles, scaled(across, k * knuckleRadius)));
+    // Into the round end, stopping short of its edge.
+    const to = project(view, add(fingertips, add(scaled(across, k * narrow), scaled(along, 0.6 * narrow * Math.sqrt(1 - k * k)))));
+    path += `M${fixed(from[0])} ${fixed(from[1])}L${fixed(to[0])} ${fixed(to[1])}`;
+  }
+  return path;
+}
+
+/**
+ * How many shapes `traceFigure` makes for a clip: one for each of the six parts of the body, one
+ * for each hand it draws again on its own, and one for each thumb, which needs its own shape to go
+ * over its hand with an outline.
+ */
+export function figureSlotCount(clip: Clip3D): number {
+  const pins = clip.keyframes[0].pose.pins;
+  const thumbs = (pins?.rightHand?.palm ? 1 : 0) + (pins?.leftHand?.palm ? 1 : 0);
+  return 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) + thumbs;
 }
 
 /** The torso's cross-section along the spine from the hips: how far along, then half its width and half its depth there. */
@@ -1332,6 +1433,22 @@ export function traceFigure(
   const rightLeg = flat(skeleton.rightLeg);
   const leftLeg = flat(skeleton.leftLeg);
   const neckBase = spine[spine.length - 1];
+  // A hand pinned with the way its palm faces has a thumb. It's part of the hand's outline, so it
+  // shows sticking out of it, and is drawn again over the hand when it's turned toward the camera.
+  const thumbs = {
+    rightArm: skeleton.rightPalm ? flat(thumbPoints(skeleton.rightArm, skeleton.rightPalm, 1)) : null,
+    leftArm: skeleton.leftPalm ? flat(thumbPoints(skeleton.leftArm, skeleton.leftPalm, -1)) : null,
+  };
+  // It has fingers drawn on it too.
+  const fingersOf = (part: Part): string => {
+    if (part === 'rightArm' && skeleton.rightPalm) return fingerLines(view, skeleton.rightArm[2], skeleton.rightArm[3], skeleton.rightPalm);
+    if (part === 'leftArm' && skeleton.leftPalm) return fingerLines(view, skeleton.leftArm[2], skeleton.leftArm[3], skeleton.leftPalm);
+    return '';
+  };
+  const thumbShape = (part: Part): string => {
+    const thumb = part === 'rightArm' || part === 'leftArm' ? thumbs[part] : null;
+    return thumb ? capsule(thumb[0], THUMB.radii[0], thumb[1], THUMB.radii[1]) : '';
+  };
 
   // The neck belongs to the torso's shape, so there's no seam where it meets the shoulders.
   const torso =
@@ -1359,7 +1476,7 @@ export function traceFigure(
     const over = forcedSide
       ? forcedSide[0] === 'torso'
       : !resting && ((forcedOver ? forcedOver.includes(part) : false) || overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg));
-    return { part, d: limbShape(points, isLeg ? LEG_RADII : ARM_RADII), depth, points, layer: over ? 2 : 0 };
+    return { part, d: limbShape(points, isLeg ? LEG_RADII : ARM_RADII) + (isLeg ? '' : thumbShape(part)), depth, points, layer: over ? 2 : 0 };
   };
   const parts: { part: Part; d: string; depth: number; points: Vec3[]; layer: number }[] = [
     limb('leftLeg', leftLeg, true),
@@ -1458,6 +1575,7 @@ export function traceFigure(
       hand: false,
       shade: Math.max(0, Math.min(1, 0.5 + offset / (2 * SHADE_RANGE))),
       accent: highlight ? highlight.includes(part) : false,
+      fingers: fingersOf(part),
     });
   }
 
@@ -1482,11 +1600,12 @@ export function traceFigure(
       const from = lerpVec(arm[1], arm[2], RESTING_FOREARM_OUTLINE_FROM);
       slots.splice(at + 1, 0, {
         part: armPart,
-        d: limbShape(arm.slice(1), ARM_RADII.slice(1)),
+        d: limbShape(arm.slice(1), ARM_RADII.slice(1)) + thumbShape(armPart),
         outline: capsule(from, lerp(wide, narrow, RESTING_FOREARM_OUTLINE_FROM), arm[2], narrow) + capsule(arm[2], ARM_RADII[2][0], arm[3], ARM_RADII[2][1]),
         hand: true,
         shade: slots[own].shade,
         accent: slots[own].accent,
+        fingers: fingersOf(armPart),
       });
     }
   }
@@ -1520,13 +1639,46 @@ export function traceFigure(
       }
       slots.splice(at + 1, 0, {
         part: armPart,
-        d,
+        d: d + thumbShape(armPart),
         outline,
         hand: true,
         shade: slots[own].shade,
         accent: slots[own].accent,
+        fingers: fingersOf(armPart),
       });
     }
+  }
+
+  // A thumb turned toward the camera lies across the front of its hand, so it's drawn again over
+  // the hand, after wherever the hand is last drawn, with an outline that keeps it apart from it.
+  // Otherwise its shape is empty: sticking out of the hand, the hand's own outline shows it, and
+  // turned away the hand hides it.
+  const thumbParts: Part[] = ['rightArm', 'leftArm'];
+  for (let i = 0; i < thumbParts.length; i++) {
+    const armPart = thumbParts[i];
+    const thumb = thumbs[armPart as 'rightArm' | 'leftArm'];
+    if (!thumb) continue;
+    const arm = armPart === 'rightArm' ? rightArm : leftArm;
+    let own = -1;
+    let last = -1;
+    for (let k = 0; k < slots.length; k++) {
+      if (slots[k].part !== armPart) continue;
+      last = k;
+      if (!slots[k].hand) own = k;
+    }
+    if (own < 0) continue;
+    const handMiddle = lerpVec(arm[2], arm[3], 0.5);
+    const over = thumb[1][2] - handMiddle[2] > THUMB_OVER;
+    const [wide, narrow] = THUMB.radii;
+    slots.splice(last + 1, 0, {
+      part: armPart,
+      d: over ? thumbShape(armPart) : '',
+      outline: over ? capsule(lerpVec(thumb[0], thumb[1], THUMB_OUTLINE_FROM), lerp(wide, narrow, THUMB_OUTLINE_FROM), thumb[1], narrow) : '',
+      hand: true,
+      shade: slots[own].shade,
+      accent: slots[own].accent,
+      fingers: '',
+    });
   }
 
   // A circle on the floor is an oval to the camera, flatter the lower the camera is.

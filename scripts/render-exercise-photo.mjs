@@ -33,6 +33,7 @@ const COLORS = {
   tape: { strip: '#E9C46A', marks: '#5B4A1E' },
 };
 const OUTLINE = 4.5;
+const FINGER_LINE = 1.8;
 
 const [clipName, output] = process.argv.slice(2);
 if (!clipName || !output) {
@@ -96,6 +97,7 @@ for (const slot of frame.slots) {
   body += slot.accent
     ? `<path d="${slot.d}" fill="${COLORS.accent}"/>`
     : `<path d="${slot.d}" fill="${COLORS.far}"/><path d="${slot.d}" fill="${COLORS.near}" fill-opacity="${slot.shade}"/>`;
+  if (slot.fingers) body += `<path d="${slot.fingers}" fill="none" stroke="${COLORS.background}" stroke-width="${FINGER_LINE}" stroke-linecap="round"/>`;
   if (phone.part === slot.part && !slot.hand && phone.over) {
     // The strap goes behind the phone, like an armband, so it doesn't hide the reading.
     if (phone.band) body += `<path d="${phone.band}" fill="none" stroke="${COLORS.phone.band}" stroke-width="5" stroke-linecap="round"/>`;

@@ -4001,6 +4001,126 @@ export const COW_FACE_ARMS_3D: Clip3D = {
   ],
 };
 
+// --- Manual forearm stretches: one arm held out straight in front, the other hand bending its wrist down and back ---
+
+/**
+ * The stretched arm is straight out in front at shoulder height, come this far (degrees) in toward
+ * the middle, with the chest turned this far toward it and the other shoulder blade slid this far
+ * forward round the ribs, as reaching across the body does: square on, the other hand couldn't
+ * reach round to the front of the hand.
+ */
+const FOREARM_ARM = { inward: 10, twist: -20, protract: 26 };
+
+type ForearmGrip = {
+  /** How far the wrist bends, down from the line of the forearm. */
+  bend: number;
+  /** Where the middle of the other hand rests, this far along the stretched hand from its wrist. */
+  along: number;
+  /**
+   * The stretched hand turns palm up (1) or down (-1) once the arm is out, and the palm turns on
+   * with the hand as the wrist bends. Palm up, the thumb is toward the camera, over the hand; palm
+   * down, the hand hides it. That's what tells the two stretches apart: without a thumb the stick
+   * figure's hand looks the same either way up.
+   */
+  palm: 1 | -1;
+};
+
+/**
+ * Palm down, the wrist bends down with the fingers toward the body; the other hand lies on the back
+ * of the hand and presses it down, its fingers over the knuckles.
+ */
+const EXTENSOR_GRIP: ForearmGrip = { bend: 80, along: 12, palm: -1 };
+/**
+ * Palm up, the wrist bends back with the fingers down; the other hand lies across the front of the
+ * fingers, on the palm's side, and pulls them down and back. It points the same way as the
+ * stretched hand's fingers, as it does in the extensor stretch, so it comes up and settles the same
+ * way: pointing back up the hand, it turned right round on the way.
+ */
+const FLEXOR_GRIP: ForearmGrip = { bend: 70, along: 14, palm: 1 };
+
+/** How the left arm comes up on its way to the right hand: raised forward, across the body, and bent at the elbow. */
+const FOREARM_LIFT = { flex: 45, abduct: -10, elbow: 70 };
+
+/** How far the other hand's middle sits off the stretched hand's: the two hands' half thicknesses. */
+const HAND_ON_HAND = 17;
+
+const cross3 = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+/** `a` turned this far (radians) toward `b`, which is square to it. */
+const tipToward = (a: Vec3, b: Vec3, angle: number): Vec3 => unit3(mix3(along3([0, 0, 0], a, Math.cos(angle)), along3([0, 0, 0], b, Math.sin(angle)), 0.5));
+
+/**
+ * Standing tall (0), the right arm rises straight out in front with the thumb up, the hand turns
+ * palm down or up, and the left hand comes up to lie on the right hand (1); then the wrist bends
+ * this far (`bend`, 0 to 1) as the left hand presses it down and back toward the body. The left
+ * hand rises behind the right arm, on the far side of it from where the clip looks, and comes down
+ * on the hand from above once it has turned.
+ */
+const forearmStretchAt = (grip: ForearmGrip, t: number, bend: number): Pose3 => {
+  const reach = phase(t, 0, 0.45);
+  const turn = phase(t, 0.38, 0.75);
+  const lift = phase(t, 0.15, 0.75);
+  const hang = STANDING.rightArm!;
+  const leftHang = STANDING.leftArm!;
+  const body: Pose3 = {
+    ...STANDING,
+    spine: { twist: FOREARM_ARM.twist * reach },
+    // Turning the chest swings the arm with it, so the arm comes across by as much again.
+    rightArm: { flex: 90 * reach, abduct: mix(hang.abduct!, FOREARM_ARM.twist - FOREARM_ARM.inward, reach), elbow: mix(hang.elbow!, 0, reach) },
+    // The left arm comes up by its own angles first, the elbow bending as it rises, so the elbow
+    // already sticks out a settled way when the hand heads for the right hand. Pinned from
+    // hanging, the arm was nearly straight, and the elbow lurched back as the hand set off.
+    leftArm: {
+      flex: FOREARM_LIFT.flex * lift,
+      abduct: mix(leftHang.abduct!, FOREARM_LIFT.abduct, lift),
+      elbow: mix(leftHang.elbow!, FOREARM_LIFT.elbow, lift),
+      protract: FOREARM_ARM.protract * reach,
+    },
+  };
+  const skeleton = solvePose(body);
+  const [, elbow, wrist] = skeleton.rightArm;
+  const forearm = unit3(sub3(wrist, elbow));
+  // Square to the forearm, and up once it's held out: the back of a palm-down hand, the palm of a
+  // palm-up one. The fingers bend down away from it, and it turns forward with them.
+  const up = unit3(cross3([0, 0, 1], forearm));
+  const angle = (grip.bend * bend * Math.PI) / 180;
+  const fingers = tipToward(forearm, [-up[0], -up[1], -up[2]], angle);
+  const face = tipToward(up, forearm, angle);
+  const onHand = along3(along3(wrist, fingers, grip.along), face, HAND_ON_HAND);
+  const target: HandTarget = { at: along3(onHand, fingers, -SKELETON.hand / 2), toward: fingers, pole: [0, -1, -0.6] };
+  // The palm faces in, toward the thigh with the arm hanging and the thumb up with it held out,
+  // until the forearm turns it down or up.
+  const palm = turnToward([0, 0, -1], along3([0, 0, 0], face, grip.palm), turn);
+  return {
+    ...body,
+    pins: { rightHand: { at: wrist, toward: fingers, pole: [0, -1, 0], palm }, leftHand: handToward(skeleton, -1, target, phase(t, 0.45, 1)) },
+  };
+};
+
+const FOREARM_STEPS = { reach: 68, bend: 18 };
+
+const forearmStretch = (grip: ForearmGrip): Clip3D => ({
+  view: '3d',
+  // From the stretched arm's side, where the wrist bends in profile, and close in on the arms.
+  camera: { yaw: 10, pitch: 10, fit: 'head' },
+  highlight: ['rightArm'],
+  // The left arm is on the far side of the right one all the way, its hand rising behind the right
+  // arm and coming to rest against the right hand, the two side by side on screen.
+  behind: [['leftArm', 'rightArm']],
+  stillFrame: 1 + FOREARM_STEPS.reach + FOREARM_STEPS.bend,
+  keyframes: [
+    { ms: 0, pose: forearmStretchAt(grip, 0, 0) },
+    { ms: 500, pose: forearmStretchAt(grip, 0, 0) },
+    ...alongArc(3400, FOREARM_STEPS.reach, (t) => forearmStretchAt(grip, t, 0)),
+    ...alongArc(900, FOREARM_STEPS.bend, (b) => forearmStretchAt(grip, 1, b)),
+    { ms: 3000, pose: forearmStretchAt(grip, 1, 1) },
+    ...alongArc(700, FOREARM_STEPS.bend, (b) => forearmStretchAt(grip, 1, 1 - b)),
+    ...alongArc(2800, FOREARM_STEPS.reach, (t) => forearmStretchAt(grip, 1 - t, 0)),
+  ],
+});
+
+export const MANUAL_EXTENSOR_FOREARM_STRETCH_3D = forearmStretch(EXTENSOR_GRIP);
+export const MANUAL_FLEXOR_FOREARM_STRETCH_3D = forearmStretch(FLEXOR_GRIP);
+
 // --- From all fours, the left leg stretching straight back, and leaning onto the hands or forearms: for the pigeon stretch ---
 
 /** On all fours the hips are over the knees, the right one here on the floor. */

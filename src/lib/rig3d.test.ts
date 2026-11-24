@@ -54,6 +54,8 @@ import {
   CROSS_BODY_SHOULDER_STRETCH_3D,
   OVERHEAD_TRICEPS_STRETCH_3D,
   COW_FACE_ARMS_3D,
+  MANUAL_EXTENSOR_FOREARM_STRETCH_3D,
+  MANUAL_FLEXOR_FOREARM_STRETCH_3D,
   PIGEON_STRETCH_3D,
   HIP_CIRCLES_3D,
   SCAP_MOBILIZATION_3D,
@@ -83,6 +85,7 @@ import {
   phoneReading,
   stageClip,
   strapPoints,
+  thumbPoints,
   traceFigure,
   trailedPart,
   viewOf,
@@ -429,6 +432,29 @@ describe('project', () => {
   });
 });
 
+describe('thumbPoints', () => {
+  const wrist: Vec3 = [0, 100, 0];
+  const thumbOf = (fingers: Vec3, palm: Vec3, side = 1) => {
+    const arm = [wrist, wrist, wrist, [wrist[0] + fingers[0] * SKELETON.hand, wrist[1] + fingers[1] * SKELETON.hand, wrist[2] + fingers[2] * SKELETON.hand] as Vec3];
+    const [root, tip] = thumbPoints(arm, palm, side);
+    return unitBetween(root, tip);
+  };
+
+  it('points forward from a hand hanging palm in, and up from one held out ahead palm in', () => {
+    expect(thumbOf([0, -1, 0], [0, 0, -1])[0]).toBeGreaterThan(0.6);
+    expect(thumbOf([0, -1, 0], [0, 0, 1], -1)[0]).toBeGreaterThan(0.6);
+    expect(thumbOf([1, 0, 0], [0, 0, -1])[1]).toBeGreaterThan(0.6);
+  });
+
+  it('turns toward the body palm down and away from it palm up, leaning toward the fingers', () => {
+    const down = thumbOf([1, 0, 0], [0, -1, 0]);
+    const up = thumbOf([1, 0, 0], [0, 1, 0]);
+    expect(down[2]).toBeLessThan(-0.6);
+    expect(up[2]).toBeGreaterThan(0.6);
+    expect(up[0]).toBeGreaterThan(0.3);
+  });
+});
+
 describe('3D clips', () => {
   it('covers the clips that have moved over', () => {
     expect(clips.map(([id]) => id)).toEqual(expect.arrayContaining([
@@ -506,10 +532,17 @@ describe('3D clips', () => {
 
     it('draws as many parts as the figure component makes room for', () => {
       // `exercise-figure-3d.tsx` sets up one shape for each of the six parts of the body, and one more
-      // for each hand a clip draws on its own. A part beyond that would never be drawn.
+      // for each hand a clip draws on its own and each thumb. A part beyond that would never be drawn.
       const view = viewOf(clip.camera);
-      const expected = 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0);
-      for (let t = 0; t <= durationOf(clip); t += 100) expect(frameAt(clip, view, t).slots).toHaveLength(expected);
+      const pins = clip.keyframes[0].pose.pins;
+      const thumbs = (pins?.rightHand?.palm ? 1 : 0) + (pins?.leftHand?.palm ? 1 : 0);
+      const expected = 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) + thumbs;
+      for (let t = 0; t <= durationOf(clip); t += 100) {
+        const { slots } = frameAt(clip, view, t);
+        expect(slots).toHaveLength(expected);
+        // Only a hand with a thumb has fingers drawn on it.
+        if (!thumbs) for (const slot of slots) expect(slot.fingers).toBe('');
+      }
     });
 
     it('keeps every joint above the floor', () => {
@@ -2632,6 +2665,75 @@ describe('3D clips', () => {
       if (order.indexOf('leftArm') > order.indexOf('torso')) expect(order.indexOf('rightArm')).toBeLessThan(order.indexOf('leftArm'));
     }
     expect(orders.filter((order) => order.indexOf('leftArm') > order.indexOf('torso')).length).toBeGreaterThan(orders.length / 2);
+  });
+
+  it.each([
+    ['extensor', MANUAL_EXTENSOR_FOREARM_STRETCH_3D, 80],
+    ['flexor', MANUAL_FLEXOR_FOREARM_STRETCH_3D, 70],
+  ] as const)('holds the arm straight out in front while the other hand bends the wrist down, in the manual %s forearm stretch', (grip, clip, bend) => {
+    standsStill(clip);
+    const held = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const [shoulder, elbow, wrist, fingertips] = held.rightArm;
+    // Straight out in front at shoulder height.
+    expect(angleAt(shoulder, elbow, wrist)).toBeGreaterThan(178);
+    expect(Math.abs(wrist[1] - shoulder[1])).toBeLessThan(2);
+    expect(wrist[0] - shoulder[0]).toBeGreaterThan(140);
+    // The wrist bends down this far from the line of the forearm.
+    expect(180 - angleAt(elbow, wrist, fingertips)).toBeCloseTo(bend, 0);
+    expect(fingertips[1]).toBeLessThan(wrist[1] - 20);
+    // The other hand lies against the front of the bent hand, the back of it (extensor) or the
+    // palm (flexor), pointing the same way as the stretched hand's fingers.
+    const [, , leftWrist, leftFingertips] = held.leftArm;
+    const hand = midpoint(wrist, fingertips);
+    const otherHand = midpoint(leftWrist, leftFingertips);
+    // Only the thumb tells the two apart. The arm comes up level with the thumb at the ceiling, and
+    // then the hand turns: palm up, the thumb lies over the front of the hand toward the camera, all
+    // through the bend and the hold; palm down, the hand hides it. The other hand has none.
+    const thumbUp = samples(clip).map(solvePose).some((skeleton) => {
+      const [, , at] = skeleton.rightArm;
+      return Math.abs(at[1] - shoulder[1]) < 3 && thumbPoints(skeleton.rightArm, skeleton.rightPalm!, 1)[1][1] > at[1] + 15;
+    });
+    expect(thumbUp).toBe(true);
+    const view = viewOf(clip.camera);
+    const bent = clip.keyframes.slice(1, clip.stillFrame + 1).reduce((total, frame) => total + frame.ms, 0);
+    for (let t = bent - 900; t <= bent + 3000; t += 10) {
+      const thumb = frameAt(clip, view, t).slots.filter((slot) => slot.part === 'rightArm' && slot.hand).pop()!;
+      expect(thumb.d !== '').toBe(grip === 'flexor');
+    }
+    expect(held.leftPalm).toBeUndefined();
+    // The hand with the thumb has its fingers drawn too, three lines splitting it into four, which
+    // turn with it: spread across it with the back of the hand to the camera and the thumb up, and
+    // gone in the hold, where the hand is edge on and the fingers are one behind the other.
+    const fingersAt = (t: number) => frameAt(clip, view, t).slots.find((slot) => slot.part === 'rightArm' && !slot.hand)!.fingers;
+    const thumbUpAt = samples(clip).findIndex((pose) => {
+      const skeleton = solvePose(pose);
+      return Math.abs(skeleton.rightArm[2][1] - shoulder[1]) < 3 && thumbPoints(skeleton.rightArm, skeleton.rightPalm!, 1)[1][1] > skeleton.rightArm[2][1] + 15;
+    });
+    expect(fingersAt(thumbUpAt * 50).match(/M/g)).toHaveLength(3);
+    expect(fingersAt(bent)).toBe('');
+    // The left arm moves smoothly: no jolts, and never pulled straight reaching for a hand just out
+    // of reach. Pinned from hanging, its elbow lurched back as the hand set off; and holding the
+    // fingertips mid-bend, the arm hit its full length and let go again.
+    let last: Vec3 | undefined;
+    let lastStep: number | undefined;
+    for (let t = 0; t <= durationOf(clip); t += 10) {
+      const [leftShoulder, leftElbow, leftHand] = solvePose(poseAt3(clip, t)).leftArm;
+      if (t > 1000 && t < durationOf(clip) - 1000) expect(distance(leftShoulder, leftHand)).toBeLessThan(149.7);
+      if (last) {
+        const step = distance(last, leftElbow);
+        if (lastStep !== undefined) expect(Math.abs(step - lastStep)).toBeLessThan(0.5);
+        lastStep = step;
+      }
+      last = leftElbow;
+    }
+    expect(distance(hand, otherHand)).toBeLessThan(20);
+    expect(otherHand[0]).toBeGreaterThan(hand[0] + 12);
+    expect(angleAt(leftFingertips, leftWrist, [leftWrist[0] + fingertips[0] - wrist[0], leftWrist[1] + fingertips[1] - wrist[1], leftWrist[2] + fingertips[2] - wrist[2]])).toBeLessThan(10);
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    // The left arm is on the far side of the right one all the way, its hand rising behind it.
+    for (const order of drawOrders(clip).map((parts) => parts.split(' '))) {
+      expect(order.indexOf('leftArm')).toBeLessThan(order.indexOf('rightArm'));
+    }
   });
 
   it('stretches the back leg straight behind from all fours, then brings the front knee forward behind the wrist with the shin across, and folds forward onto the forearms, in the pigeon stretch', () => {

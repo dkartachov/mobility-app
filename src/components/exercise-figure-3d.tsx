@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedProps, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import { frameAt, stageClip, trailedPart, type Clip3D, type FigureFrame, type Part } from '@/lib/rig3d';
+import { figureSlotCount, frameAt, stageClip, trailedPart, type Clip3D, type FigureFrame, type Part } from '@/lib/rig3d';
 
 import { useClipTime } from './exercise-figure';
 
@@ -29,12 +29,8 @@ const COLORS = {
 
 /** How far the background shows around each part of the body, so limbs that cross stay apart. */
 const OUTLINE = 4.5;
-
-/**
- * One for each part of the body: the torso, the head and the four limbs. A clip adds one for each
- * hand it draws on its own, holding a limb (`holds`) or resting on the body (`handsOnBody`).
- */
-const BODY_SLOTS = 6;
+/** How thick the lines between a hand's fingers are. */
+const FINGER_LINE = 1.8;
 
 /**
  * The clip's phone, if it's on this slot's part right now: under the limb when it's on the far
@@ -76,7 +72,8 @@ function PhoneLayer({ frame, index, over }: { frame: SharedValue<FigureFrame>; i
  * Whichever part of the body is this far from the camera right now. The slots are drawn furthest
  * first, and the parts move between them as they pass in front of each other. Colors can't follow
  * them, so every slot has each color laid over the last: the far shade, the near shade let through
- * by how near the part is, and the accent, which is only drawn for a highlighted part. The clip's
+ * by how near the part is, and the accent, which is only drawn for a highlighted part. A hand with
+ * a thumb has the lines between its fingers stroked over it. The clip's
  * trail goes under whichever slot holds the part it traces, and its phone with the part it's on.
  */
 function Slot({
@@ -109,6 +106,7 @@ function Slot({
     const slot = frame.get().slots[index];
     return { d: slot.accent ? slot.d : '' };
   });
+  const fingers = useAnimatedProps(() => ({ d: frame.get().slots[index].fingers }));
 
   return (
     <>
@@ -118,6 +116,7 @@ function Slot({
       <AnimatedPath animatedProps={far} fill={COLORS.far} />
       <AnimatedPath animatedProps={near} fill={COLORS.near} />
       <AnimatedPath animatedProps={accent} fill={COLORS.accent} />
+      <AnimatedPath animatedProps={fingers} fill="none" stroke={COLORS.background} strokeWidth={FINGER_LINE} strokeLinecap="round" />
       {phone && <PhoneLayer frame={frame} index={index} over />}
     </>
   );
@@ -141,10 +140,8 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
   const time = useClipTime(clip, playing, paused);
   const stage = useMemo(() => stageClip(clip), [clip]);
   const view = stage.view;
-  const slots = useMemo(
-    () => Array.from({ length: BODY_SLOTS + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) }, (_, index) => index),
-    [clip]
-  );
+  // One for each part of the body, and each hand or thumb the clip draws on its own.
+  const slots = useMemo(() => Array.from({ length: figureSlotCount(clip) }, (_, index) => index), [clip]);
 
   const frame = useDerivedValue(() => frameAt(clip, view, time.get()));
   const shadow = useAnimatedProps(() => ({ d: frame.get().shadow }));
