@@ -1,4 +1,4 @@
-import { distance, SKELETON, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
+import { distance, SKELETON, solveJoint3, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -2080,43 +2080,25 @@ const puppyReach = (p: number): number => {
 const PUPPY_HANDS_START = ALL_FOURS.pins.rightHand.at[0];
 const PUPPY_HEAD = { start: solvePose(onAllFours(0, 0)).head[1], end: COBRA_HEAD_DOWN };
 
-/** How the body sinks over the walk: steadily, settling just as the last step lands. */
-const puppySink = (t: number) => smooth(t);
-/** How many steps each hand takes. A planted hand's elbow bends as the chest sinks toward it, until that hand steps on, so fewer, longer steps bend the arms more. */
-const PUPPY_STRIDES = 3;
-/** The walk: the right hand, then the left, in turn. */
-const PUPPY_STEPS = Array.from({ length: 2 * PUPPY_STRIDES }, (_, i) => ({
-  hand: i % 2 === 0 ? ('rightHand' as const) : ('leftHand' as const),
-  from: i / (2 * PUPPY_STRIDES),
-  to: (i + 1) / (2 * PUPPY_STRIDES),
-}));
-/** Where the hands end up: as far out as the arms reach when the right hand takes its last step. The left one lands beside it. */
-const PUPPY_HANDS_END = puppyReach(puppySink(PUPPY_STEPS[PUPPY_STEPS.length - 2].to));
-/** The shortest step a hand takes, so none is too small to read as more than a lift and drop. */
-const PUPPY_MIN_STEP = 16;
 /**
- * Where a step lands: as far out as the arm reaches by then, but leaving the steps still to come
- * room to be at least the shortest step each. The last one lands beside the other hand.
+ * Into the pose as one move, from 0 to 1: the chest sinks over most of it, the right hand reaching
+ * out in one step and landing partway, and the left one, which waits where it was, its arm bending
+ * as the chest comes forward over it, follows straight on to land beside it as the chest settles.
+ * Walked out in short steps, the hands shuffled. They land as far out as the arm reaches when the
+ * right one comes down: any further and it couldn't land until the chest was all the way down, the
+ * left arm folding right up under it while it waited, or both hands off the floor at once.
  */
-const puppyLanding = (step: number) => {
-  const last = PUPPY_STEPS.length - 2;
-  const k = Math.min(step, last);
-  return Math.min(puppyReach(puppySink(PUPPY_STEPS[k].to)), PUPPY_HANDS_END - (last - k) * PUPPY_MIN_STEP);
-};
+const PUPPY_MOVE = { bodyEnds: 0.85, rightLands: 0.52, leftFrom: 0.55 };
+/** Where the hands end up. */
+const PUPPY_HANDS_END = puppyReach(smooth(PUPPY_MOVE.rightLands / PUPPY_MOVE.bodyEnds));
 
-/** Where a hand is this far through the walk: planted, or lifting a little off the floor on its way to the next spot. */
-const puppyHand = (hand: 'rightHand' | 'leftHand', t: number): Vec3 => {
-  let x = PUPPY_HANDS_START;
-  let lift = 0;
-  PUPPY_STEPS.forEach((step, i) => {
-    if (step.hand !== hand || t <= step.from) return;
-    const s = smooth(Math.min(1, (t - step.from) / (step.to - step.from)));
-    const from = x;
-    x = mix(from, puppyLanding(i), s);
-    // A short step barely leaves the floor, so it reads as a step forward and not a hop.
-    lift = t < step.to ? Math.sin(Math.PI * s) * Math.min(10, (puppyLanding(i) - from) / 3) : 0;
-  });
-  return [x, WRIST_Y + lift, (hand === 'rightHand' ? 1 : -1) * SKELETON.shoulder];
+/**
+ * A hand `s` of the way through its one step out: up off the floor, forward through the air and
+ * straight down. Moving forward all the way to the floor, a hand slides in as it lands.
+ */
+const puppyHand = (side: 1 | -1, s: number): Vec3 => {
+  const x = mix(PUPPY_HANDS_START, PUPPY_HANDS_END, smooth(Math.min(1, Math.max(0, (s - 0.15) / 0.7))));
+  return [x, WRIST_Y + Math.sin(Math.PI * s) * 14, side * SKELETON.shoulder];
 };
 
 /**
@@ -2124,16 +2106,24 @@ const puppyHand = (hand: 'rightHand' | 'leftHand', t: number): Vec3 => {
  * the floor as the body settles.
  */
 const puppyAt = (t: number): Pose3 => {
-  const p = puppySink(t);
+  const p = smooth(Math.min(1, t / PUPPY_MOVE.bodyEnds));
   const body = puppyBody(p);
+  const shoulders = solvePose(body);
+  const hand = (side: 1 | -1): Vec3 => {
+    const s = side === 1 ? Math.min(1, t / PUPPY_MOVE.rightLands) : Math.max(0, (t - PUPPY_MOVE.leftFrom) / (1 - PUPPY_MOVE.leftFrom));
+    const at = puppyHand(side, s);
+    // Out of the arm's reach while the body is still coming forward, the hand in the air goes as far as it reaches.
+    const shoulder = side === 1 ? shoulders.rightArm[0] : shoulders.leftArm[0];
+    return distance(shoulder, at) > 0.999 * ARM_REACH ? toward(shoulder, at, 0.999 * ARM_REACH) : at;
+  };
   // Whatever bend the arms take goes back and out to the sides, as in a push-up.
   const pole = (side: 1 | -1): Vec3 => [-0.7, 0, side * 0.7];
   const posed: Pose3 = {
     ...body,
     pins: {
       ...ALL_FOURS.pins,
-      rightHand: { at: puppyHand('rightHand', t), toward: [1, 0, 0], pole: pole(1) },
-      leftHand: { at: puppyHand('leftHand', t), toward: [1, 0, 0], pole: pole(-1) },
+      rightHand: { at: hand(1), toward: [1, 0, 0], pole: pole(1) },
+      leftHand: { at: hand(-1), toward: [1, 0, 0], pole: pole(-1) },
     },
   };
   const target = mix(PUPPY_HEAD.start, PUPPY_HEAD.end, p);
@@ -2148,7 +2138,7 @@ const puppyAt = (t: number): Pose3 => {
 };
 const PUPPY_ALL_FOURS = puppyAt(0);
 const PUPPY = puppyAt(1);
-/** Enough frames for the lifted hands to arc and the planted ones to stay put, a whole number of them to each step so a step never shares one with the next. */
+/** Enough frames for the lifted hands to arc and land, not slide in. */
 const PUPPY_WALK_FRAMES = 84;
 const puppyWalk = (ms: number, at: (t: number) => Pose3): Keyframe3[] =>
   Array.from({ length: PUPPY_WALK_FRAMES }, (_, i) => ({ ms: ms / PUPPY_WALK_FRAMES, pose: at((i + 1) / PUPPY_WALK_FRAMES), ease: 'none' as const }));
@@ -2163,9 +2153,9 @@ export const PUPPY_POSE_3D: Clip3D = {
   keyframes: [
     { ms: 0, pose: PUPPY_ALL_FOURS },
     { ms: 500, pose: PUPPY_ALL_FOURS },
-    ...puppyWalk(4000, puppyAt),
+    ...puppyWalk(3200, puppyAt),
     { ms: 3500, pose: PUPPY },
-    ...puppyWalk(3600, (t) => puppyAt(1 - t)),
+    ...puppyWalk(2900, (t) => puppyAt(1 - t)),
   ],
 };
 
@@ -3689,7 +3679,7 @@ export const NECK_SIDE_STRETCH_3D: Clip3D = {
   holds: [{ hand: 'rightHand', limb: 'head' }],
   // The left arm hangs down the side of the body facing the camera, so it stays over the torso; as
   // its shoulder dropped, it went under it, the top of the arm vanishing into the shoulder.
-  over: ['leftArm'],
+  over: ['leftArm', 'leftLeg'],
   stillFrame: 1 + NECK_STEPS,
   keyframes: [
     { ms: 0, pose: NECK_UP },
@@ -3813,7 +3803,7 @@ export const CROSS_BODY_SHOULDER_STRETCH_3D: Clip3D = {
   behind: [['leftArm', 'rightArm']],
   holds: [{ hand: 'leftHand', limb: 'rightArm', forearm: true }],
   // Square to the camera, the arms are over the torso.
-  over: ['leftArm'],
+  over: ['leftArm', 'leftLeg'],
   stillFrame: 2 + CROSS_BODY_STEPS,
   keyframes: [
     { ms: 0, pose: CROSS_BODY_HELD },
@@ -4000,7 +3990,7 @@ export const COW_FACE_ARMS_3D: Clip3D = {
   // stays over the back as the hand goes behind it. By depth it started under the torso and came
   // over it as the hand went behind the hip, its shoulder end jumping from behind the shoulder
   // blade to in front of it.
-  over: ['leftArm'],
+  over: ['leftArm', 'leftLeg'],
   stillFrame: 1 + COW_FACE_STEPS,
   keyframes: [
     { ms: 0, pose: COW_FACE_DOWN },
@@ -4435,5 +4425,310 @@ export const THE_BREAKDANCER_3D: Clip3D = {
     { ms: 3500, pose: BREAKDANCER_FOLDED },
     ...alongArc(2200, BREAKDANCER_STEPS, (t) => breakdancerPose(1, 1 - t)),
     ...alongArc(1400, BREAKDANCER_STEPS, (t) => breakdancerPose(1 - t, 0)),
+  ],
+};
+
+// --- Scap mobilization: on all fours with the arms straight, the chest sinks between the shoulder blades, then pushes the floor away ---
+
+/**
+ * How far the shoulder blades slide round the ribs: back in toward the spine as the chest sinks,
+ * and forward as the hands push the floor away. The shoulders move about 11 either way.
+ */
+const SCAP = { sunk: -22, pushed: 22 };
+/** The upper back arches a little as the chest sinks and rounds as it pushes up. */
+const SCAP_SPINE = { sunk: -6, pushed: 10 };
+
+/**
+ * All fours as in cat cow, the hands and knees planted, the shoulder blades this far round from
+ * resting (-1 sunk, 1 pushed away). The arms stay straight, so the body tips over the knees until
+ * the shoulders are an arm's length from the hands: as the blades pull in, the chest sinks between
+ * them, and as they push out, it rises.
+ */
+const scapAt = (s: number): Pose3 => {
+  const protract = s < 0 ? -s * SCAP.sunk : s * SCAP.pushed;
+  const flex = s < 0 ? -s * SCAP_SPINE.sunk : s * SCAP_SPINE.pushed;
+  const arms = { rightArm: { protract }, leftArm: { protract } };
+  const body = (lean: number): Pose3 => ({ ...ALL_FOURS, ...arms, lean, spine: { flex }, neck: { flex: -flex / 2 } });
+  return body(straightArmLean(body, ALL_FOURS.pins.rightHand.at));
+};
+/**
+ * One rep, from pushed up (0) down to sunk (0.5) and back up (1), as a wave: the chest slows into
+ * each end and turns straight round, with no pause between one rep and the next.
+ */
+const scapRep = (u: number): Pose3 => scapAt(Math.cos(2 * Math.PI * u));
+const SCAP_REP_MS = 3200;
+const SCAP_STEPS = 32;
+
+export const SCAP_MOBILIZATION_3D: Clip3D = {
+  view: '3d',
+  // From the side, a little toward the head and above: the line of the back dips between the
+  // shoulders and rounds up over them. From the front the head hid the shoulders.
+  camera: { yaw: 12, pitch: 14 },
+  highlight: ['torso'],
+  // Sunk between the shoulder blades.
+  stillFrame: SCAP_STEPS / 2,
+  // Evenly spaced along the wave and not eased, so it flows through every frame and from the end of
+  // one rep straight into the next.
+  keyframes: [
+    { ms: 0, pose: scapRep(0) },
+    ...Array.from({ length: SCAP_STEPS }, (_, i): Keyframe3 => ({ ms: SCAP_REP_MS / SCAP_STEPS, pose: scapRep((i + 1) / SCAP_STEPS), ease: 'none' })),
+  ],
+};
+
+// --- Lizard pose: a low lunge with the front foot outside the hands and the back knee down, lowering onto the forearms as the hips sink ---
+
+/** The back knee rests on the floor here, its shin and the top of its foot flat behind, and the hips swing forward and down around it. */
+const LIZARD_BACK_KNEE: Vec3 = [-150, ANKLE_Y, -SKELETON.hip];
+/** How far the back thigh tips forward from upright: on the hands to start with, and sunk on the forearms. */
+const LIZARD_THIGH = { up: 42, sunk: 62 };
+/** The front foot is planted flat out to the side of the right hand, the toes turned out a little. */
+const LIZARD_FOOT: Vec3 = [22, ANKLE_Y, 68];
+const LIZARD_TOES_OUT = 12;
+/** The front knee points up and forward straight over the foot, not out to the side. */
+const LIZARD_KNEE: Vec3 = [0.57, 0.48, 0.42];
+/** Up on the hands they're planted inside the front foot, shoulder-width apart. */
+const LIZARD_HANDS_X = 40;
+/** The forearms come down angled in a little toward each other. */
+const LIZARD_FOREARMS_IN = 12;
+
+/**
+ * The body from up on straight-ish arms (0) to down where the shoulders are an upper arm above the
+ * floor (1): the back thigh tips forward around the planted back knee, so the hips sink toward the
+ * floor and forward, and the body tips over. The front knee points straight over the toes, opening
+ * the groin; the back hip opens at the front. No hands: they're placed on it.
+ */
+const lizardBody = (t: number): Pose3 => {
+  const thigh = radians(mix(LIZARD_THIGH.up, LIZARD_THIGH.sunk, t));
+  const pelvis: Vec3 = [LIZARD_BACK_KNEE[0] + SKELETON.thigh * Math.sin(thigh), ANKLE_Y + SKELETON.thigh * Math.cos(thigh), 0];
+  const toesOut = radians(LIZARD_TOES_OUT);
+  const legs: NonNullable<Pose3['pins']> = {
+    rightFoot: { at: LIZARD_FOOT, toward: [Math.cos(toesOut), 0, Math.sin(toesOut)], pole: LIZARD_KNEE },
+    leftFoot: { at: [LIZARD_BACK_KNEE[0] - SKELETON.shin, ANKLE_Y, LIZARD_BACK_KNEE[2]], toward: [-1, 0, 0], pole: [1, -1, 0] },
+  };
+  const body = (lean: number): Pose3 => ({ pelvis, lean, neck: { flex: -0.4 * lean }, pins: legs });
+  // Up on the hands the arms are a little bent; down, the shoulders are an upper arm above the floor.
+  const upLean = leanWhere((l) => distance(solvePose(body(l)).rightArm[0], lizardPlanted(1)) - 0.99 * ARM_REACH, -20, 100);
+  const downLean = leanWhere((l) => solvePose(body(l)).rightArm[0][1] - (SKELETON.upperArm + ELBOW_Y), 20, 110);
+  return body(mix(upLean, downLean, t));
+};
+/** Where the hands are planted up on them, inside the front foot, shoulder-width apart. */
+const lizardPlanted = (side: 1 | -1): Vec3 => [LIZARD_HANDS_X, WRIST_Y, side * SKELETON.shoulder];
+/** Each forearm flat on the floor in front of its shoulder, as it is once the body is down. */
+const lizardForearm = (skeleton: Skeleton, side: 1 | -1): Pin => {
+  const shoulder = shoulderOf(skeleton, side);
+  return forearmDown(shoulder, [shoulder[0] + 6, ELBOW_Y, side * SKELETON.shoulder], side * LIZARD_FOREARMS_IN);
+};
+/** Where each wrist ends up, with the forearm flat on the floor. */
+const LIZARD_WRISTS = (() => {
+  const skeleton = solvePose(lizardBody(1));
+  return { right: lizardForearm(skeleton, 1).at, left: lizardForearm(skeleton, -1).at };
+})();
+
+/**
+ * A hand `s` of the way through its move from where it was planted to where its forearm lies: up
+ * off the floor, forward through the air, and straight down, then the elbow coming down behind
+ * it. Moving forward all the way to the floor, the hand slid in as it landed.
+ */
+const lizardHand = (skeleton: Skeleton, side: 1 | -1, s: number, lands: number): Pin => {
+  const shoulder = shoulderOf(skeleton, side);
+  const end = side === 1 ? LIZARD_WRISTS.right : LIZARD_WRISTS.left;
+  const travel = Math.min(1, s / lands);
+  const along = mix3(lizardPlanted(side), end, phase(travel, 0.15, 0.85));
+  const at: Vec3 = [along[0], along[1] + Math.sin(Math.PI * travel) * 14, along[2]];
+  const onHand: Pin = { at, toward: [1, 0, 0], pole: [-1, 0, side * 0.4] };
+  const settle = phase(s, lands, 1);
+  if (settle === 0) return { ...onHand, at: withinReach(shoulder, at, 0.999 * ARM_REACH) };
+  // The elbow travels from where it is, off the hand, to its place on the floor behind it. Turning
+  // the way it points instead, the folded arm's elbow swung across in a single frame as it set off.
+  const forearm = lizardForearm(skeleton, side);
+  const from = solveJoint3(shoulder, at, SKELETON.upperArm, SKELETON.forearm, onHand.pole!);
+  const to = solveJoint3(shoulder, at, SKELETON.upperArm, SKELETON.forearm, forearm.pole!);
+  return { ...pinVia(shoulder, mix3(from, to, settle), at), toward: mix3(onHand.toward!, forearm.toward!, settle) };
+};
+/**
+ * `t` of the way down, and the left hand `left` of the way to its place. The right hand reaches out
+ * the whole time the body is going down, landing as it gets there, and its elbow settles behind it;
+ * the left one waits where it was planted, its arm bending as the body comes down over it, and
+ * only then follows. As one quick step each with both hands waiting till the body was nearly down,
+ * the arms flicked out.
+ */
+const lizardAt = (t: number, left: number): Pose3 => {
+  const pose = lizardBody(t);
+  const skeleton = solvePose(pose);
+  return { ...pose, pins: { ...pose.pins, rightHand: lizardHand(skeleton, 1, t, LIZARD_LANDS.right), leftHand: lizardHand(skeleton, -1, left, LIZARD_LANDS.left) } };
+};
+/** How far through its move each hand touches down, before its elbow comes down behind it. */
+const LIZARD_LANDS = { right: 0.8, left: 0.8 };
+const LIZARD_UP = lizardAt(0, 0);
+const LIZARD_DOWN = lizardAt(1, 1);
+/**
+ * Down onto the forearms as one move, from 0 to 1: the body goes down over the first part of it,
+ * the right hand reaching out with it, and the left hand sets off as the body settles the last of
+ * the way and the right elbow comes down. Done one after the other, the body stopped and the left
+ * hand took too long to follow.
+ */
+const LIZARD_MOVE = { bodyEnds: 0.62, leftFrom: 0.5 };
+const lizardMove = (u: number): Pose3 => lizardAt(phase(u, 0, LIZARD_MOVE.bodyEnds), Math.max(0, (u - LIZARD_MOVE.leftFrom) / (1 - LIZARD_MOVE.leftFrom)));
+/** Fine enough that a hand's step is drawn as an arc that lands, not a line that slides in. */
+const LIZARD_STEPS = 80;
+/** The move's frames evenly along it and not eased again: the body and the hands ease themselves. */
+const lizardFrames = (ms: number, at: (u: number) => Pose3): Keyframe3[] =>
+  Array.from({ length: LIZARD_STEPS }, (_, i) => ({ ms: ms / LIZARD_STEPS, pose: at((i + 1) / LIZARD_STEPS), ease: 'none' as const }));
+
+export const LIZARD_POSE_3D: Clip3D = {
+  view: '3d',
+  // From the front leg's side, a little in front and just above: the front knee bends straight over
+  // the foot, the hips sink toward the floor and the forearms come down inside the front leg. From in
+  // front the knee pointed at the camera and the leg looked straight; turned further toward the
+  // front, the front leg and the right arm swapped as the body came down.
+  camera: { yaw: 10, pitch: 20 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // Down on the forearms.
+  stillFrame: 1 + LIZARD_STEPS,
+  keyframes: [
+    { ms: 0, pose: LIZARD_UP },
+    { ms: 500, pose: LIZARD_UP },
+    ...lizardFrames(4000, lizardMove),
+    { ms: 3500, pose: LIZARD_DOWN },
+    // Back up the same way: the left hand first, then the right one with the body.
+    ...lizardFrames(3600, (u) => lizardMove(1 - u)),
+  ],
+};
+
+// --- Figure four stretch: lying on the back with the knees bent, one ankle crosses over the other knee, and the hands pull the bottom thigh in ---
+
+const FOUR_HIP = (side: 1 | -1): Vec3 => [LYING_ON_BACK.pelvis[0], LYING_ON_BACK.pelvis[1], side * SKELETON.hip];
+/**
+ * The bottom (left) thigh's angle up from the floor toward the head, and its knee's bend: planted
+ * as in floor angels to start with, lifted off the floor with the knee at 90° for the hands to
+ * take hold, and pulled in toward the chest.
+ */
+const FOUR_PLANTED = (Math.atan2(ANGEL_KNEE.y - LYING_ON_BACK.pelvis[1], ANGEL_KNEE.x) * 180) / Math.PI;
+const FOUR_THIGH = { lifted: 85, pulled: 124 };
+/** The bottom knee is at 90° when the hands take hold, and bends further as the thigh is pulled in. */
+const FOUR_KNEE = { lifted: 90, pulled: 45 };
+/**
+ * The hands clasp behind the bottom thigh this far along it from the hip, right by the knee, the
+ * right hand round the right leg and the left round the outside. They reach it once the thigh is
+ * lifted.
+ */
+const FOUR_GRIP_ALONG = 0.86;
+/** The top (right) ankle rests on the front of the bottom thigh this far back from the knee, just past it to the left. */
+const FOUR_ANKLE_BACK = 14;
+const FOUR_ANKLE_PAST = 10;
+/**
+ * Resting, the near (right) hand lies on the belly and the far one on the floor beside the hip: the
+ * far arm goes round behind the left leg to the clasp, so it stays behind the body and the leg.
+ */
+const FOUR_REST = (side: 1 | -1): Pin =>
+  side === 1 ? { at: [-25, 52, 16], toward: [0.3, 0, -1], pole: [-0.2, -0.6, 1] } : { at: [20, ARM_REST_Y, -46], toward: [1, 0, 0], pole: [0.2, -0.6, -1] };
+
+/** The bottom leg with its thigh this far up from the floor, and `fold` (0 to 1) of the way into the knee's extra bend as it's pulled in. */
+const fourBottomLeg = (thighDegrees: number, fold = 0) => {
+  const hip = FOUR_HIP(-1);
+  const thigh = radians(thighDegrees);
+  const along: Vec3 = [Math.cos(thigh), Math.sin(thigh), 0];
+  const knee = along3(hip, along, SKELETON.thigh);
+  // The knee opens from its planted bend to 90° as the foot comes off the floor, then bends further
+  // as the thigh is pulled in.
+  const plantedShin = Math.atan2(ANKLE_Y - ANGEL_KNEE.y, ANGEL_ANKLE_X - ANGEL_KNEE.x);
+  const lift = Math.min(1, Math.max(0, (thighDegrees - FOUR_PLANTED) / (FOUR_THIGH.lifted - FOUR_PLANTED)));
+  const kneeAngle = radians(mix(FOUR_KNEE.lifted, FOUR_KNEE.pulled, smooth(fold)));
+  const shinAngle = mix(plantedShin - radians(FOUR_PLANTED), kneeAngle - Math.PI, smooth(lift)) + thigh;
+  const ankle = along3(knee, [Math.cos(shinAngle), Math.sin(shinAngle), 0], 0.999 * SKELETON.shin);
+  // The front of the thigh, away from the back of it where the hands hold.
+  const front: Vec3 = [-Math.sin(thigh), Math.cos(thigh), 0];
+  // The foot keeps its angle to the shin: flat on the floor planted, and turning up with the shin as it lifts.
+  const foot = shinAngle - plantedShin;
+  return { hip, knee, ankle, along, front, pin: { ...pinVia(hip, knee, ankle), toward: [Math.cos(foot), Math.sin(foot), 0] } as Pin };
+};
+
+/**
+ * The right ankle resting across the left thigh just below the knee all the way through, its knee
+ * open to the side. `reach` takes the hands from the floor to clasped behind the left thigh;
+ * `pull` the left thigh from planted (0) to lifted (1) to pulled in (2), carrying the right leg with it.
+ */
+const figureFourAt = (reach: number, pull: number): Pose3 => {
+  // The thigh comes in at one steady rate the whole way; the knee opens to 90° until the hands can
+  // take hold, then bends on. Split into a lift and a pull, the thigh braked hard between them.
+  const thigh = mix(FOUR_PLANTED, FOUR_THIGH.pulled, pull / 2);
+  const bottom = fourBottomLeg(thigh, Math.max(0, (thigh - FOUR_THIGH.lifted) / (FOUR_THIGH.pulled - FOUR_THIGH.lifted)));
+  // Resting on the front of the left thigh, just below the knee, past it to the left.
+  const ankle = along3(along3(along3(bottom.knee, bottom.along, -FOUR_ANKLE_BACK), bottom.front, 13), [0, 0, -1], FOUR_ANKLE_PAST);
+  const rightFoot: Pin = { at: ankle, toward: unitOf([0.2, 0.35, -1]), pole: [0.25, 0.55, 1] };
+  const pose: Pose3 = { ...LYING_ON_BACK, pins: { rightFoot, leftFoot: bottom.pin } };
+  const skeleton = solvePose(pose);
+  const grip = (side: 1 | -1): Pin => ({
+    at: along3(along3(along3(bottom.hip, bottom.along, FOUR_GRIP_ALONG * SKELETON.thigh), bottom.front, -13), [0, 0, 1], side * 11),
+    toward: [0, 0, -side],
+    pole: [0, 0.2, side],
+  });
+  const hand = (side: 1 | -1): Pin => {
+    const r = smooth(reach);
+    const [from, to] = [FOUR_REST(side), grip(side)];
+    // On one smooth curve: the right hand comes up over the belly and round the right leg, rather
+    // than through the right thigh; the left one comes up off the floor round the outside of the left
+    // thigh.
+    const via = FOUR_VIA[side === 1 ? 'right' : 'left'];
+    const at = mix3(mix3(from.at, via, r), mix3(via, to.at, r), r);
+    const pin = { ...mixPin(from, to, r), at };
+    return { ...pin, at: withinReach(shoulderOf(skeleton, side), pin.at, 0.999 * ARM_REACH) };
+  };
+  return { ...pose, pins: { ...pose.pins, rightHand: hand(1), leftHand: hand(-1) } };
+};
+/**
+ * The hands set off this far into the move and take hold this far into it, once the thigh has come
+ * near enough to reach: setting off with the thigh, they ran out of reach partway and stalled.
+ */
+/** The hands' paths bend toward these points on the way from resting to the clasp. */
+const FOUR_VIA: Record<'right' | 'left', Vec3> = { right: [-15, 85, 2], left: [-10, 90, -60] };
+const FOUR_REACH = { from: 0.3, to: 0.88 };
+/**
+ * From crossed (0) to pulled in (1) as one move: the left foot comes off the floor and the thigh
+ * comes in all the way without stopping, the hands reaching for it on the way. As two moves, lifting
+ * and then pulling, everything stopped dead between them.
+ */
+const figureFourMove = (u: number): Pose3 => figureFourAt(Math.min(1, Math.max(0, (u - FOUR_REACH.from) / (FOUR_REACH.to - FOUR_REACH.from))), 2 * u);
+const FOUR_CROSSED = figureFourMove(0);
+const FOUR_PULLED = figureFourMove(1);
+const FOUR_STEPS = 24;
+
+export const FIGURE_FOUR_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From behind the head on the right side, well above: the right leg makes the four, its shin
+  // lying across the left thigh with the knee open toward the camera, and the left thigh pulls in
+  // over the belly. From the feet end the hands were hidden behind the thigh and the figure was
+  // small; from the right side the open knee pointed at the camera.
+  camera: { yaw: -30, pitch: 50 },
+  highlight: ['rightLeg'],
+  // The left knee is up above the belly from the start, nearer the camera than the body; by depth
+  // the thigh went under the torso and over it again as it was pulled in.
+  over: ['leftLeg'],
+  behind: [
+    // The right arm reaches in between the legs, under the right shin lying across, and the hands
+    // clasp under the back of the left thigh: by depth the arm came over each leg for a few frames
+    // on the way.
+    ['rightArm', 'rightLeg'],
+    ['rightArm', 'leftLeg'],
+    // The face is turned up to the camera and the chin covers the neck; by depth the neck showed
+    // through the head.
+    ['torso', 'head'],
+    // The far arm stays behind the body and behind the left leg it reaches round.
+    ['leftArm', 'torso'],
+    ['leftArm', 'leftLeg'],
+  ],
+  // The near forearm wraps round the right leg to the hands clasped behind the left thigh, its upper
+  // arm under the shin and the forearm over it, and over the belly the hand rests on to start with.
+  // Drawn whole, the arm went under the legs and the hand was lost. The far arm stays behind
+  // everything: it goes round behind the left leg.
+  holds: [{ hand: 'rightHand', limb: 'rightLeg', forearm: true }],
+  // Pulled in.
+  stillFrame: 1 + FOUR_STEPS,
+  keyframes: [
+    { ms: 0, pose: FOUR_CROSSED },
+    { ms: 600, pose: FOUR_CROSSED },
+    ...alongArc(3000, FOUR_STEPS, figureFourMove),
+    { ms: 3500, pose: FOUR_PULLED },
+    ...alongArc(2600, FOUR_STEPS, (t) => figureFourMove(1 - t)),
   ],
 };

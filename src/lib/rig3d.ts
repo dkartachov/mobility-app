@@ -56,6 +56,13 @@ export type ArmPose = {
    * drops as a hand reaches for the floor. It moves a pinned arm's shoulder too.
    */
   shrug?: number;
+  /**
+   * Sliding the shoulder blade forward round the ribs, as an angle at the collarbone, which carries
+   * the shoulder toward the chest's front; negative pulls it back toward the spine. On all fours,
+   * with the hands planted, pushing the floor away lifts the chest between the shoulders and
+   * letting it sink drops it (scap mobilization). It moves a pinned arm's shoulder too.
+   */
+  protract?: number;
 };
 
 /** A leg standing straight with the foot pointing ahead is all zeros. */
@@ -424,6 +431,7 @@ function lerpArm(a: ArmPose | undefined, b: ArmPose | undefined, t: number): Arm
     rotate: lerp(a?.rotate ?? 0, b?.rotate ?? 0, t),
     elbow: lerp(a?.elbow ?? 0, b?.elbow ?? 0, t),
     shrug: lerp(a?.shrug ?? 0, b?.shrug ?? 0, t),
+    protract: lerp(a?.protract ?? 0, b?.protract ?? 0, t),
   };
 }
 
@@ -557,8 +565,10 @@ export function solvePose(pose: Pose3): Skeleton {
   const skull = mul(mul(mul(chest, rotY(pose.neck?.twist ?? 0)), rotZ(-(pose.neck?.flex ?? 0))), rotX(pose.neck?.side ?? 0));
   const head = add(neckBase, turned(skull, [0, SKELETON.neck, 0]));
 
-  // The collarbone swings up from the top of the spine as the shoulder shrugs, and down as it drops.
-  const collarbone = (arm: ArmPose | undefined, side: number) => turned(mul(chest, rotX(-side * (arm?.shrug ?? 0))), [0, 0, side * SKELETON.shoulder]);
+  // The collarbone swings up from the top of the spine as the shoulder shrugs, and down as it drops,
+  // and forward as the shoulder blade slides round the ribs, and back as it pulls in to the spine.
+  const collarbone = (arm: ArmPose | undefined, side: number) =>
+    turned(mul(mul(chest, rotX(-side * (arm?.shrug ?? 0))), rotY(side * (arm?.protract ?? 0))), [0, 0, side * SKELETON.shoulder]);
   const rightShoulder = add(neckBase, collarbone(pose.rightArm, 1));
   const leftShoulder = add(neckBase, collarbone(pose.leftArm, -1));
   const rightHip = add(pose.pelvis, turned(pelvis, [0, 0, SKELETON.hip]));
