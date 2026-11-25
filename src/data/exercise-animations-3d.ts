@@ -5147,3 +5147,152 @@ export const HALF_SPINAL_TWIST_3D: Clip3D = {
     { ms: 800, pose: TWIST_AHEAD },
   ],
 };
+
+// --- Half-twisted lizard: from the lizard, the right hand reaches up over the front knee and back as the chest turns open, the back shin comes up into it, and the hand draws the foot on in ---
+
+/**
+ * How far the back shin turns up from flat on the floor behind the knee, around the knee: where it
+ * comes up into the waiting hand, a little past upright, and where the hand draws it on to, 70° up
+ * from the floor in front of the knee, so the knee is bent to an acute angle with the calf still
+ * well off the hamstring. The hand can't reach the foot any lower with the left one on the floor.
+ */
+const TWIST_LIZARD_SHIN = { meet: 95, held: 110 };
+/**
+ * Turned open: the hips sink as far as in the lizard on the forearms, and the chest turns to the
+ * right, toward the front leg, so the right hand reaches back with the arm long and the left hand
+ * still on the floor. Drawing the foot in, the body leans on forward a little and bends toward it.
+ * The head turns back the other way, so it keeps looking down past the front hand: turned with the
+ * chest, the face came round to the camera and the nose came and went.
+ */
+const TWIST_LIZARD = { sink: 1, twist: -70, neck: 45, lean: { meet: 40, held: 45 }, side: { meet: 0, held: -10 } };
+/** How far along the top of the foot, from the ankle to the toes, the hand holds it. */
+const TWIST_LIZARD_GRIP = 0.45;
+/**
+ * The ways from the shoulder the right arm points on its way around: forward and up over the front
+ * knee, then up and back over the head, before it comes down behind to the foot. Out to the side,
+ * the arm pointed at the camera halfway and looked like a stub.
+ */
+const TWIST_LIZARD_AROUND: [Vec3, Vec3] = [
+  [0.6, 0.8, 0],
+  [-0.4, 0.9, 0],
+];
+/** How long the arm is on the way: all but straight, swinging about the shoulder. */
+const TWIST_LIZARD_ARM = 0.995 * ARM_REACH;
+/**
+ * The way the right elbow points once the hand lifts: out to the right, across the way the arm
+ * swings, so the elbow never has to swing round. Pointing down and back, the bent arm folded
+ * forward as it went overhead.
+ */
+const TWIST_LIZARD_ELBOW: Vec3 = [0, 0.2, 1];
+/**
+ * Where each part of the move starts and ends, from 0 to 1: the hand reaching back and the shin
+ * coming up together, meeting, then the hand drawing the foot in.
+ */
+const TWIST_LIZARD_PHASES = { reach: [0, 0.75], lift: [0, 0.75], pull: [0.75, 1] } as const;
+
+const TWIST_LIZARD_KNEE = solvePose(LIZARD_UP).leftLeg[1];
+
+/** The back foot with its shin turned up this far (degrees) around the knee, which stays on the floor, the foot pointing on from the shin. */
+const twistLizardFoot = (shin: number, body: Pose3): Pin => {
+  const angle = radians(shin);
+  const along: Vec3 = [-Math.cos(angle), Math.sin(angle), 0];
+  const ankle: Vec3 = [TWIST_LIZARD_KNEE[0] + SKELETON.shin * along[0], TWIST_LIZARD_KNEE[1] + SKELETON.shin * along[1], TWIST_LIZARD_KNEE[2]];
+  return { ...pinVia(solvePose(body).leftLeg[0], TWIST_LIZARD_KNEE, ankle), toward: along };
+};
+
+/** Where the right hand holds the back foot: on top of it, partway to the toes. */
+const twistLizardGrip = (foot: Pin): Vec3 => along3(foot.at, foot.toward!, TWIST_LIZARD_GRIP * SKELETON.foot);
+
+/** The body `reach` of the way turned open, and `pull` of the way leaned on into drawing the foot in. */
+const twistLizardBody = (reach: number, pull: number): Pose3 => {
+  const lean = mix(mix(LIZARD_UP.lean!, TWIST_LIZARD.lean.meet, reach), TWIST_LIZARD.lean.held, pull);
+  return {
+    ...LIZARD_UP,
+    pelvis: lizardBody(TWIST_LIZARD.sink * reach).pelvis,
+    lean,
+    spine: { twist: TWIST_LIZARD.twist * reach, side: mix(TWIST_LIZARD.side.meet * reach, TWIST_LIZARD.side.held, pull) },
+    neck: { flex: -0.4 * lean, twist: TWIST_LIZARD.neck * reach },
+  };
+};
+/** The way the back of the right hand faces holding the foot. */
+const TWIST_LIZARD_TOES: Vec3 = [-0.3, -0.3, -1];
+/**
+ * The right hand `reach` of the way from the floor to `grip`, swinging up over the front knee,
+ * overhead and back, seen from the shoulder: the way it points turns smoothly, and the arm is long
+ * the whole way between the ends, the elbow pointing out to the right.
+ */
+const twistLizardHand = (shoulder: Vec3, grip: Vec3, reach: number): Pin => {
+  const planted = LIZARD_UP.pins!.rightHand!;
+  const from = toward([0, 0, 0], [planted.at[0] - shoulder[0], planted.at[1] - shoulder[1], planted.at[2] - shoulder[2]], 1);
+  const to = toward([0, 0, 0], [grip[0] - shoulder[0], grip[1] - shoulder[1], grip[2] - shoulder[2]], 1);
+  const [w1, w2] = TWIST_LIZARD_AROUND;
+  const a1 = turnToward(from, w1, reach), a2 = turnToward(w1, w2, reach), a3 = turnToward(w2, to, reach);
+  const way = turnToward(turnToward(a1, a2, reach), turnToward(a2, a3, reach), reach);
+  const ends = mix(distance(shoulder, planted.at), Math.min(distance(shoulder, grip), ARM_REACH), reach);
+  const long = Math.min(ends, TWIST_LIZARD_ARM) + (ends > TWIST_LIZARD_ARM ? 0 : (TWIST_LIZARD_ARM - ends) * Math.sin(Math.PI * reach));
+  return { at: along3(shoulder, way, Math.min(long, ARM_REACH)), pole: turnToward(planted.pole!, TWIST_LIZARD_ELBOW, phase(reach, 0, 0.1)), toward: turnToward(planted.toward!, TWIST_LIZARD_TOES, reach) };
+};
+
+/**
+ * The half-twisted lizard `s` of the way along. The hips sink, the chest turns open and the right
+ * hand lets go of the floor and swings up over the front knee, overhead and back, as the back shin
+ * comes up off the floor, the two meeting where the hand takes the foot. Then the hand draws the
+ * foot on in toward the glute as the body leans into it. The left hand stays planted.
+ */
+const halfTwistedLizard = (s: number): Pose3 => {
+  const reach = phase(s, ...TWIST_LIZARD_PHASES.reach);
+  const lift = phase(s, ...TWIST_LIZARD_PHASES.lift);
+  const pull = phase(s, ...TWIST_LIZARD_PHASES.pull);
+  const body = twistLizardBody(reach, pull);
+  const foot = twistLizardFoot(TWIST_LIZARD_SHIN.meet * lift + (TWIST_LIZARD_SHIN.held - TWIST_LIZARD_SHIN.meet) * pull, body);
+  const pins = { ...LIZARD_UP.pins, leftFoot: foot };
+  const shoulder = solvePose({ ...body, pins }).rightArm[0];
+  // Holding the foot, the hand goes where it goes.
+  if (lift === 1) return { ...body, pins: { ...pins, rightHand: { at: withinReach(shoulder, twistLizardGrip(foot)), pole: TWIST_LIZARD_ELBOW, toward: TWIST_LIZARD_TOES } } };
+  return { ...body, pins: { ...pins, rightHand: twistLizardHand(shoulder, twistLizardGrip(twistLizardFoot(TWIST_LIZARD_SHIN.meet, body)), reach) } };
+};
+/**
+ * Coming out, `t` of the way, all at once: the hand lets go of the foot and swings back the way it
+ * came, overhead and over the front knee to the floor, as the shin goes back down and the chest
+ * turns back. The hand leaves upward and the foot goes down, so they part at once.
+ */
+const releaseTwistedLizard = (t: number): Pose3 => {
+  const body = twistLizardBody(1 - t, 1 - t);
+  const pins = { ...LIZARD_UP.pins, leftFoot: twistLizardFoot(TWIST_LIZARD_SHIN.held * (1 - t), body) };
+  const shoulder = solvePose({ ...body, pins }).rightArm[0];
+  return { ...body, pins: { ...pins, rightHand: twistLizardHand(shoulder, twistLizardGrip(twistLizardFoot(TWIST_LIZARD_SHIN.held, body)), 1 - t) } };
+};
+const TWIST_LIZARD_HELD = halfTwistedLizard(1);
+/** The foot and the hand travel on curves, so it takes this many keyframes for them to follow. */
+const TWIST_LIZARD_STEPS = 72;
+
+export const HALF_TWISTED_LIZARD_3D: Clip3D = {
+  view: '3d',
+  // As for the lizard: from the front leg's side, a little in front and just above. The chest turns
+  // open toward the camera, and the right arm swings up over the front knee and back as the back shin
+  // comes up to meet its hand.
+  camera: LIZARD_POSE_3D.camera,
+  highlight: ['leftLeg', 'torso'],
+  behind: [
+    // The right arm is inside the front knee the whole way, behind it from here; by depth the two
+    // swapped as the hand lifted off the floor.
+    ['rightArm', 'rightLeg'],
+    ['torso', 'rightArm'],
+    // Overhead the arm is in front of the head; reaching back it's only just behind it, and clear of
+    // it on screen, and by depth the two swapped as it went.
+    ['head', 'rightArm'],
+    // The left arm, planted well in front, and the back leg are far apart on screen; by depth they
+    // swapped as the body turned.
+    ['leftLeg', 'leftArm'],
+  ],
+  // Holding the foot, the chest turned open.
+  stillFrame: 1 + TWIST_LIZARD_STEPS,
+  keyframes: [
+    { ms: 0, pose: LIZARD_UP },
+    { ms: 600, pose: LIZARD_UP },
+    ...alongArc(3000, TWIST_LIZARD_STEPS, halfTwistedLizard),
+    { ms: 3500, pose: TWIST_LIZARD_HELD },
+    // Out of it with the arm and the leg together.
+    ...alongArc(2000, TWIST_LIZARD_STEPS, releaseTwistedLizard),
+  ],
+};

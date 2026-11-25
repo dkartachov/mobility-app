@@ -54,6 +54,7 @@ import {
   SEATED_SHOULDER_EXTENSION_3D,
   HALF_KNEELING_FROG_STRETCH_3D,
   HALF_SPINAL_TWIST_3D,
+  HALF_TWISTED_LIZARD_3D,
   NECK_SIDE_STRETCH_3D,
   CROSS_BODY_SHOULDER_STRETCH_3D,
   OVERHEAD_TRICEPS_STRETCH_3D,
@@ -530,6 +531,7 @@ describe('3D clips', () => {
       'finger-tendon-glides',
       'cuban-rotation',
       'half-spinal-twist',
+      'half-twisted-lizard',
       'warmup-marching',
     ]));
   });
@@ -1332,6 +1334,86 @@ describe('3D clips', () => {
     // Nothing ever changes places: the propping arm stays behind the body. From well above, the face
     // never shows a nose.
     expect(new Set(drawOrders(clip))).toEqual(new Set(['rightArm torso leftLeg rightLeg leftArm head']));
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBe(2);
+  });
+
+  it('swings the right arm up over the front knee and back as the chest turns open, then brings the back shin up into the hand, which draws the foot in, and lets go with the arm and the leg coming down together, in the half-twisted lizard', () => {
+    const clip = HALF_TWISTED_LIZARD_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    /** The closest two chains of bones come in the room. */
+    const between = (a: readonly Vec3[], b: readonly Vec3[]) => {
+      let gap = Infinity;
+      for (let i = 1; i < a.length; i++) {
+        for (let j = 1; j < b.length; j++) {
+          for (let s = 0; s <= 12; s++) {
+            for (let u = 0; u <= 12; u++) {
+              const p = a[i - 1].map((v, k) => v + ((a[i][k] - v) * s) / 12);
+              const q = b[j - 1].map((v, k) => v + ((b[j][k] - v) * u) / 12);
+              gap = Math.min(gap, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
+            }
+          }
+        }
+      }
+      return gap;
+    };
+    // To start, the lizard: both hands planted inside the front foot, the back shin flat on the floor.
+    expect(start.rightArm[2][1]).toBeCloseTo(11, 0);
+    expect(start.leftLeg[2][1]).toBeCloseTo(13, 0);
+    /** How far the back shin is turned up around the knee from flat on the floor behind it. */
+    const shin = ({ leftLeg }: Skeleton) => angleAt([leftLeg[1][0] - 1, leftLeg[1][1], leftLeg[1][2]], leftLeg[1], leftLeg[2]);
+    const holdFrom = clip.keyframes.slice(1, clip.stillFrame + 1).reduce((total, { ms }) => total + ms, 0);
+    const holdTo = holdFrom + clip.keyframes[clip.stillFrame + 1].ms;
+    let elbowStep = 0;
+    let elbowBend = 180;
+    skeletons.forEach((skeleton, i) => {
+      const goingIn = i * 50 <= holdFrom;
+      const { spine, rightLeg, leftLeg, leftArm, rightArm } = skeleton;
+      // The front foot, the back knee and the left hand stay where they are; the hips only sink, and
+      // stay well off the floor.
+      expect(spine[0][1]).toBeLessThanOrEqual(start.spine[0][1] + 0.01);
+      expect(spine[0][1]).toBeGreaterThan(start.leftLeg[1][1] + 25);
+      expect(distance(rightLeg[2], start.rightLeg[2])).toBeCloseTo(0);
+      expect(distance(leftLeg[1], start.leftLeg[1])).toBeLessThan(1);
+      expect(distance(leftArm[2], start.leftArm[2])).toBeCloseTo(0);
+      // The reaching arm swings up over the front knee, overhead and back down to the foot clear of the
+      // front leg and the body, and its upper arm clear of the back leg the hand comes down to.
+      expect(between(rightArm, rightLeg)).toBeGreaterThan(30);
+      expect(between(rightArm.slice(0, 2), leftLeg)).toBeGreaterThan(50);
+      expect(between(rightArm.slice(1), spine)).toBeGreaterThan(38);
+      // Going in, the hand has reached back before the foot leaves the floor, and holds it from where
+      // the shin comes up into it on.
+      if (goingIn && leftLeg[2][1] > 15) expect(rightArm[2][0]).toBeLessThan(spine[0][0] - 40);
+      if ((goingIn || i * 50 <= holdTo) && shin(skeleton) > 94) expect(distance(rightArm[2], leftLeg[2])).toBeLessThan(SKELETON.foot);
+      // Till then the arm stays long, the elbow only a little bent; drawing the foot in bends it more.
+      else if (goingIn) elbowBend = Math.min(elbowBend, angleAt(rightArm[0], rightArm[1], rightArm[2]));
+      if (i > 0) elbowStep = Math.max(elbowStep, distance(rightArm[1], skeletons[i - 1].rightArm[1]));
+    });
+    // The elbow moves smoothly the whole way, never swinging round, which would take it a forearm or
+    // more: at most this far in the 50ms between samples, as the arm swings overhead.
+    expect(elbowBend).toBeGreaterThan(130);
+    expect(elbowStep).toBeLessThan(30);
+    // Coming out, the hand lets go at once and the arm and the leg come down together: halfway out,
+    // the shin is halfway down and the hand well off the foot.
+    const out = solvePose(poseAt3(clip, (holdTo + durationOf(clip)) / 2));
+    expect(shin(out)).toBeGreaterThan(30);
+    expect(shin(out)).toBeLessThan(80);
+    expect(distance(out.rightArm[2], out.leftLeg[2])).toBeGreaterThan(60);
+    // Held: the right hand on the back foot, the shin past upright, 70° up from the floor in front of
+    // the knee, the knee bent to an acute angle with the calf still off the hamstring, and the chest
+    // turned open toward the front leg.
+    const held = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(distance(held.rightArm[2], held.leftLeg[2])).toBeLessThan(SKELETON.foot);
+    expect(angleAt([held.leftLeg[1][0] + 1, held.leftLeg[1][1], held.leftLeg[1][2]], held.leftLeg[1], held.leftLeg[2])).toBeCloseTo(70);
+    expect(angleAt(held.leftLeg[0], held.leftLeg[1], held.leftLeg[2])).toBeLessThan(90);
+    expect(angleAt(held.leftLeg[0], held.leftLeg[1], held.leftLeg[2])).toBeGreaterThan(35);
+    const shoulders = ({ rightArm, leftArm }: Skeleton) => (Math.atan2(rightArm[0][0] - leftArm[0][0], rightArm[0][2] - leftArm[0][2]) * 180) / Math.PI;
+    // Seen from above: the body leans well forward, so the spine's 70° turn shows as less than that.
+    expect(Math.abs(shoulders(held) - shoulders(start))).toBeGreaterThan(40);
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    // Nothing ever changes places, and the face, looking down past the front hand, never shows a nose.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightArm rightLeg']));
     const view = viewOf(clip.camera);
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBe(2);
   });

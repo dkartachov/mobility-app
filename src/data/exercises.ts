@@ -29,6 +29,7 @@ import {
   FROG_STRETCH_3D,
   HALF_KNEELING_FROG_STRETCH_3D,
   HALF_SPINAL_TWIST_3D,
+  HALF_TWISTED_LIZARD_3D,
   HORSE_STANCE_3D,
   KNEELING_WRIST_STRETCH_3D,
   KNIGHT_STRETCH_3D,
@@ -68,7 +69,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  HALF_TWISTED_LIZARD,
   INCHWORM,
   LYING_EXTERNAL_ROTATION_STRETCH,
   OPEN_BOOK,
@@ -464,7 +464,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Pull the foot toward your glute, twist open and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/half-twisted-lizard.png'),
-    animation: HALF_TWISTED_LIZARD,
+    animation: HALF_TWISTED_LIZARD_3D,
     twoSided: true,
   },
   {
