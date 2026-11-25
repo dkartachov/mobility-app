@@ -28,6 +28,7 @@ import {
   FROG_ROCKS_3D,
   FROG_STRETCH_3D,
   HALF_KNEELING_FROG_STRETCH_3D,
+  HALF_SPINAL_TWIST_3D,
   HORSE_STANCE_3D,
   KNEELING_WRIST_STRETCH_3D,
   KNIGHT_STRETCH_3D,
@@ -67,7 +68,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  HALF_SPINAL_TWIST,
   HALF_TWISTED_LIZARD,
   INCHWORM,
   LYING_EXTERNAL_ROTATION_STRETCH,
@@ -318,7 +318,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Twist toward the bent knee and hold, then switch sides',
     ],
     photo: require('@/assets/images/exercises/half-spinal-twist.png'),
-    animation: HALF_SPINAL_TWIST,
+    animation: HALF_SPINAL_TWIST_3D,
     twoSided: true,
   },
   {

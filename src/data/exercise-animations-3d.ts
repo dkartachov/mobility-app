@@ -5075,3 +5075,75 @@ export const CUBAN_ROTATION_3D: Clip3D = {
     { ms: 1200, pose: CUBAN_HANGING },
   ],
 };
+
+// --- Half spinal twist: the left leg long, the right foot planted outside the left knee; the left arm hugs the right knee and the chest turns toward it ---
+
+/** The right foot is planted flat on the floor across the left leg, beside the left knee and outside it. */
+const TWIST_FOOT: Vec3 = [72, ANKLE_Y, -48];
+/** The right knee points up at the ceiling, crossing over toward the left. */
+const TWIST_KNEE_POLE: Vec3 = [0.2, 1, -0.2];
+/** The right hand rests on the floor behind the right hip, the fingers pointing back, to sit tall against. */
+const TWIST_PROP: Vec3 = [-36, WRIST_Y, 34];
+/** How far the spine and then the neck turn toward the right knee, looking back over the right shoulder. */
+const TWIST = { spine: -42, neck: -38 };
+/** How far the body tips forward from the hips, the hugging arm drawing the chest toward the knee. */
+const TWIST_LEAN = 12;
+
+const TWIST_SITTING: Pose3 = {
+  pelvis: [0, SIT_PELVIS_Y, 0],
+  lean: TWIST_LEAN,
+  // The straight left leg lies along the floor, the toes up, as in sit and reach.
+  leftLeg: { flex: 90 - SIT_LEG_DROP + TWIST_LEAN, ankle: SIT_LEG_DROP },
+  pins: { rightFoot: { at: TWIST_FOOT, toward: [1, 0, -0.15], pole: TWIST_KNEE_POLE } },
+};
+/**
+ * The left arm hugs the right knee just below it: the elbow out to the left of the knee, the
+ * forearm straight across the front of the shin, snug against it, and the hand past its right side,
+ * the fingers pointing back round it. The forearm is longer than the knee is wide, so the elbow and
+ * the hand stand well out either side. A hand drawn in round the back of the knee took the straight
+ * forearm through it.
+ */
+const TWIST_HUG_AT = { elbow: [24, 0, -50] as Vec3, hand: [22, -4, 25] as Vec3 };
+const TWIST_HUG: Pin = (() => {
+  const body = solvePose(TWIST_SITTING);
+  const knee = body.rightLeg[1];
+  const elbow: Vec3 = [knee[0] + TWIST_HUG_AT.elbow[0], knee[1] + TWIST_HUG_AT.elbow[1], knee[2] + TWIST_HUG_AT.elbow[2]];
+  const hand: Vec3 = [knee[0] + TWIST_HUG_AT.hand[0], knee[1] + TWIST_HUG_AT.hand[1], knee[2] + TWIST_HUG_AT.hand[2]];
+  return { ...pinVia(body.leftArm[0], elbow, toward(elbow, hand, SKELETON.forearm)), toward: [-1, 0, 0.3] };
+})();
+
+/** Sitting tall, turned this far toward the right knee (0 facing ahead, 1 the full twist). */
+const halfSpinalTwist = (t: number): Pose3 => ({
+  ...TWIST_SITTING,
+  spine: { twist: TWIST.spine * t },
+  neck: { twist: TWIST.neck * t },
+  pins: {
+    ...TWIST_SITTING.pins,
+    leftHand: TWIST_HUG,
+    rightHand: { at: TWIST_PROP, toward: [-1, 0, 0.2], pole: [-1, 0.2, 0.3] },
+  },
+});
+const TWIST_AHEAD = halfSpinalTwist(0);
+const TWIST_TURNED = halfSpinalTwist(1);
+
+export const HALF_SPINAL_TWIST_3D: Clip3D = {
+  view: '3d',
+  // From the front and to the right, well above: the chest turns toward the camera, the shoulders
+  // swinging round over the hips, and the hug, the planted foot and the hand behind all show. Lower
+  // down, the right foot planted beyond the straight leg overlapped it on screen, and the nose came
+  // and went as the face turned; from up here the face is never turned enough to show one.
+  camera: { yaw: 65, pitch: 40 },
+  highlight: ['torso'],
+  // The right hand props the body up on the floor behind the hips, so the arm is behind the body
+  // all the way. By depth its shoulder end came over the torso until the chest turned toward the camera.
+  behind: [['rightArm', 'torso']],
+  // Turned.
+  stillFrame: 1,
+  keyframes: [
+    { ms: 0, pose: TWIST_AHEAD },
+    { ms: 2000, pose: TWIST_TURNED },
+    { ms: 3000, pose: TWIST_TURNED },
+    { ms: 2000, pose: TWIST_AHEAD },
+    { ms: 800, pose: TWIST_AHEAD },
+  ],
+};

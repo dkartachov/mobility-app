@@ -53,6 +53,7 @@ import {
   SEATED_STRADDLE_SIDE_BEND_3D,
   SEATED_SHOULDER_EXTENSION_3D,
   HALF_KNEELING_FROG_STRETCH_3D,
+  HALF_SPINAL_TWIST_3D,
   NECK_SIDE_STRETCH_3D,
   CROSS_BODY_SHOULDER_STRETCH_3D,
   OVERHEAD_TRICEPS_STRETCH_3D,
@@ -528,6 +529,7 @@ describe('3D clips', () => {
       'downward-facing-dog-to-cobra',
       'finger-tendon-glides',
       'cuban-rotation',
+      'half-spinal-twist',
       'warmup-marching',
     ]));
   });
@@ -1278,6 +1280,60 @@ describe('3D clips', () => {
     // Nothing ever changes places, and the face, turned to the camera, keeps its nose.
     expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightLeg rightArm']));
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBeGreaterThan(2);
+  });
+
+  it('turns the chest toward the right knee, the left arm hugging it and the right foot planted outside the left knee, in the half spinal twist', () => {
+    const clip = HALF_SPINAL_TWIST_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    /** The closest two bones come in the room. */
+    const between = (a: readonly Vec3[], b: readonly Vec3[]) => {
+      let gap = Infinity;
+      for (let i = 0; i <= 20; i++) {
+        for (let j = 0; j <= 20; j++) {
+          const p = a[0].map((v, k) => v + ((a[1][k] - v) * i) / 20);
+          const q = b[0].map((v, k) => v + ((b[1][k] - v) * j) / 20);
+          gap = Math.min(gap, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
+        }
+      }
+      return gap;
+    };
+    for (const { spine, rightLeg, leftLeg, leftArm, rightArm } of skeletons) {
+      // Sitting: the hips stay put on the floor, the left leg long along it and the right foot
+      // planted across it, outside the left knee, with the right knee up.
+      expect(distance(spine[0], start.spine[0])).toBeCloseTo(0);
+      expect(distance(rightLeg[2], start.rightLeg[2])).toBeCloseTo(0);
+      expect(angleAt(leftLeg[0], leftLeg[1], leftLeg[2])).toBeCloseTo(180);
+      expect(leftLeg[2][1]).toBeCloseTo(13, 0);
+      expect(rightLeg[2][2]).toBeLessThan(leftLeg[1][2] - 25);
+      expect(Math.abs(rightLeg[2][0] - leftLeg[1][0])).toBeLessThan(35);
+      expect(rightLeg[1][1]).toBeGreaterThan(90);
+      // The hands hold still: the left hugging the right knee, the right on the floor behind the hips.
+      expect(distance(leftArm[2], start.leftArm[2])).toBeCloseTo(0);
+      expect(distance(rightArm[2], start.rightArm[2])).toBeCloseTo(0);
+      expect(rightArm[2][0]).toBeLessThan(spine[0][0] - 30);
+      // The hug: the forearm across the front of the shin, snug against it but never through it, the
+      // elbow out to the left of the knee and the hand past its right side.
+      expect(between(leftArm.slice(1, 3), rightLeg.slice(1, 3))).toBeGreaterThan(20);
+      expect(between(leftArm.slice(1, 3), rightLeg.slice(1, 3))).toBeLessThan(26);
+      expect(between(leftArm.slice(2, 4), rightLeg.slice(0, 2))).toBeGreaterThan(22);
+      expect(between(leftArm.slice(0, 2), rightLeg.slice(0, 2))).toBeGreaterThan(22);
+      expect(leftArm[1][2]).toBeLessThan(rightLeg[1][2] - 25);
+      expect(leftArm[2][2]).toBeGreaterThan(rightLeg[1][2] + 15);
+    }
+    // The chest turns toward the right knee, to the right, and the head turns further, looking back
+    // over the right shoulder.
+    const turned = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const shoulders = ({ rightArm, leftArm }: Skeleton) => (Math.atan2(rightArm[0][0] - leftArm[0][0], rightArm[0][2] - leftArm[0][2]) * 180) / Math.PI;
+    const facing = ({ facing }: Skeleton) => (Math.atan2(facing[2], facing[0]) * 180) / Math.PI;
+    expect(shoulders(start) - shoulders(turned)).toBeGreaterThan(35);
+    expect(facing(turned) - facing(start)).toBeGreaterThan(70);
+    expect(longestHold(clip)).toBeGreaterThanOrEqual(3000);
+    // Nothing ever changes places: the propping arm stays behind the body. From well above, the face
+    // never shows a nose.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['rightArm torso leftLeg rightLeg leftArm head']));
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBe(2);
   });
 
   it('sits back from all fours onto the heels, hands, knees and feet planted, forehead to the floor, in prayer pose', () => {
