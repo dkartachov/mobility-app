@@ -1,4 +1,4 @@
-import { distance, SKELETON, solveJoint3, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
+import { distance, SKELETON, solveJoint3, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Fingers, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -2334,6 +2334,132 @@ export const THREE_LEGGED_DOWNWARD_FACING_DOG_3D: Clip3D = {
     ...threeLegLift(-1, 1300),
     { ms: 600, pose: threeLegged(-1, 1) },
     ...threeLegLift(-1, 1300, true),
+  ],
+};
+
+// --- Downward facing dog to cobra: hands and toes planted, the hips come down out of the V through a plank, rolling over the toes, into cobra, and back ---
+
+/**
+ * The hands stay planted here, and the tips of the feet this far behind them: near enough that the
+ * shoulders come over the hands in the plank and in cobra, where the hips are low and the legs
+ * long behind. The V is a long one, the legs and body meeting at the hips at about 83°, as it is
+ * flowing in and out of it without stepping the feet in.
+ */
+const FLOW_HANDS: Vec3 = [140, WRIST_Y, SKELETON.shoulder];
+const FLOW_TOES: Vec3 = [FLOW_HANDS[0] - 280, DOG_TOE_Y, SKELETON.hip];
+/**
+ * How steep each foot stands from the floor, from its tip up to the ankle: the heels toward the
+ * floor in the V, the toes tucked under in the plank, and over the toes onto the top of the foot in
+ * cobra, the ankle resting on the floor ahead of the tip.
+ */
+const FLOW_FOOT = { dog: 20, plank: 70, cobra: 180 - (Math.asin((ANKLE_Y - DOG_TOE_Y) / SKELETON.foot) * 180) / Math.PI };
+/** How high the hips are in cobra: low, the thighs just off the floor. */
+const FLOW_COBRA_HIPS = 48;
+/** How far the back arches in cobra. */
+const FLOW_COBRA_ARCH = -45;
+/** The body lies along a straight line from the ankles in the plank, the neck this far along it. */
+const FLOW_PLANK_NECK = LEG_REACH + SKELETON.torso;
+
+/** Where the ankle is with the foot this steep, its tip on the floor, and which way the foot points from it. */
+const flowFoot = (steep: number, side: 1 | -1): { at: Vec3; toward: Vec3 } => {
+  const angle = radians(steep);
+  return {
+    at: [FLOW_TOES[0] - SKELETON.foot * Math.cos(angle), DOG_TOE_Y + SKELETON.foot * Math.sin(angle), side * FLOW_TOES[2]],
+    toward: [Math.cos(angle), -Math.sin(angle), 0],
+  };
+};
+
+/** Which way the straight legs point from the ankles up to the hips, in the side-on plane (0 back along the floor, 90 up). */
+const flowLegAngle = (ankle: Vec3, pelvis: readonly [number, number]) => Math.atan2(pelvis[1] - ankle[1], pelvis[0] - ankle[0]);
+const FLOW_LEGS = (() => {
+  // The V: the hips a leg's reach from the ankles and about a body and arm's from the hands.
+  const ankle = flowFoot(FLOW_FOOT.dog, 1).at;
+  const [legs, body] = [LEG_REACH, SKELETON.torso + DOG_ARMS_IN_LINE * ARM_REACH];
+  const across = [FLOW_HANDS[0] - ankle[0], FLOW_HANDS[1] - ankle[1]];
+  const gap = Math.hypot(across[0], across[1]);
+  const along = (legs * legs - body * body + gap * gap) / (2 * gap);
+  const up = Math.sqrt(legs * legs - along * along);
+  const [ux, uy] = [across[0] / gap, across[1] / gap];
+  const dog = flowLegAngle(ankle, [ankle[0] + ux * along - uy * up, ankle[1] + uy * along + ux * up]);
+  // The plank: the body in one line from the ankles, tipped down until the neck is an arm's reach
+  // from the hands. Steeper, it's further.
+  const plankAnkle = flowFoot(FLOW_FOOT.plank, 1).at;
+  const neckGap = (angle: number) =>
+    Math.hypot(plankAnkle[0] + FLOW_PLANK_NECK * Math.cos(angle) - FLOW_HANDS[0], plankAnkle[1] + FLOW_PLANK_NECK * Math.sin(angle) - FLOW_HANDS[1]);
+  let [low, high] = [0, Math.PI / 4];
+  for (let i = 0; i < 40; i++) {
+    const angle = (low + high) / 2;
+    if (neckGap(angle) > ARM_REACH) high = angle;
+    else low = angle;
+  }
+  const cobraAnkle = flowFoot(FLOW_FOOT.cobra, 1).at;
+  const cobra = Math.asin((FLOW_COBRA_HIPS - cobraAnkle[1]) / LEG_REACH);
+  return { dog, plank: (low + high) / 2, cobra };
+})();
+
+/** A smooth curve through `a` at 0, `b` at a half and `c` at 1. */
+const throughThree = (a: number, b: number, c: number, t: number) => a * (1 - t) * (1 - 2 * t) + b * 4 * t * (1 - t) + c * t * (2 * t - 1);
+
+/**
+ * The flow this far from the V (0) to cobra (1), through the plank halfway. The legs stay straight
+ * as they swing down around the ankles, and the feet roll forward over their tips as they go, the
+ * heels rising into the plank and carrying on over into cobra. The body tips as far forward as
+ * keeps the arms straight, the back long until the plank and arching on the way down into cobra,
+ * where the head comes up to look ahead.
+ */
+const dogToCobra = (t: number): Pose3 => {
+  const steep = throughThree(FLOW_FOOT.dog, FLOW_FOOT.plank, FLOW_FOOT.cobra, t);
+  const legs = throughThree(FLOW_LEGS.dog, FLOW_LEGS.plank, FLOW_LEGS.cobra, t);
+  const ankle = flowFoot(steep, 1).at;
+  const pelvis: Vec3 = [ankle[0] + LEG_REACH * Math.cos(legs), ankle[1] + LEG_REACH * Math.sin(legs), 0];
+  // The kneecaps face the hands in the V and the floor in cobra.
+  const kneePole = mix3(DOG_STRAIGHT_POLE, [0, -1, 0], smooth(t));
+  const foot = (side: 1 | -1): Pin => ({ ...flowFoot(steep, side), pole: kneePole });
+  const hand = (side: 1 | -1): Pin => ({ at: [FLOW_HANDS[0], FLOW_HANDS[1], side * FLOW_HANDS[2]], toward: [1, 0, 0], pole: [-1, 0, side * 0.3] });
+  const flex = FLOW_COBRA_ARCH * smooth(Math.max(0, (t - 0.4) / 0.6));
+  const body = (lean: number): Pose3 => ({
+    pelvis,
+    lean,
+    spine: { flex },
+    neck: { flex: mix(0, -8, smooth(t)) },
+    pins: { rightFoot: foot(1), leftFoot: foot(-1), rightHand: hand(1), leftHand: hand(-1) },
+  });
+  const gap = (lean: number) => {
+    const shoulder = solvePose(body(lean)).rightArm[0];
+    return Math.hypot(FLOW_HANDS[0] - shoulder[0], FLOW_HANDS[1] - shoulder[1], FLOW_HANDS[2] - shoulder[2]);
+  };
+  // Tipping forward brings the shoulders toward the hands until they point at them, so the lean
+  // that reaches is found on the way there.
+  let nearest = -20;
+  for (let tip = -20; tip <= 180; tip += 2) if (gap(tip) < gap(nearest)) nearest = tip;
+  let [upright, tipped] = [-20, nearest];
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + tipped) / 2;
+    if (gap(tip) > ARM_REACH) upright = tip;
+    else tipped = tip;
+  }
+  return body((upright + tipped) / 2);
+};
+
+const FLOW_DOG = dogToCobra(0);
+const FLOW_COBRA = dogToCobra(1);
+/** The hips and the feet travel on arcs, so it takes this many keyframes for the toes to stay put between them. */
+const FLOW_STEPS = 32;
+
+export const DOWNWARD_FACING_DOG_TO_COBRA_3D: Clip3D = {
+  view: '3d',
+  // As for downward facing dog: from the right side, a little in front and above, so the V, the
+  // plank and cobra are all flat on the screen, and the head hangs behind the near arm.
+  camera: DOWNWARD_FACING_DOG_3D.camera,
+  highlight: ['torso', 'rightLeg', 'leftLeg'],
+  // Cobra: the dog has its own exercise and tile.
+  stillFrame: 1 + FLOW_STEPS,
+  keyframes: [
+    { ms: 0, pose: FLOW_DOG },
+    { ms: 900, pose: FLOW_DOG },
+    ...alongArc(2200, FLOW_STEPS, dogToCobra),
+    { ms: 900, pose: FLOW_COBRA },
+    ...alongArc(2200, FLOW_STEPS, (t) => dogToCobra(1 - t)),
   ],
 };
 
@@ -4850,5 +4976,68 @@ export const FIGURE_FOUR_STRETCH_3D: Clip3D = {
     ...alongArc(3000, FOUR_STEPS, figureFourMove),
     { ms: 3500, pose: FOUR_PULLED },
     ...alongArc(2600, FOUR_STEPS, (t) => figureFourMove(1 - t)),
+  ],
+};
+
+// --- Finger tendon glides: close up on both hands held up, the fingers moving from straight through a hook fist, a full fist and a flat fist ---
+
+/** Where the right shoulder is, standing. */
+const GLIDE_SHOULDER = solvePose(STANDING).rightArm[0];
+/**
+ * The right elbow, out to the side and a little forward, below the wrist. The hands are held up
+ * either side of the head, wide enough that the fingers curling in toward the middle stay clear of
+ * it, with the forearms upright.
+ */
+const GLIDE_ELBOW: Vec3 = [GLIDE_SHOULDER[0] + 30, 0, 75];
+const GLIDE_ELBOW_AT: Vec3 = [
+  GLIDE_ELBOW[0],
+  GLIDE_SHOULDER[1] - Math.sqrt(SKELETON.upperArm ** 2 - (GLIDE_ELBOW[0] - GLIDE_SHOULDER[0]) ** 2 - (GLIDE_ELBOW[2] - GLIDE_SHOULDER[2]) ** 2),
+  GLIDE_ELBOW[2],
+];
+const GLIDE_WRIST: Vec3 = [GLIDE_ELBOW_AT[0], GLIDE_ELBOW_AT[1] + SKELETON.forearm, GLIDE_ELBOW_AT[2]];
+
+/**
+ * Both hands up, the fingers pointing at the ceiling and the palms facing each other, the fingers
+ * bent this far. The hand is pinned, since it's the palm that has to face in: on an arm posed by
+ * its angles that takes the elbows in at the shoulders' width.
+ */
+const glide = (fingers: Fingers): Pose3 => {
+  const hand = (side: 1 | -1): Pin => ({
+    ...pinVia([GLIDE_SHOULDER[0], GLIDE_SHOULDER[1], side * GLIDE_SHOULDER[2]], [GLIDE_ELBOW_AT[0], GLIDE_ELBOW_AT[1], side * GLIDE_ELBOW_AT[2]], [GLIDE_WRIST[0], GLIDE_WRIST[1], side * GLIDE_WRIST[2]], [0, 1, 0]),
+    palm: [0, 0, -side],
+  });
+  return {
+    ...STANDING,
+    rightArm: { fingers },
+    leftArm: { fingers },
+    pins: { rightHand: hand(1), leftHand: hand(-1) },
+  };
+};
+
+/** The fingers straight; the knuckles straight and the other joints bent; everything bent; and the knuckles bent with the fingers straight. */
+const GLIDE_STRAIGHT = glide({ knuckle: 0, middle: 0, tip: 0 });
+const GLIDE_HOOK = glide({ knuckle: 0, middle: 95, tip: 85 });
+const GLIDE_FULL_FIST = glide({ knuckle: 85, middle: 95, tip: 70 });
+const GLIDE_FLAT_FIST = glide({ knuckle: 90, middle: 0, tip: 0 });
+
+export const FINGER_TENDON_GLIDES_3D: Clip3D = {
+  view: '3d',
+  // Close up from the front: the palms face each other, so the camera looks at the hands from the
+  // thumb's side, the fingers one behind the other, and every bend shows in profile as they curl
+  // in toward the middle.
+  camera: { yaw: 90, pitch: 12, fit: 'hands' },
+  highlight: ['rightArm', 'leftArm'],
+  // The hook fist.
+  stillFrame: 1,
+  keyframes: [
+    { ms: 0, pose: GLIDE_STRAIGHT },
+    { ms: 1100, pose: GLIDE_HOOK },
+    { ms: 500, pose: GLIDE_HOOK },
+    { ms: 1100, pose: GLIDE_FULL_FIST },
+    { ms: 500, pose: GLIDE_FULL_FIST },
+    { ms: 1100, pose: GLIDE_FLAT_FIST },
+    { ms: 500, pose: GLIDE_FLAT_FIST },
+    { ms: 1100, pose: GLIDE_STRAIGHT },
+    { ms: 500, pose: GLIDE_STRAIGHT },
   ],
 };

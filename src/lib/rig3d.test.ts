@@ -14,6 +14,8 @@ import {
   COBRA_TO_PRAYER_3D,
   COSSACK_SQUAT_3D,
   DOWNWARD_FACING_DOG_3D,
+  DOWNWARD_FACING_DOG_TO_COBRA_3D,
+  FINGER_TENDON_GLIDES_3D,
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
   HIP_INTERNAL_ROTATION_3D,
@@ -75,6 +77,7 @@ import {
   distance,
   frameAt,
   framedJoints,
+  HAND,
   poseAt3,
   project,
   SKELETON,
@@ -120,6 +123,11 @@ const STANDING: Pose3 = { pelvis: [0, 213, 0] };
 function unitBetween(a: Vec3, b: Vec3): Vec3 {
   const length = distance(a, b);
   return [(b[0] - a[0]) / length, (b[1] - a[1]) / length, (b[2] - a[2]) / length];
+}
+
+/** The direction square to both of two others. */
+function cross(a: Vec3, b: Vec3): Vec3 {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 /** Halfway between two points. */
@@ -320,6 +328,22 @@ describe('solvePose', () => {
       expect(rightArm[3][0] - rightArm[2][0]).toBeCloseTo(SKELETON.hand);
     }
   });
+
+  it('gives a hand fingers only when asked, and bends them toward the palm', () => {
+    expect(solvePose(STANDING).rightFingers).toBeUndefined();
+    // Hanging, the palms face in, so the right fingers curl toward the left and the left ones toward the right.
+    const curled = solvePose({ ...STANDING, rightArm: { fingers: { knuckle: 90 } }, leftArm: { fingers: { knuckle: 90 } } });
+    const [rightKnuckle, , , rightTip] = curled.rightFingers!.joints;
+    expect(rightKnuckle[1]).toBeCloseTo(curled.rightArm[2][1] - HAND.palm);
+    expect(rightTip[2] - rightKnuckle[2]).toBeCloseTo(-(HAND.fingers[0] + HAND.fingers[1] + HAND.fingers[2]));
+    expect(curled.leftFingers!.joints[3][2] - curled.leftFingers!.joints[0][2]).toBeCloseTo(HAND.fingers[0] + HAND.fingers[1] + HAND.fingers[2]);
+    // A pinned hand bends them toward the palm it's pinned with, and without one has no fingers to bend.
+    const pin = { at: [60, 300, 60] as Vec3, toward: [0, 1, 0] as Vec3 };
+    const pinned = solvePose({ ...STANDING, rightArm: { fingers: { middle: 90 } }, pins: { rightHand: { ...pin, palm: [1, 0, 0] } } });
+    const [, middle, , tip] = pinned.rightFingers!.joints;
+    expect(tip[0] - middle[0]).toBeCloseTo(HAND.fingers[1] + HAND.fingers[2]);
+    expect(solvePose({ ...STANDING, rightArm: { fingers: { middle: 90 } }, pins: { rightHand: pin } }).rightFingers).toBeUndefined();
+  });
 });
 
 describe('poseAt3', () => {
@@ -498,6 +522,8 @@ describe('3D clips', () => {
       'kneeling-wrist-stretch',
       'floor-angels',
       'reverse-tabletop',
+      'downward-facing-dog-to-cobra',
+      'finger-tendon-glides',
       'warmup-marching',
     ]));
   });
@@ -506,7 +532,13 @@ describe('3D clips', () => {
     const skeletons = samples(clip).map(solvePose);
 
     it('never stretches a bone', () => {
-      for (const { rightArm, leftArm, rightLeg, leftLeg } of skeletons) {
+      for (const { rightArm, leftArm, rightLeg, leftLeg, rightFingers, leftFingers } of skeletons) {
+        // A hand with fingers that bend: the hand from the wrist to the knuckles, then each finger bone.
+        for (const [fingers, arm] of [[rightFingers, rightArm], [leftFingers, leftArm]] as const) {
+          if (!fingers) continue;
+          expect(distance(arm[2], fingers.joints[0])).toBeCloseTo(HAND.palm);
+          HAND.fingers.forEach((length, i) => expect(distance(fingers.joints[i], fingers.joints[i + 1])).toBeCloseTo(length));
+        }
         for (const arm of [rightArm, leftArm]) {
           expect(distance(arm[0], arm[1])).toBeCloseTo(SKELETON.upperArm);
           expect(distance(arm[1], arm[2])).toBeCloseTo(SKELETON.forearm);
@@ -1093,6 +1125,93 @@ describe('3D clips', () => {
     const headParts = new Set<number>();
     for (let t = 0; t <= durationOf(clip); t += 10) headParts.add(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length);
     expect(headParts.size).toBe(1);
+  });
+
+  it('comes down out of the V through a plank into cobra, rolling over the toes, hands and toes planted, in downward facing dog to cobra', () => {
+    const clip = DOWNWARD_FACING_DOG_TO_COBRA_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightArm, leftArm, rightLeg, leftLeg } of skeletons) {
+      // The hands stay planted, and the tips of the feet stay on the floor where they started.
+      for (const [arm, first] of [[rightArm, start.rightArm], [leftArm, start.leftArm]] as const) expect(distance(arm[2], first[2])).toBeCloseTo(0);
+      for (const [leg, first] of [[rightLeg, start.rightLeg], [leftLeg, start.leftLeg]] as const) {
+        expect(distance(leg[3], first[3])).toBeLessThan(1);
+        // The legs stay straight, and the arms never more than a little bent.
+        expect(angleAt(leg[0], leg[1], leg[2])).toBeGreaterThan(170);
+      }
+      for (const arm of [rightArm, leftArm]) expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(165);
+    }
+    // The V: the hips the highest point, the heels behind the toes, toward the floor.
+    const [pelvis, neckBase] = [start.spine[0], start.spine[6]];
+    for (const point of [neckBase, start.head, ...start.rightArm, ...start.rightLeg.slice(1)]) expect(point[1]).toBeLessThan(pelvis[1]);
+    expect(start.rightLeg[3][0]).toBeGreaterThan(start.rightLeg[2][0]);
+    expect(start.rightLeg[2][1]).toBeLessThan(30);
+    // Halfway, the plank: the body in one line from the ankles to the neck, the heels up over the
+    // tucked toes and the shoulders over the hands.
+    const timeOf = (index: number) => clip.keyframes.slice(1, index + 1).reduce((total, frame) => total + frame.ms, 0);
+    const plank = solvePose(poseAt3(clip, (timeOf(1) + timeOf(clip.stillFrame)) / 2));
+    expect(angleAt(plank.rightLeg[2], plank.spine[0], plank.spine[6])).toBeGreaterThan(170);
+    expect(plank.rightLeg[2][1]).toBeGreaterThan(40);
+    expect(Math.abs(plank.rightArm[0][0] - plank.rightArm[2][0])).toBeLessThan(20);
+    // Cobra: over onto the tops of the feet, the hips low, the chest up and the arms straight.
+    const cobra = solvePose(clip.keyframes[clip.stillFrame].pose);
+    for (const leg of [cobra.rightLeg, cobra.leftLeg]) {
+      expect(leg[2][0]).toBeGreaterThan(leg[3][0] + 0.9 * SKELETON.foot);
+      expect(leg[2][1]).toBeCloseTo(13, 0);
+    }
+    expect(cobra.spine[0][1]).toBeLessThan(55);
+    expect(cobra.spine[6][1]).toBeGreaterThan(140);
+    expect(angleAt(cobra.rightArm[0], cobra.rightArm[1], cobra.rightArm[2])).toBeGreaterThan(170);
+    // The back arches in cobra, and is long in the V.
+    expect(angleAt(cobra.spine[0], cobra.spine[3], cobra.spine[6])).toBeLessThan(160);
+    expect(angleAt(start.spine[0], start.spine[3], start.spine[6])).toBeCloseTo(180, 0);
+    // Nothing ever changes places, and the head, side on, never shows a nose.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightLeg rightArm']));
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBe(2);
+  });
+
+  it('holds both hands up still while the fingers go straight, hook fist, full fist, flat fist, seen side on, in finger tendon glides', () => {
+    const clip = FINGER_TENDON_GLIDES_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const skeleton of skeletons) {
+      for (const [arm, first] of [[skeleton.rightArm, start.rightArm], [skeleton.leftArm, start.leftArm]] as const) {
+        expect(distance(arm[2], first[2])).toBeCloseTo(0);
+        // The forearm upright, the hand carrying on straight up from it.
+        expect(tipped(arm[1], arm[2])).toBeLessThan(1);
+        expect(tipped(arm[2], arm[3])).toBeLessThan(1);
+      }
+      expect(skeleton.rightFingers).toBeDefined();
+      expect(skeleton.leftFingers).toBeDefined();
+    }
+    // The angle each finger joint makes, 180 straight: at the knuckles, the middle joint and the one nearest the tip.
+    const bends = (pose: Pose3) => {
+      const { rightArm, rightFingers } = solvePose(pose);
+      const [knuckle, middle, end, tip] = rightFingers!.joints;
+      return [angleAt(rightArm[2], knuckle, middle), angleAt(knuckle, middle, end), angleAt(middle, end, tip)].map(Math.round);
+    };
+    const shapes = clip.keyframes.map((frame) => bends(frame.pose).join(' '));
+    // Straight, then the hook fist with the knuckles straight, the full fist, and the flat fist with
+    // the knuckles at a right angle and the fingers straight, each held, and back to straight.
+    expect([...new Set(shapes)]).toEqual(['180 180 180', '180 85 95', '95 85 110', '90 180 180']);
+    // The fingers curl in toward the middle, the palms facing each other.
+    const fist = solvePose(clip.keyframes[3].pose);
+    expect(fist.rightFingers!.joints[2][2]).toBeLessThan(fist.rightArm[2][2]);
+    expect(fist.leftFingers!.joints[2][2]).toBeGreaterThan(fist.leftArm[2][2]);
+    // The camera looks along the knuckles, so the four fingers are one behind the other and every
+    // bend is side on to it, and the curled fingers stay clear of the head.
+    const view = viewOf(clip.camera);
+    for (const skeleton of skeletons) {
+      for (const [fingers, arm] of [[skeleton.rightFingers!, skeleton.rightArm], [skeleton.leftFingers!, skeleton.leftArm]] as const) {
+        const knuckles = cross(unitBetween(arm[2], fingers.joints[0]), fingers.palm);
+        expect(Math.abs(project(view, knuckles)[2])).toBeGreaterThan(0.95);
+        for (const joint of fingers.joints) expect(onScreen(project(view, joint), project(view, skeleton.head))).toBeGreaterThan(SKELETON.head + 10);
+      }
+    }
+    // Nothing ever changes places, and the face, turned to the camera, keeps its nose.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg rightLeg torso head leftArm leftArm hand rightArm rightArm hand']));
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBeGreaterThan(2);
   });
 
   it('sits back from all fours onto the heels, hands, knees and feet planted, forehead to the floor, in prayer pose', () => {

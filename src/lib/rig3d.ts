@@ -30,6 +30,24 @@ export const SKELETON = {
   head: 30,
 };
 
+/**
+ * A hand with fingers that bend (see `ArmPose.fingers`), drawn in place of the plain round hand:
+ * from the wrist to the knuckles, then the three bones of the fingers. It's a hand's real size next
+ * to the forearm, about twice the plain one's length, which is only ever seen at a distance; with
+ * fingers that bend, the camera comes in close on the hands (`fit: 'hands'`). The four fingers bend
+ * together, as one, so a hand seen from the thumb's side shows them one behind the other.
+ */
+export const HAND = {
+  palm: 26,
+  fingers: [14, 9, 7] as readonly [number, number, number],
+  /** Half its width across the knuckles and half its thickness, at the wrist and at the knuckles. */
+  palmWidth: [9, 11] as const,
+  palmThickness: [8, 6.5] as const,
+  /** The same for the four fingers side by side, at the knuckles and at the tips. */
+  fingerWidth: [10, 8.5] as const,
+  fingerThickness: [5, 4] as const,
+};
+
 /** How a run of the spine curves, shared evenly along it. */
 export type Bend = {
   /** Rounding forward. Negative arches back. */
@@ -63,6 +81,22 @@ export type ArmPose = {
    * letting it sink drops it (scap mobilization). It moves a pinned arm's shoulder too.
    */
   protract?: number;
+  /**
+   * Bending the four fingers, together, toward the palm: a hand with fingers drawn, in close up
+   * (finger tendon glides), instead of the plain round one. Leave it out for the plain hand. A
+   * pinned hand needs its `palm` for the fingers to know which way they bend.
+   */
+  fingers?: Fingers;
+};
+
+/** How far the fingers bend at each of their three joints, from the knuckles out: all zeros is a flat hand. */
+export type Fingers = {
+  /** At the knuckles, where the fingers meet the hand. */
+  knuckle?: number;
+  /** At the middle joint. */
+  middle?: number;
+  /** At the joint nearest the tip. */
+  tip?: number;
 };
 
 /** A leg standing straight with the foot pointing ahead is all zeros. */
@@ -136,22 +170,28 @@ export type Camera = {
   /** How far the camera is raised: 0 is level with the floor, 90 looks straight down. */
   pitch: number;
   /**
-   * Frame the whole body, or move in on everything from the pelvis up, on the pelvis and legs, or
-   * on the head and shoulders (see `framedJoints`).
+   * Frame the whole body, or move in on everything from the pelvis up, on the pelvis and legs, on
+   * the head and shoulders, or close up on the hands and their fingers (see `framedJoints`).
    */
-  fit?: 'body' | 'upper' | 'lower' | 'head';
+  fit?: 'body' | 'upper' | 'lower' | 'head' | 'hands';
 };
 
 /**
  * The joints a camera's `fit` keeps in the frame. `'head'` takes the head, the top third of the
  * spine and whatever of the arms is up there with it: for a stretch of the neck, where the rest of
  * the body only stands still, and an arm reaching up to the head is all of it in view but one
- * hanging down the side is cut off.
+ * hanging down the side is cut off. `'hands'` takes the wrists and the fingers, for a hand with
+ * fingers that bend, where the rest of the body is only there to hold them up.
  */
 export function framedJoints(skeleton: Skeleton, fit: Camera['fit']): Vec3[] {
   const body = [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm];
   const legs = [...skeleton.rightLeg, ...skeleton.leftLeg];
   if (fit === 'upper') return body;
+  if (fit === 'hands') {
+    const hands = [skeleton.rightArm[2], skeleton.leftArm[2]];
+    for (const fingers of [skeleton.rightFingers, skeleton.leftFingers]) if (fingers) hands.push(...fingers.joints);
+    return hands;
+  }
   if (fit === 'lower') return [skeleton.spine[0], ...legs];
   if (fit === 'head') {
     const chest = skeleton.spine.slice((2 * SPINE_SEGMENTS) / 3);
@@ -282,6 +322,16 @@ export type Skeleton = {
   /** The way each palm faces, for a hand pinned with one (see `Pin.palm`), which gives it a thumb. */
   rightPalm?: Vec3;
   leftPalm?: Vec3;
+  /** A hand with fingers that bend (see `ArmPose.fingers`). */
+  rightFingers?: FingerJoints;
+  leftFingers?: FingerJoints;
+};
+
+export type FingerJoints = {
+  /** The knuckles, the middle joints, the joints nearest the tips and the tips, along the middle of the hand. */
+  joints: Vec3[];
+  /** The way the palm faces, which the fingers bend toward. */
+  palm: Vec3;
 };
 
 export type FigureSlot = {
@@ -443,6 +493,14 @@ function lerpArm(a: ArmPose | undefined, b: ArmPose | undefined, t: number): Arm
     elbow: lerp(a?.elbow ?? 0, b?.elbow ?? 0, t),
     shrug: lerp(a?.shrug ?? 0, b?.shrug ?? 0, t),
     protract: lerp(a?.protract ?? 0, b?.protract ?? 0, t),
+    fingers:
+      a?.fingers || b?.fingers
+        ? {
+            knuckle: lerp(a?.fingers?.knuckle ?? 0, b?.fingers?.knuckle ?? 0, t),
+            middle: lerp(a?.fingers?.middle ?? 0, b?.fingers?.middle ?? 0, t),
+            tip: lerp(a?.fingers?.tip ?? 0, b?.fingers?.tip ?? 0, t),
+          }
+        : undefined,
   };
 }
 
@@ -530,14 +588,47 @@ function pinnedLimb(root: Vec3, pin: Pin, first: number, second: number, endLeng
   return [root, joint, end, add(end, scaled(direction, endLength))];
 }
 
-/** `side` is 1 for the right limb and -1 for the left, which mirrors what "outward" means. */
+/** How the upper arm is turned from hanging. `side` is 1 for the right limb and -1 for the left, which mirrors what "outward" means. */
+function upperArmTurn(chest: Mat3, arm: ArmPose | undefined, side: number): Mat3 {
+  'worklet';
+  return mul(mul(mul(chest, rotZ(arm?.flex ?? 0)), rotX(-side * (arm?.abduct ?? 0))), rotY(-side * (arm?.rotate ?? 0)));
+}
+
 function armJoints(root: Vec3, chest: Mat3, arm: ArmPose | undefined, side: number): Vec3[] {
   'worklet';
-  const upper = mul(mul(mul(chest, rotZ(arm?.flex ?? 0)), rotX(-side * (arm?.abduct ?? 0))), rotY(-side * (arm?.rotate ?? 0)));
+  const upper = upperArmTurn(chest, arm, side);
   const elbow = add(root, turned(upper, [0, -SKELETON.upperArm, 0]));
   const lower = mul(upper, rotZ(arm?.elbow ?? 0));
   const wrist = add(elbow, turned(lower, [0, -SKELETON.forearm, 0]));
   return [root, elbow, wrist, add(wrist, turned(lower, [0, -SKELETON.hand, 0]))];
+}
+
+/**
+ * The way the palm of an arm posed by its angles faces: in toward the body with the arm hanging,
+ * and turning with the arm from there.
+ */
+function armPalm(chest: Mat3, arm: ArmPose | undefined, side: number): Vec3 {
+  'worklet';
+  return turned(mul(upperArmTurn(chest, arm, side), rotZ(arm?.elbow ?? 0)), [0, 0, -side]);
+}
+
+/**
+ * The joints of fingers bent this far, from the knuckles out, on a hand running from `wrist` toward
+ * `ahead` with its palm facing `palm`. Each bone turns from the one before it toward the palm.
+ */
+function fingerJoints(wrist: Vec3, ahead: Vec3, palm: Vec3, fingers: Fingers): FingerJoints {
+  'worklet';
+  const along = unit(sub(ahead, wrist), [0, -1, 0]);
+  const facing = unit(sub(palm, scaled(along, dot(palm, along))), [1, 0, 0]);
+  const joints: Vec3[] = [add(wrist, scaled(along, HAND.palm))];
+  const bends = [fingers.knuckle ?? 0, fingers.middle ?? 0, fingers.tip ?? 0];
+  let bent = 0;
+  for (let i = 0; i < 3; i++) {
+    bent += (bends[i] * Math.PI) / 180;
+    const direction = add(scaled(along, Math.cos(bent)), scaled(facing, Math.sin(bent)));
+    joints.push(add(joints[i], scaled(direction, HAND.fingers[i])));
+  }
+  return { joints, palm: facing };
 }
 
 function legJoints(root: Vec3, pelvis: Mat3, leg: LegPose | undefined, side: number): Vec3[] {
@@ -596,6 +687,15 @@ export function solvePose(pose: Pose3): Skeleton {
   const leg = (root: Vec3, angles: LegPose | undefined, pin: Pin | undefined, side: number) =>
     pin ? pinnedLimb(root, pin, SKELETON.thigh, SKELETON.shin, SKELETON.foot, kneePole, ahead) : legJoints(root, pelvis, angles, side);
 
+  const rightArm = arm(rightShoulder, pose.rightArm, pose.pins?.rightHand, 1);
+  const leftArm = arm(leftShoulder, pose.leftArm, pose.pins?.leftHand, -1);
+  // A hand with fingers bends them toward its palm: a pinned one's says which way it faces.
+  const fingers = (points: Vec3[], angles: ArmPose | undefined, pin: Pin | undefined, side: number): FingerJoints | undefined => {
+    if (!angles?.fingers) return undefined;
+    const palm = pin ? pin.palm : armPalm(chest, angles, side);
+    return palm ? fingerJoints(points[2], points[3], palm, angles.fingers) : undefined;
+  };
+
   return {
     spine,
     spineRight,
@@ -604,12 +704,14 @@ export function solvePose(pose: Pose3): Skeleton {
     facing: turned(skull, [1, 0, 0]),
     headUp: turned(skull, [0, 1, 0]),
     headRight: turned(skull, [0, 0, 1]),
-    rightArm: arm(rightShoulder, pose.rightArm, pose.pins?.rightHand, 1),
-    leftArm: arm(leftShoulder, pose.leftArm, pose.pins?.leftHand, -1),
+    rightArm,
+    leftArm,
     rightLeg: leg(rightHip, pose.rightLeg, pose.pins?.rightFoot, 1),
     leftLeg: leg(leftHip, pose.leftLeg, pose.pins?.leftFoot, -1),
     rightPalm: pose.pins?.rightHand?.palm,
     leftPalm: pose.pins?.leftHand?.palm,
+    rightFingers: fingers(rightArm, pose.rightArm, pose.pins?.rightHand, 1),
+    leftFingers: fingers(leftArm, pose.leftArm, pose.pins?.leftHand, -1),
   };
 }
 
@@ -749,6 +851,50 @@ export function fingerLines(view: Mat3, wrist: Vec3, fingertips: Vec3, palm: Vec
     // Into the round end, stopping short of its edge.
     const to = project(view, add(fingertips, add(scaled(across, k * narrow), scaled(along, 0.6 * narrow * Math.sqrt(1 - k * k)))));
     path += `M${fixed(from[0])} ${fixed(from[1])}L${fixed(to[0])} ${fixed(to[1])}`;
+  }
+  return path;
+}
+
+/**
+ * A hand with fingers that bend: a bone from the wrist to the knuckles, then one for each bone of
+ * the fingers, all together one shape. Each is wide across the knuckles and thin from the palm to
+ * the back of the hand, so how thick it looks depends on how it's turned to the camera, as the
+ * torso's does: seen from the thumb's side, the fingers one behind the other show their bends in
+ * profile; seen from the back, they're one wide paddle.
+ */
+function handShape(view: Mat3, wrist: Vec3, fingers: FingerJoints): string {
+  'worklet';
+  const points: Vec3[] = [wrist];
+  for (let i = 0; i < fingers.joints.length; i++) points.push(fingers.joints[i]);
+  const along = unit(sub(fingers.joints[0], wrist), [0, -1, 0]);
+  const across = cross(along, fingers.palm);
+  // How far along the fingers each joint is, from the knuckles (0) to the tips (1).
+  const fingerLength = HAND.fingers[0] + HAND.fingers[1] + HAND.fingers[2];
+  const reach = [0, 0, HAND.fingers[0] / fingerLength, (HAND.fingers[0] + HAND.fingers[1]) / fingerLength, 1];
+  let path = '';
+  for (let i = 1; i < points.length; i++) {
+    const a = project(view, points[i - 1]);
+    const b = project(view, points[i]);
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const length = Math.hypot(dx, dy);
+    // Square to the bone on screen. A bone pointing at the camera shows its whole width, whichever way.
+    const nx = length < 0.5 ? 1 : -dy / length;
+    const ny = length < 0.5 ? 0 : dx / length;
+    // The bone's thickness runs square to it and to its width.
+    const thick = cross(unit(sub(points[i], points[i - 1]), along), across);
+    const acrossSeen = turned(view, across);
+    const thickSeen = turned(view, thick);
+    // On screen y runs down, so the y of a direction in the room flips.
+    const radius = (width: number, thickness: number) =>
+      fixed(Math.hypot(width * (acrossSeen[0] * nx - acrossSeen[1] * ny), thickness * (thickSeen[0] * nx - thickSeen[1] * ny)));
+    const end = (k: number) =>
+      k === 0
+        ? radius(HAND.palmWidth[0], HAND.palmThickness[0])
+        : k === 1 && i === 1
+          ? radius(HAND.palmWidth[1], HAND.palmThickness[1])
+          : radius(lerp(HAND.fingerWidth[0], HAND.fingerWidth[1], reach[k]), lerp(HAND.fingerThickness[0], HAND.fingerThickness[1], reach[k]));
+    path += capsule(a, end(i - 1), b, end(i));
   }
   return path;
 }
@@ -1439,8 +1585,9 @@ export function traceFigure(
     rightArm: skeleton.rightPalm ? flat(thumbPoints(skeleton.rightArm, skeleton.rightPalm, 1)) : null,
     leftArm: skeleton.leftPalm ? flat(thumbPoints(skeleton.leftArm, skeleton.leftPalm, -1)) : null,
   };
-  // It has fingers drawn on it too.
+  // It has fingers drawn on it too, unless they're drawn whole, bending (see `handShape`).
   const fingersOf = (part: Part): string => {
+    if ((part === 'rightArm' && skeleton.rightFingers) || (part === 'leftArm' && skeleton.leftFingers)) return '';
     if (part === 'rightArm' && skeleton.rightPalm) return fingerLines(view, skeleton.rightArm[2], skeleton.rightArm[3], skeleton.rightPalm);
     if (part === 'leftArm' && skeleton.leftPalm) return fingerLines(view, skeleton.leftArm[2], skeleton.leftArm[3], skeleton.leftPalm);
     return '';
@@ -1476,7 +1623,12 @@ export function traceFigure(
     const over = forcedSide
       ? forcedSide[0] === 'torso'
       : !resting && ((forcedOver ? forcedOver.includes(part) : false) || overTorso(points, spine, thickness, isLeg ? spine[0] : neckBase, isLeg));
-    return { part, d: limbShape(points, isLeg ? LEG_RADII : ARM_RADII) + (isLeg ? '' : thumbShape(part)), depth, points, layer: over ? 2 : 0 };
+    // A hand with fingers that bend is drawn in place of the plain one.
+    const fingers = part === 'rightArm' ? skeleton.rightFingers : part === 'leftArm' ? skeleton.leftFingers : undefined;
+    const shape = fingers
+      ? limbShape(points.slice(0, 3), ARM_RADII) + handShape(view, part === 'rightArm' ? skeleton.rightArm[2] : skeleton.leftArm[2], fingers)
+      : limbShape(points, isLeg ? LEG_RADII : ARM_RADII);
+    return { part, d: shape + (isLeg ? '' : thumbShape(part)), depth, points, layer: over ? 2 : 0 };
   };
   const parts: { part: Part; d: string; depth: number; points: Vec3[]; layer: number }[] = [
     limb('leftLeg', leftLeg, true),
@@ -1867,7 +2019,7 @@ function tapeShape(tape: Clip3D['tape'], view: Mat3): Staging['tape'] {
 export function stageClip(clip: Clip3D): Staging {
   const view = viewOf(clip.camera);
   // Framed from somewhere up the body, the floor needn't be in the frame.
-  const upper = clip.camera.fit === 'upper' || clip.camera.fit === 'head';
+  const upper = clip.camera.fit === 'upper' || clip.camera.fit === 'head' || clip.camera.fit === 'hands';
   let left = Infinity;
   let right = -Infinity;
   let top = Infinity;

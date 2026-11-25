@@ -1,3 +1,4 @@
+import { FINGER_TENDON_GLIDES } from '@/data/exercise-animations';
 import { EXERCISES } from '@/data/exercises';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
 import { MARCHING_EXERCISE } from '@/data/test-warmup';
@@ -44,7 +45,9 @@ const STAND: Pose = {
   nearFoot: [480, 456, 0],
   farFoot: [488, 456, 0],
 };
-const hands = EXERCISES.flatMap((e) => (e.animation?.view === 'hand' ? [{ id: e.id, animation: e.animation }] : []));
+// Finger tendon glides has moved to the 3D engine, but its old clip stays until the new one has been
+// checked on a device, so it's still held to this engine's standard.
+const hands = [{ id: 'finger-tendon-glides', animation: FINGER_TENDON_GLIDES }];
 const ARM_REACH = BONES.upperArm + BONES.forearm;
 const LEG_REACH = BONES.thigh + BONES.shin;
 
