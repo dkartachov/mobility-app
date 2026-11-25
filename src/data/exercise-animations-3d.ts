@@ -5041,3 +5041,37 @@ export const FINGER_TENDON_GLIDES_3D: Clip3D = {
     { ms: 500, pose: GLIDE_STRAIGHT },
   ],
 };
+
+// --- Cuban rotation: a light dumbbell in each hand, the elbows lift out to shoulder height, then the forearms turn from hanging to pointing up ---
+
+/** The arms hang at the sides, the palms facing back, a little out so the weights clear the thighs. */
+const CUBAN_HANGING_ARM: ArmPose = { abduct: 10, elbow: 8, rotate: -90 };
+/** The elbows out to the sides at shoulder height, bent to a right angle, the forearms hanging. */
+const CUBAN_ROW_ARM: ArmPose = { abduct: 90, elbow: 90, rotate: -90 };
+
+/** Both arms the same. */
+const cuban = (arm: ArmPose): Pose3 => ({ ...STANDING, rightArm: arm, leftArm: arm });
+const CUBAN_HANGING = cuban(CUBAN_HANGING_ARM);
+const CUBAN_ROW = cuban(CUBAN_ROW_ARM);
+const CUBAN_UP = cuban({ ...CUBAN_ROW_ARM, rotate: 90 });
+
+export const CUBAN_ROTATION_3D: Clip3D = {
+  view: '3d',
+  // From the front and to the right, well above: both elbows show out at the sides, the far forearm
+  // sweeps up across the screen, and the near one, pointing at the camera halfway round, still
+  // shows its length from up here. Side on, the far arm was lost behind the body.
+  camera: { yaw: 60, pitch: 28, fit: 'upper' },
+  highlight: ['rightArm', 'leftArm'],
+  dumbbells: ['rightHand', 'leftHand'],
+  // Turned up, the weights over the elbows.
+  stillFrame: 3,
+  keyframes: [
+    { ms: 0, pose: CUBAN_HANGING },
+    { ms: 400, pose: CUBAN_HANGING },
+    { ms: 1200, pose: CUBAN_ROW },
+    { ms: 1400, pose: CUBAN_UP },
+    { ms: 600, pose: CUBAN_UP },
+    { ms: 1400, pose: CUBAN_ROW },
+    { ms: 1200, pose: CUBAN_HANGING },
+  ],
+};

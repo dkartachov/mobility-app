@@ -263,6 +263,12 @@ export type Clip3D = {
   phone?: PhoneMount;
   /** A tape measure lying flat from one point to another, on the floor or the top of a block. */
   tape?: { from: Vec3; to: Vec3 };
+  /**
+   * A light dumbbell held in each of these hands, the handle across the palm, so it turns with the
+   * hand (Cuban rotation). The hand has to know which way its palm faces: an arm posed by its
+   * angles does, and a pinned hand needs its `palm`.
+   */
+  dumbbells?: readonly ('rightHand' | 'leftHand')[];
   /** The test needs a second person, who isn't drawn: a badge says so instead. */
   partner?: boolean;
 };
@@ -322,6 +328,12 @@ export type Skeleton = {
   /** The way each palm faces, for a hand pinned with one (see `Pin.palm`), which gives it a thumb. */
   rightPalm?: Vec3;
   leftPalm?: Vec3;
+  /**
+   * The way each palm faces, where it's known: on an arm posed by its angles, or a hand pinned with
+   * a `palm`. Unlike `rightPalm`, it doesn't give the hand a thumb.
+   */
+  rightPalmFacing?: Vec3;
+  leftPalmFacing?: Vec3;
   /** A hand with fingers that bend (see `ArmPose.fingers`). */
   rightFingers?: FingerJoints;
   leftFingers?: FingerJoints;
@@ -359,6 +371,24 @@ export type FigureFrame = {
   strap: string;
   /** The clip's phone, drawn with the limb it's on. Empty paths without one. */
   phone: PhoneFrame;
+  /** The dumbbell in each hand, drawn with its arm. Empty paths for a hand without one. */
+  dumbbells: { rightArm: DumbbellFrame; leftArm: DumbbellFrame };
+};
+
+/**
+ * A dumbbell, in two halves either side of the hand that grips it: the one further from the camera
+ * is drawn under the arm and the nearer one over it. Each is the handle from the edge of the fist out
+ * to the weight, and the weight.
+ */
+export type DumbbellFrame = {
+  under: { handle: string; weight: string };
+  over: { handle: string; weight: string };
+  /**
+   * The far half is in front of the upper arm where they overlap: it goes over the arm, and the
+   * forearm and hand (`cover`) are drawn again over it.
+   */
+  raised: boolean;
+  cover: string;
 };
 
 export type PhoneFrame = {
@@ -689,12 +719,12 @@ export function solvePose(pose: Pose3): Skeleton {
 
   const rightArm = arm(rightShoulder, pose.rightArm, pose.pins?.rightHand, 1);
   const leftArm = arm(leftShoulder, pose.leftArm, pose.pins?.leftHand, -1);
-  // A hand with fingers bends them toward its palm: a pinned one's says which way it faces.
-  const fingers = (points: Vec3[], angles: ArmPose | undefined, pin: Pin | undefined, side: number): FingerJoints | undefined => {
-    if (!angles?.fingers) return undefined;
-    const palm = pin ? pin.palm : armPalm(chest, angles, side);
-    return palm ? fingerJoints(points[2], points[3], palm, angles.fingers) : undefined;
-  };
+  // Which way a palm faces is known for an arm posed by its angles, and for a pinned hand that says.
+  const rightPalmFacing = pose.pins?.rightHand ? pose.pins.rightHand.palm : armPalm(chest, pose.rightArm, 1);
+  const leftPalmFacing = pose.pins?.leftHand ? pose.pins.leftHand.palm : armPalm(chest, pose.leftArm, -1);
+  // A hand with fingers bends them toward its palm.
+  const fingers = (points: Vec3[], angles: ArmPose | undefined, palm: Vec3 | undefined): FingerJoints | undefined =>
+    angles?.fingers && palm ? fingerJoints(points[2], points[3], palm, angles.fingers) : undefined;
 
   return {
     spine,
@@ -710,8 +740,10 @@ export function solvePose(pose: Pose3): Skeleton {
     leftLeg: leg(leftHip, pose.leftLeg, pose.pins?.leftFoot, -1),
     rightPalm: pose.pins?.rightHand?.palm,
     leftPalm: pose.pins?.leftHand?.palm,
-    rightFingers: fingers(rightArm, pose.rightArm, pose.pins?.rightHand, 1),
-    leftFingers: fingers(leftArm, pose.leftArm, pose.pins?.leftHand, -1),
+    rightPalmFacing,
+    leftPalmFacing,
+    rightFingers: fingers(rightArm, pose.rightArm, rightPalmFacing),
+    leftFingers: fingers(leftArm, pose.leftArm, leftPalmFacing),
   };
 }
 
@@ -1517,6 +1549,67 @@ function phoneShape(skeleton: Skeleton, view: Mat3, mount: PhoneMount | undefine
   };
 }
 
+/**
+ * A light dumbbell: how far apart its weights are, how thick each is along the handle and its
+ * radius, the handle's radius, how far along the hand from the wrist it's gripped, and how far the
+ * fist reaches along the handle either side of the grip, which hides that much of it.
+ */
+export const DUMBBELL = { between: 30, weight: 7, radius: 12, handle: 3, grip: 0.55, fist: 10 };
+/** How many points go round each face of a weight. */
+const DUMBBELL_STEPS = 16;
+const NO_DUMBBELL_HALF = { handle: '', weight: '' };
+const NO_DUMBBELL: DumbbellFrame = { under: NO_DUMBBELL_HALF, over: NO_DUMBBELL_HALF, raised: false, cover: '' };
+
+/** Where a dumbbell's middle is, and which way its handle runs: across the palm, from the thumb's side to the little finger's. */
+export function dumbbellPlacement(arm: readonly Vec3[], palm: Vec3): { center: Vec3; axis: Vec3 } {
+  'worklet';
+  const along = unit(sub(arm[3], arm[2]), [0, -1, 0]);
+  const facing = unit(sub(palm, scaled(along, dot(palm, along))), [1, 0, 0]);
+  return { center: lerpVec(arm[2], arm[3], DUMBBELL.grip), axis: cross(along, facing) };
+}
+
+/** The dumbbell in a hand, as the camera sees it. */
+function dumbbellShape(view: Mat3, arm: readonly Vec3[], palm: Vec3 | undefined): DumbbellFrame {
+  'worklet';
+  if (!palm) return NO_DUMBBELL;
+  const { center, axis } = dumbbellPlacement(arm, palm);
+  // Two directions square to the handle, to go round the weights with.
+  const u = unit(cross(axis, Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]), [1, 0, 0]);
+  const v = cross(axis, u);
+  const half = (sign: number) => {
+    const inner = add(center, scaled(axis, (sign * DUMBBELL.between) / 2));
+    const outer = add(center, scaled(axis, sign * (DUMBBELL.between / 2 + DUMBBELL.weight)));
+    // A weight is a short cylinder: on screen, the outline round both its faces.
+    const points: Vec2[] = [];
+    for (let i = 0; i < DUMBBELL_STEPS; i++) {
+      const angle = (2 * Math.PI * i) / DUMBBELL_STEPS;
+      const rim = add(scaled(u, DUMBBELL.radius * Math.cos(angle)), scaled(v, DUMBBELL.radius * Math.sin(angle)));
+      const a = project(view, add(inner, rim));
+      const b = project(view, add(outer, rim));
+      points.push([a[0], a[1]], [b[0], b[1]]);
+    }
+    return {
+      handle: capsule(project(view, add(center, scaled(axis, sign * DUMBBELL.fist))), DUMBBELL.handle, project(view, inner), DUMBBELL.handle),
+      weight: polygon(hull(points)),
+      depth: project(view, outer)[2],
+    };
+  };
+  const a = half(1);
+  const b = half(-1);
+  const [near, far] = a.depth > b.depth ? [a, b] : [b, a];
+  // The far half is behind the hand and the forearm, which are square to the handle, but can be in
+  // front of the upper arm: with the forearm turned toward the camera, the weight on the inside of
+  // the fist is nearer than the upper arm it overlaps. It goes over the arm then, and the forearm
+  // and hand are drawn again over it.
+  const upper = [project(view, arm[0]), project(view, arm[1])];
+  const farCenter = project(view, add(center, scaled(axis, (a.depth > b.depth ? -1 : 1) * (DUMBBELL.between / 2 + DUMBBELL.weight / 2))));
+  const behindUpper = nearestOnScreen(upper, farCenter);
+  const raised = behindUpper.gap < DUMBBELL.radius + ARM_RADII[0][0] && farCenter[2] > behindUpper.depth;
+  // Without an outline: it joins the arm drawn under it, and stands out from the dark weight anyway.
+  const cover = raised ? limbShape([project(view, arm[1]), project(view, arm[2]), project(view, arm[3])], ARM_RADII.slice(1)) : '';
+  return { under: { handle: far.handle, weight: far.weight }, over: { handle: near.handle, weight: near.weight }, raised, cover };
+}
+
 /** How far along a hand drawn on its own its outline starts, which keeps the outline off the wrist it joins. */
 const HELD_HAND_OUTLINE_FROM = 0.6;
 /** How far along the forearm from the elbow the outline of a forearm drawn on its own over the torso starts. */
@@ -1564,7 +1657,9 @@ export function traceFigure(
   /** Hands to draw again over the limb they hold, see `Clip3D.holds`. */
   holds?: Clip3D['holds'],
   /** Arms to put behind the torso with their forearms and hands drawn again over it, see `Clip3D.handsOnBody`. */
-  handsOnBody?: Clip3D['handsOnBody']
+  handsOnBody?: Clip3D['handsOnBody'],
+  /** Hands holding a dumbbell, see `Clip3D.dumbbells`. */
+  dumbbells?: Clip3D['dumbbells']
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -1859,7 +1954,16 @@ export function traceFigure(
     }
   }
 
-  return { slots, shadow, strap: strapLine, phone: phoneShape(skeleton, view, phone, reading) };
+  return {
+    slots,
+    shadow,
+    strap: strapLine,
+    phone: phoneShape(skeleton, view, phone, reading),
+    dumbbells: {
+      rightArm: dumbbells && dumbbells.includes('rightHand') ? dumbbellShape(view, skeleton.rightArm, skeleton.rightPalmFacing) : NO_DUMBBELL,
+      leftArm: dumbbells && dumbbells.includes('leftHand') ? dumbbellShape(view, skeleton.leftArm, skeleton.leftPalmFacing) : NO_DUMBBELL,
+    },
+  };
 }
 
 /**
@@ -1882,7 +1986,7 @@ export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   const pose = poseAt3(clip, timeMs);
   const skeleton = solvePose(pose);
   const behind = pose.behind ? (clip.behind ? [...clip.behind, ...pose.behind] : pose.behind) : clip.behind;
-  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody);
+  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells);
 }
 
 function duration(clip: Clip3D): number {

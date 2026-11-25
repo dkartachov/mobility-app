@@ -19,6 +19,7 @@ import {
   COBRA_TO_PRAYER_3D,
   COSSACK_SQUAT_3D,
   COUCH_STRETCH_3D,
+  CUBAN_ROTATION_3D,
   DOWNWARD_FACING_DOG_3D,
   DOWNWARD_FACING_DOG_TO_COBRA_3D,
   ELEPHANT_WALK_3D,
@@ -66,7 +67,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  CUBAN_ROTATION,
   HALF_SPINAL_TWIST,
   HALF_TWISTED_LIZARD,
   INCHWORM,
@@ -1267,7 +1267,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Rotate back down, lower your arms, and keep repeating slowly',
     ],
     photo: require('@/assets/images/exercises/cuban-rotation.png'),
-    animation: CUBAN_ROTATION,
+    animation: CUBAN_ROTATION_3D,
     active: true,
     oneMinuteOnly: true,
   },

@@ -12,6 +12,7 @@ import {
   BUTTERFLY_3D,
   CAT_COW_3D,
   COBRA_TO_PRAYER_3D,
+  CUBAN_ROTATION_3D,
   COSSACK_SQUAT_3D,
   DOWNWARD_FACING_DOG_3D,
   DOWNWARD_FACING_DOG_TO_COBRA_3D,
@@ -75,6 +76,8 @@ import { MARCHING_EXERCISE } from '@/data/test-warmup';
 
 import {
   distance,
+  DUMBBELL,
+  dumbbellPlacement,
   frameAt,
   framedJoints,
   HAND,
@@ -524,6 +527,7 @@ describe('3D clips', () => {
       'reverse-tabletop',
       'downward-facing-dog-to-cobra',
       'finger-tendon-glides',
+      'cuban-rotation',
       'warmup-marching',
     ]));
   });
@@ -1211,6 +1215,68 @@ describe('3D clips', () => {
     }
     // Nothing ever changes places, and the face, turned to the camera, keeps its nose.
     expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg rightLeg torso head leftArm leftArm hand rightArm rightArm hand']));
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBeGreaterThan(2);
+  });
+
+  it('lifts the elbows to shoulder height and turns the forearms from hanging to straight up, dumbbells in hand, in Cuban rotation', () => {
+    const clip = CUBAN_ROTATION_3D;
+    expect(clip.dumbbells).toEqual(['rightHand', 'leftHand']);
+    const timeOf = (index: number) => clip.keyframes.slice(1, index + 1).reduce((total, frame) => total + frame.ms, 0);
+    // The rotation is between the row, the elbows up with the forearms hanging, and the forearms up.
+    const row = clip.keyframes.findIndex((frame, i) => i > 0 && frame.pose !== clip.keyframes[0].pose);
+    const up = clip.stillFrame;
+    const turning: Skeleton[] = [];
+    for (let t = timeOf(row); t <= timeOf(up); t += 10) turning.push(solvePose(poseAt3(clip, t)));
+    const elbow = turning[0].rightArm[1];
+    for (const { rightArm, leftArm } of turning) {
+      for (const arm of [rightArm, leftArm]) {
+        // The elbow out to the side at shoulder height, where it stays, bent to a right angle.
+        expect(arm[1][1]).toBeCloseTo(arm[0][1]);
+        expect(arm[1][0]).toBeCloseTo(arm[0][0]);
+        expect(angleAt(arm[0], arm[1], arm[2])).toBeCloseTo(90);
+      }
+      expect(distance(rightArm[1], elbow)).toBeCloseTo(0);
+    }
+    // The forearms hang straight down to start and point straight up at the end, through ahead.
+    const first = turning[0].rightArm;
+    const last = turning[turning.length - 1].rightArm;
+    expect(fromHanging(first[1], first[2])).toBeCloseTo(0);
+    expect(tipped(last[1], last[2])).toBeCloseTo(0);
+    const halfway = turning[Math.floor(turning.length / 2)].rightArm;
+    expect(halfway[2][0] - halfway[1][0]).toBeGreaterThan(0.9 * SKELETON.forearm);
+    // The handle runs across the palm: along the upper arm with the forearm hanging or up, so it
+    // turns with the hand, the weights out to either side of the fist.
+    for (const skeleton of [turning[0], turning[turning.length - 1]]) {
+      const { axis, center } = dumbbellPlacement(skeleton.rightArm, skeleton.rightPalmFacing!);
+      expect(Math.abs(axis[2])).toBeCloseTo(1);
+      expect(distance(center, skeleton.rightArm[2])).toBeCloseTo(DUMBBELL.grip * SKELETON.hand);
+    }
+    // Both halves of each dumbbell are drawn, all the way through.
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 100) {
+      const { dumbbells } = frameAt(clip, view, t);
+      for (const dumbbell of [dumbbells.rightArm, dumbbells.leftArm]) {
+        for (const half of [dumbbell.under, dumbbell.over]) {
+          expect(half.weight).not.toBe('');
+          expect(half.handle).not.toBe('');
+        }
+      }
+    }
+    // Past halfway round, the near forearm points up toward the camera and the weight on the inside
+    // of the fist is in front of the upper arm it overlaps: it goes over the arm, under the forearm
+    // and hand drawn again over it, rather than vanishing into the bicep.
+    const raised: number[] = [];
+    for (let t = timeOf(row); t <= timeOf(up); t += 10) {
+      const dumbbell = frameAt(clip, view, t).dumbbells.rightArm;
+      if (!dumbbell.raised) continue;
+      raised.push(t);
+      expect(dumbbell.cover).not.toBe('');
+    }
+    expect(raised.length).toBeGreaterThan(10);
+    // Hanging and up, the weights are clear of the upper arm, and go under the arm and over it as usual.
+    for (const t of [0, timeOf(row), timeOf(up)]) expect(frameAt(clip, view, t).dumbbells.rightArm.raised).toBe(false);
+    // Nothing ever changes places, and the face, turned to the camera, keeps its nose.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightLeg rightArm']));
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBeGreaterThan(2);
   });
 

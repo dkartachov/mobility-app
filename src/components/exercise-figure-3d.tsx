@@ -24,11 +24,14 @@ const COLORS = {
   /** The screen is lit like an old LCD, with the reading in dark segments on it. */
   phone: { body: '#22302E', screen: '#8FB5AE', reading: '#13211F', band: '#3E4D4B' },
   tape: { strip: '#E9C46A', marks: '#5B4A1E' },
+  dumbbell: { handle: '#3E4D4B', weight: '#22302E' },
   badge: { background: '#FFFFFF', text: '#0B3B36' },
 };
 
 /** How far the background shows around each part of the body, so limbs that cross stay apart. */
 const OUTLINE = 4.5;
+/** How far the background shows around a dumbbell. */
+const DUMBBELL_OUTLINE = 3;
 /** How thick the lines between a hand's fingers are. */
 const FINGER_LINE = 1.8;
 
@@ -69,11 +72,65 @@ function PhoneLayer({ frame, index, over }: { frame: SharedValue<FigureFrame>; i
 }
 
 /**
+ * The half of a dumbbell on one side of the hand holding it, if this slot is that hand's arm: the
+ * far half under the arm (`under`), the near one over it (`over`). Outlined in the background color,
+ * like the body. Where the far half is in front of the upper arm, it goes over the arm instead
+ * (`raised`), with the forearm and hand drawn again over it in the arm's colors.
+ */
+function DumbbellLayer({ frame, index, stage }: { frame: SharedValue<FigureFrame>; index: number; stage: 'under' | 'raised' | 'over' }) {
+  const dumbbellOf = (f: FigureFrame) => {
+    'worklet';
+    const slot = f.slots[index];
+    if (slot.hand || (slot.part !== 'rightArm' && slot.part !== 'leftArm')) return null;
+    return f.dumbbells[slot.part];
+  };
+  const half = (f: FigureFrame) => {
+    'worklet';
+    const dumbbell = dumbbellOf(f);
+    if (!dumbbell) return null;
+    if (stage === 'over') return dumbbell.over;
+    return (stage === 'raised') === dumbbell.raised ? dumbbell.under : null;
+  };
+  const handle = useAnimatedProps(() => ({ d: half(frame.get())?.handle ?? '' }));
+  const weight = useAnimatedProps(() => ({ d: half(frame.get())?.weight ?? '' }));
+  const cover = (f: FigureFrame) => {
+    'worklet';
+    return stage === 'raised' ? (dumbbellOf(f)?.cover ?? '') : '';
+  };
+  const far = useAnimatedProps(() => {
+    const f = frame.get();
+    return { d: f.slots[index].accent ? '' : cover(f) };
+  });
+  const near = useAnimatedProps(() => {
+    const f = frame.get();
+    return { d: f.slots[index].accent ? '' : cover(f), fillOpacity: f.slots[index].shade };
+  });
+  const accent = useAnimatedProps(() => {
+    const f = frame.get();
+    return { d: f.slots[index].accent ? cover(f) : '' };
+  });
+  return (
+    <>
+      <AnimatedPath animatedProps={handle} fill={COLORS.dumbbell.handle} stroke={COLORS.background} strokeWidth={DUMBBELL_OUTLINE} />
+      <AnimatedPath animatedProps={weight} fill={COLORS.dumbbell.weight} stroke={COLORS.background} strokeWidth={DUMBBELL_OUTLINE} strokeLinejoin="round" />
+      {stage === 'raised' && (
+        <>
+          <AnimatedPath animatedProps={far} fill={COLORS.far} />
+          <AnimatedPath animatedProps={near} fill={COLORS.near} />
+          <AnimatedPath animatedProps={accent} fill={COLORS.accent} />
+        </>
+      )}
+    </>
+  );
+}
+
+/**
  * Whichever part of the body is this far from the camera right now. The slots are drawn furthest
  * first, and the parts move between them as they pass in front of each other. Colors can't follow
  * them, so every slot has each color laid over the last: the far shade, the near shade let through
  * by how near the part is, and the accent, which is only drawn for a highlighted part. A hand with
- * a thumb has the lines between its fingers stroked over it. The clip's
+ * a thumb has the lines between its fingers stroked over it, and a hand holding a dumbbell has a
+ * half of it either side. The clip's
  * trail goes under whichever slot holds the part it traces, and its phone with the part it's on.
  */
 function Slot({
@@ -82,12 +139,14 @@ function Slot({
   trail,
   trailed,
   phone,
+  dumbbells,
 }: {
   frame: SharedValue<FigureFrame>;
   index: number;
   trail: string;
   trailed?: Part;
   phone: boolean;
+  dumbbells: boolean;
 }) {
   const path = useAnimatedProps(() => {
     const slot = frame.get().slots[index];
@@ -112,11 +171,14 @@ function Slot({
     <>
       <AnimatedPath animatedProps={path} fill="none" stroke={COLORS.accent} strokeWidth={5} strokeDasharray="2 12" strokeLinecap="round" opacity={0.8} />
       {phone && <PhoneLayer frame={frame} index={index} over={false} />}
+      {dumbbells && <DumbbellLayer frame={frame} index={index} stage="under" />}
       <AnimatedPath animatedProps={outline} fill="none" stroke={COLORS.background} strokeWidth={2 * OUTLINE} strokeLinejoin="round" />
       <AnimatedPath animatedProps={far} fill={COLORS.far} />
       <AnimatedPath animatedProps={near} fill={COLORS.near} />
       <AnimatedPath animatedProps={accent} fill={COLORS.accent} />
       <AnimatedPath animatedProps={fingers} fill="none" stroke={COLORS.background} strokeWidth={FINGER_LINE} strokeLinecap="round" />
+      {dumbbells && <DumbbellLayer frame={frame} index={index} stage="raised" />}
+      {dumbbells && <DumbbellLayer frame={frame} index={index} stage="over" />}
       {phone && <PhoneLayer frame={frame} index={index} over />}
     </>
   );
@@ -168,7 +230,7 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
           </>
         )}
         {slots.map((index) => (
-          <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} phone={clip.phone !== undefined} />
+          <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} phone={clip.phone !== undefined} dumbbells={clip.dumbbells !== undefined} />
         ))}
         {clip.strap && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
       </Svg>

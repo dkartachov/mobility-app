@@ -31,8 +31,10 @@ const COLORS = {
   scenery: { light: '#C9DDD9', mid: '#B4CFCA', dark: '#A3C2BC' },
   phone: { body: '#22302E', screen: '#8FB5AE', reading: '#13211F', band: '#3E4D4B' },
   tape: { strip: '#E9C46A', marks: '#5B4A1E' },
+  dumbbell: { handle: '#3E4D4B', weight: '#22302E' },
 };
 const OUTLINE = 4.5;
+const DUMBBELL_OUTLINE = 3;
 const FINGER_LINE = 1.8;
 
 const [clipName, output] = process.argv.slice(2);
@@ -88,16 +90,30 @@ const { phone } = frame;
 const phoneSvg =
   `<path d="${phone.body}" fill="${COLORS.phone.body}" stroke="${COLORS.background}" stroke-width="2" stroke-linejoin="round"/><path d="${phone.screen}" fill="${COLORS.phone.screen}"/>` +
   `<path d="${phone.reading}" fill="none" stroke="${COLORS.phone.reading}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+// A dumbbell's far half goes under the arm holding it and its near half over it.
+const dumbbellSvg = (half) =>
+  `<path d="${half.handle}" fill="${COLORS.dumbbell.handle}" stroke="${COLORS.background}" stroke-width="${DUMBBELL_OUTLINE}"/>` +
+  `<path d="${half.weight}" fill="${COLORS.dumbbell.weight}" stroke="${COLORS.background}" stroke-width="${DUMBBELL_OUTLINE}" stroke-linejoin="round"/>`;
 for (const slot of frame.slots) {
+  const dumbbell = !slot.hand && (slot.part === 'rightArm' || slot.part === 'leftArm') ? frame.dumbbells[slot.part] : null;
   if (stage.trail && slot.part === trailed && !slot.hand) {
     body += `<path d="${stage.trail}" fill="none" stroke="${COLORS.accent}" stroke-width="5" stroke-dasharray="2 12" stroke-linecap="round" opacity="0.8"/>`;
   }
   if (phone.part === slot.part && !slot.hand && !phone.over) body += phoneSvg;
+  if (dumbbell && !dumbbell.raised) body += dumbbellSvg(dumbbell.under);
   body += `<path d="${slot.outline}" fill="none" stroke="${COLORS.background}" stroke-width="${2 * OUTLINE}" stroke-linejoin="round"/>`;
   body += slot.accent
     ? `<path d="${slot.d}" fill="${COLORS.accent}"/>`
     : `<path d="${slot.d}" fill="${COLORS.far}"/><path d="${slot.d}" fill="${COLORS.near}" fill-opacity="${slot.shade}"/>`;
   if (slot.fingers) body += `<path d="${slot.fingers}" fill="none" stroke="${COLORS.background}" stroke-width="${FINGER_LINE}" stroke-linecap="round"/>`;
+  // A far half in front of the upper arm goes over the arm, with the forearm and hand drawn again over it.
+  if (dumbbell && dumbbell.raised) {
+    body += dumbbellSvg(dumbbell.under);
+    body += slot.accent
+      ? `<path d="${dumbbell.cover}" fill="${COLORS.accent}"/>`
+      : `<path d="${dumbbell.cover}" fill="${COLORS.far}"/><path d="${dumbbell.cover}" fill="${COLORS.near}" fill-opacity="${slot.shade}"/>`;
+  }
+  if (dumbbell) body += dumbbellSvg(dumbbell.over);
   if (phone.part === slot.part && !slot.hand && phone.over) {
     // The strap goes behind the phone, like an armband, so it doesn't hide the reading.
     if (phone.band) body += `<path d="${phone.band}" fill="none" stroke="${COLORS.phone.band}" stroke-width="5" stroke-linecap="round"/>`;
