@@ -271,6 +271,19 @@ export type Clip3D = {
   dumbbells?: readonly ('rightHand' | 'leftHand')[];
   /** The test needs a second person, who isn't drawn: a badge says so instead. */
   partner?: boolean;
+  /**
+   * The camera travels along the floor with the figure, keeping the pelvis where it started on
+   * screen, for an exercise that moves off across the room (inchworm). Lines across the mat slide by
+   * underneath to show the floor going past. The clip still loops on screen: its last pose is its
+   * first one, further along the room, and only the pelvis's distance along x is followed.
+   */
+  follow?: boolean;
+  /**
+   * `false` leaves the head a plain circle all the way through, even where the face turns toward
+   * the camera, for a clip where a nose that comes partway through only distracts (open book, where
+   * the face turns up as the chest opens).
+   */
+  nose?: false;
 };
 
 export type HeldLimb = {
@@ -373,6 +386,8 @@ export type FigureFrame = {
   phone: PhoneFrame;
   /** The dumbbell in each hand, drawn with its arm. Empty paths for a hand without one. */
   dumbbells: { rightArm: DumbbellFrame; leftArm: DumbbellFrame };
+  /** Lines across the mat that slide by under a figure the camera follows, to stroke. Empty otherwise. */
+  floor: string;
 };
 
 /**
@@ -1169,10 +1184,10 @@ function lineHole(points: readonly Vec2[], halfWidth: number): string {
  * past the head's outline, the rest of the body already shows which way the figure faces, so the
  * head is left plain. So is the back of the head.
  */
-function headShape(view: Mat3, skeleton: Skeleton, head: Vec3): string {
+function headShape(view: Mat3, skeleton: Skeleton, head: Vec3, withNose: boolean): string {
   'worklet';
   const outline = disc(head, SKELETON.head, SKELETON.head);
-  if (turned(view, skeleton.facing)[2] <= 0) return outline;
+  if (!withNose || turned(view, skeleton.facing)[2] <= 0) return outline;
   const nose = noseOutline(view, skeleton);
   let sticksOut = -Infinity;
   for (let i = 0; i < nose.length; i++) sticksOut = Math.max(sticksOut, Math.hypot(nose[i][0] - head[0], nose[i][1] - head[1]) - SKELETON.head);
@@ -1659,7 +1674,9 @@ export function traceFigure(
   /** Arms to put behind the torso with their forearms and hands drawn again over it, see `Clip3D.handsOnBody`. */
   handsOnBody?: Clip3D['handsOnBody'],
   /** Hands holding a dumbbell, see `Clip3D.dumbbells`. */
-  dumbbells?: Clip3D['dumbbells']
+  dumbbells?: Clip3D['dumbbells'],
+  /** Whether a face turned toward the camera gets its nose, see `Clip3D.nose`. */
+  withNose = true
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -1808,7 +1825,7 @@ export function traceFigure(
     else if (firstInFront === parts.length) firstInFront = i;
   }
   const at = lastBehind < firstInFront ? lastBehind + 1 : byDepth;
-  parts.splice(at, 0, { part: 'head', d: headShape(view, skeleton, head), depth: headDepth, points: [head], layer: 1 });
+  parts.splice(at, 0, { part: 'head', d: headShape(view, skeleton, head, withNose), depth: headDepth, points: [head], layer: 1 });
 
   const slots: FigureSlot[] = [];
   for (let i = 0; i < parts.length; i++) {
@@ -1958,6 +1975,7 @@ export function traceFigure(
     slots,
     shadow,
     strap: strapLine,
+    floor: '',
     phone: phoneShape(skeleton, view, phone, reading),
     dumbbells: {
       rightArm: dumbbells && dumbbells.includes('rightHand') ? dumbbellShape(view, skeleton.rightArm, skeleton.rightPalmFacing) : NO_DUMBBELL,
@@ -1980,13 +1998,72 @@ export function trailedPart(trail: Clip3D['trail']): Part | undefined {
   return undefined;
 }
 
+// These come before `frameAt`, which uses them: a worklet takes the functions it calls with it
+// as they are when it's made.
+
+function travelOf(clip: Clip3D, pose: Pose3): number {
+  'worklet';
+  return clip.follow ? pose.pelvis[0] - clip.keyframes[0].pose.pelvis[0] : 0;
+}
+
+/**
+ * How far along the room the figure has gone at this time since the clip's first pose, in a clip
+ * the camera follows (`follow`), and so how far the camera has gone with it. Nothing otherwise.
+ */
+export function travelAt3(clip: Clip3D, timeMs: number): number {
+  'worklet';
+  return travelOf(clip, poseAt3(clip, timeMs));
+}
+
+/** The pose moved along the room by `dx`, pins and all: where a camera that follows it sees it. */
+export function shiftedPose(pose: Pose3, dx: number): Pose3 {
+  'worklet';
+  const pin = (p: Pin | undefined): Pin | undefined => (p ? { ...p, at: [p.at[0] + dx, p.at[1], p.at[2]] } : undefined);
+  const pins = pose.pins;
+  return {
+    ...pose,
+    pelvis: [pose.pelvis[0] + dx, pose.pelvis[1], pose.pelvis[2]],
+    pins: pins ? { rightHand: pin(pins.rightHand), leftHand: pin(pins.leftHand), rightFoot: pin(pins.rightFoot), leftFoot: pin(pins.leftFoot) } : undefined,
+  };
+}
+
+/** About how far apart the lines across the mat are under a figure the camera follows. */
+const FLOOR_MARK_SPACING = 90;
+/** How far the lines reach either side of the middle of the mat, which is always wider than this. */
+const FLOOR_MARK_HALF_WIDTH = 55;
+/** How far along the room either way the mat and its lines go, well past the frame. */
+const FLOOR_REACH = 1600;
+
+/**
+ * Lines across the mat, slid back by how far the figure has gone. They're spaced so a whole number
+ * of them fit into the clip's whole journey, so they're back where they started as it loops.
+ */
+function floorMarks(view: Mat3, travel: number, journey: number): string {
+  'worklet';
+  const length = Math.abs(journey);
+  const spacing = length < 1 ? FLOOR_MARK_SPACING : length / Math.max(1, Math.round(length / FLOOR_MARK_SPACING));
+  const left = ((travel % spacing) + spacing) % spacing;
+  // A whole journey can come out a hair short of a whole number of spacings.
+  const offset = spacing - left < 1e-6 ? 0 : left;
+  let path = '';
+  for (let x = -FLOOR_REACH - offset; x <= FLOOR_REACH; x += spacing) {
+    const a = project(view, [x, 0, -FLOOR_MARK_HALF_WIDTH]);
+    const b = project(view, [x, 0, FLOOR_MARK_HALF_WIDTH]);
+    path += `M${fixed(a[0])} ${fixed(a[1])}L${fixed(b[0])} ${fixed(b[1])}`;
+  }
+  return path;
+}
+
 /** The clip at a moment, drawn. */
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
   const pose = poseAt3(clip, timeMs);
-  const skeleton = solvePose(pose);
+  const travel = travelOf(clip, pose);
+  const skeleton = solvePose(clip.follow ? shiftedPose(pose, -travel) : pose);
   const behind = pose.behind ? (clip.behind ? [...clip.behind, ...pose.behind] : pose.behind) : clip.behind;
-  return traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells);
+  const frame = traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells, clip.nose !== false);
+  if (clip.follow) frame.floor = floorMarks(view, travel, travelOf(clip, clip.keyframes[clip.keyframes.length - 1].pose));
+  return frame;
 }
 
 function duration(clip: Clip3D): number {
@@ -2134,7 +2211,9 @@ export function stageClip(clip: Clip3D): Staging {
   const total = duration(clip);
   const steps = Math.max(1, Math.ceil(total / SAMPLE_MS));
   for (let step = 0; step <= steps; step++) {
-    const skeleton = solvePose(poseAt3(clip, (total * step) / steps));
+    // A camera that follows the figure sees it where it started along the room.
+    const pose = poseAt3(clip, (total * step) / steps);
+    const skeleton = solvePose(clip.follow ? shiftedPose(pose, -travelOf(clip, pose)) : pose);
     const body = [...skeleton.spine, skeleton.head, ...skeleton.rightArm, ...skeleton.leftArm];
     const legs = [...skeleton.rightLeg, ...skeleton.leftLeg];
     for (const joint of framedJoints(skeleton, clip.camera.fit)) {
@@ -2185,6 +2264,11 @@ export function stageClip(clip: Clip3D): Staging {
     minX = Math.min(minX, block.from[0], block.to[0]);
     maxX = Math.max(maxX, block.from[0], block.to[0]);
     halfWidth = Math.max(halfWidth, Math.abs(block.from[2]), Math.abs(block.to[2]));
+  }
+  // Under a figure the camera follows, the room goes by, so the mat runs right across the frame.
+  if (clip.follow) {
+    minX -= FLOOR_REACH;
+    maxX += FLOOR_REACH;
   }
   const corners: Vec3[] = [
     [minX, 0, -halfWidth],

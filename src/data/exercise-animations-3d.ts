@@ -1,4 +1,4 @@
-import { distance, SKELETON, solveJoint3, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Fingers, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
+import { distance, shiftedPose, SKELETON, solveJoint3, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Fingers, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -5295,4 +5295,371 @@ export const HALF_TWISTED_LIZARD_3D: Clip3D = {
     // Out of it with the arm and the leg together.
     ...alongArc(2000, TWIST_LIZARD_STEPS, releaseTwistedLizard),
   ],
+};
+
+// --- Open book: lying on the left side with the knees bent to 90°, the top arm sweeps over to the floor behind as the chest turns open ---
+
+/** How high the spine lies off the floor on the side: the bottom shoulder and hip just clear of it. */
+const BOOK_SPINE_Y = 46;
+/**
+ * The top arm comes down across the chest, out in front, to rest on the bottom one, palms together:
+ * the shoulders are stacked a shoulder-width apart, and the hands a hand's thickness.
+ */
+/**
+ * Both shoulders are drawn down toward the hips the whole way, the arms reaching long from them,
+ * which keeps the top one clear of the head from this camera. Drawn down together, they stay the
+ * same distance apart along the body, so the hands still meet.
+ */
+const BOOK_SHRUG = -30;
+const BOOK_PALMS_TOGETHER = -(Math.asin((2 * SKELETON.shoulder * Math.cos(radians(BOOK_SHRUG)) - 14) / ARM_REACH) * 180) / Math.PI;
+/** Open: the chest turned toward the ceiling and the arm on past it, reaching for the floor behind. */
+const BOOK_OPEN = { twist: -75, arm: 110, neck: -45 };
+
+const bookBody = (t: number): Pose3 => ({
+  pelvis: [0, BOOK_SPINE_Y, 0],
+  tilt: -90,
+  spine: { twist: BOOK_OPEN.twist * t },
+  neck: { twist: BOOK_OPEN.neck * t },
+  rightArm: { flex: 90, abduct: mix(BOOK_PALMS_TOGETHER, BOOK_OPEN.arm, t), shrug: BOOK_SHRUG },
+  leftArm: { flex: 90, shrug: BOOK_SHRUG },
+  // The top knee rests on the bottom one.
+  rightLeg: { flex: 90, knee: 90, abduct: -8 },
+  leftLeg: { flex: 90, knee: 90 },
+});
+/** Where the bottom hand rests on the floor to start, the arm straight out in front. */
+const BOOK_FLOOR_HAND = solvePose(bookBody(0)).leftArm[2];
+
+/**
+ * The book this far open, from closed (0). The pelvis and the stacked knees stay where they are,
+ * and the twist runs up the spine, so the chest turns the most. The top arm stays straight out from
+ * the chest at shoulder height, swinging round it, and the head turns to follow the hand.
+ *
+ * The bottom arm stays straight along the floor. The chest rolls onto its back over it, which
+ * would bring that shoulder forward and up toward the hand; its shoulder blade draws back instead,
+ * keeping the shoulder an arm's length from the hand, and what that can't make up the hand slides
+ * along the floor.
+ */
+const openBookAt = (t: number): Pose3 => {
+  const body = bookBody(t);
+  const shoulder = (protract: number) => solvePose({ ...body, leftArm: { protract, shrug: BOOK_SHRUG } }).leftArm[0];
+  // Drawing the blade back takes the shoulder further from the hand.
+  let [back, forward] = [-30, 0];
+  for (let i = 0; i < 40; i++) {
+    const protract = (back + forward) / 2;
+    if (distance(shoulder(protract), BOOK_FLOOR_HAND) > ARM_REACH) back = protract;
+    else forward = protract;
+  }
+  const protract = (back + forward) / 2;
+  const root = shoulder(protract);
+  // Along the floor, ahead, until the arm is straight.
+  const [dy, dz] = [BOOK_FLOOR_HAND[1] - root[1], BOOK_FLOOR_HAND[2] - root[2]];
+  const ahead = Math.max(BOOK_FLOOR_HAND[0], root[0] + Math.sqrt(Math.max(0, ARM_REACH ** 2 - dy ** 2 - dz ** 2)));
+  return {
+    ...body,
+    leftArm: { protract, shrug: BOOK_SHRUG },
+    pins: { leftHand: { at: [ahead, BOOK_FLOOR_HAND[1], BOOK_FLOOR_HAND[2]], toward: [1, 0, 0], pole: [0, 0, -1] } },
+  };
+};
+const BOOK_CLOSED_POSE = openBookAt(0);
+const BOOK_OPEN_POSE = openBookAt(1);
+const BOOK_STEPS = 16;
+
+export const OPEN_BOOK_3D: Clip3D = {
+  view: '3d',
+  // From the feet end, a little behind the back and well above: the arm sweeps round over the body
+  // in a half circle across the screen, the chest turning up toward the camera with it, and the
+  // stacked knees are in front, down on the floor. High enough that the head, further along the
+  // body, sits clear above the top shoulder on screen.
+  camera: { yaw: 340, pitch: 62 },
+  highlight: ['torso', 'rightArm'],
+  behind: [
+    // The head lies beyond the neck from here, but the neck goes into it, so the head is drawn over
+    // the torso rather than the neck showing through it.
+    ['torso', 'head'],
+    // The top knee is nearer the camera than the top arm. They're well apart on screen, and by
+    // depth they swapped as the arm went overhead.
+    ['rightArm', 'rightLeg'],
+  ],
+  // The face turns up toward the camera as the chest opens, and a nose appearing partway through
+  // only distracts from the arm.
+  nose: false,
+  // Open.
+  stillFrame: 1 + BOOK_STEPS,
+  keyframes: [
+    { ms: 0, pose: BOOK_CLOSED_POSE },
+    { ms: 500, pose: BOOK_CLOSED_POSE },
+    ...alongArc(2200, BOOK_STEPS, openBookAt),
+    { ms: 900, pose: BOOK_OPEN_POSE },
+    ...alongArc(2200, BOOK_STEPS, (t) => openBookAt(1 - t)),
+  ],
+};
+
+// --- Inchworm: standing, folding forward to put the hands down, walking them out to a plank, then walking the feet in and standing up, further along the room ---
+
+/** How far the hands are from the shoulders while they bear weight: a hair short of straight. */
+const IW_ARMS = 0.985 * ARM_REACH;
+/** How steep a foot stands flat on the floor, from its tip up to the ankle. */
+const IW_FLAT = (Math.asin((ANKLE_Y - DOG_TOE_Y) / SKELETON.foot) * 180) / Math.PI;
+/** How high a hand or foot lifts halfway through a step. */
+const IW_LIFT = { hands: 18, toes: 14 };
+
+/**
+ * How the body is shaped over the feet: which way the legs point from the ankles up to the pelvis
+ * (90 is straight up, more leans the hips back), how far the pelvis is from the ankles as a share of
+ * the legs' reach (short of it bends the knees), how steep the feet stand, and how far the back
+ * rounds and the neck bends. The body tips forward from there until the hands are in reach.
+ */
+type IwShape = { legs: number; reach: number; foot: number; spine: number; neck: number };
+const IW_STANDING: IwShape = { legs: 90, reach: 1, foot: IW_FLAT, spine: 0, neck: 0 };
+/** Folded with the hands just down on the floor ahead of the toes, the knees giving to get them there. */
+const IW_FOLD: IwShape = { legs: 96, reach: 0.96, foot: IW_FLAT, spine: 40, neck: 25 };
+/** Halfway out: the hips high in a V, the legs straight and the heels coming up. */
+const IW_V: IwShape = { legs: 58, reach: 1, foot: 30, spine: 0, neck: 12 };
+/** The plank: on the toes, the body in one line from the ankles to the neck, steep enough for the arms to reach straight down to the floor. */
+const IW_PLANK_FOOT = 70;
+const IW_PLANK: IwShape = {
+  legs: (Math.asin((IW_ARMS + WRIST_Y - DOG_TOE_Y - SKELETON.foot * Math.sin(radians(IW_PLANK_FOOT))) / (LEG_REACH + SKELETON.torso)) * 180) / Math.PI,
+  reach: 1,
+  foot: IW_PLANK_FOOT,
+  spine: 0,
+  neck: -5,
+};
+
+/** The shape this far from the fold (0) to the plank (1), through the V halfway. */
+const iwShapeAt = (s: number): IwShape => ({
+  legs: throughThree(IW_FOLD.legs, IW_V.legs, IW_PLANK.legs, s),
+  // Past the V the legs are straight, and the curve through the three would overshoot that.
+  reach: Math.min(1, throughThree(IW_FOLD.reach, IW_V.reach, IW_PLANK.reach, s)),
+  foot: throughThree(IW_FOLD.foot, IW_V.foot, IW_PLANK.foot, s),
+  spine: throughThree(IW_FOLD.spine, IW_V.spine, IW_PLANK.spine, s),
+  neck: throughThree(IW_FOLD.neck, IW_V.neck, IW_PLANK.neck, s),
+});
+
+/** The ankle over a foot whose tip is at `toe` along the room, standing this steep, and lifted this far. */
+const iwAnkle = (toe: number, steep: number, side: 1 | -1, lift = 0): Vec3 => [
+  toe - SKELETON.foot * Math.cos(radians(steep)),
+  DOG_TOE_Y + SKELETON.foot * Math.sin(radians(steep)) + lift,
+  side * SKELETON.hip,
+];
+const iwFoot = (toe: number, steep: number, side: 1 | -1, lift = 0): Pin => ({
+  at: iwAnkle(toe, steep, side, lift),
+  toward: [Math.cos(radians(steep)), -Math.sin(radians(steep)), 0],
+  pole: [1, 0.2, 0],
+});
+const iwHand = (x: number, side: 1 | -1, lift = 0): Pin => ({ at: [x, WRIST_Y + lift, side * SKELETON.shoulder], toward: [1, 0, 0], pole: [-1, 0, side * 0.3] });
+
+/**
+ * The body shaped like this, upright, over the feet with their tips at `toes`, right then left, and
+ * lifted this far. The hips go out from between the ankles the way the shape's legs point, as far as
+ * keeps whichever foot is further from its hip at the shape's reach, so with the feet a step apart
+ * the other knee bends. Neither ever has to stretch, whether the hips are ahead of the feet or behind.
+ */
+const iwBody = (shape: IwShape, toes: readonly [number, number], lifts: readonly [number, number] = [0, 0]): Pose3 => {
+  const right = iwAnkle(toes[0], shape.foot, 1, lifts[0]);
+  const left = iwAnkle(toes[1], shape.foot, -1, lifts[1]);
+  // The middle of the ankles on the floor: a foot lifting doesn't move the hips.
+  const [baseX, baseY] = [(toes[0] + toes[1]) / 2 - SKELETON.foot * Math.cos(radians(shape.foot)), right[1] - lifts[0]];
+  const legs = radians(shape.legs);
+  const pelvisAt = (length: number): Vec3 => [baseX + length * Math.cos(legs), baseY + length * Math.sin(legs), 0];
+  // The hips sit level with the ankles either side, so only the distance along the room and up counts.
+  const furthest = (pelvis: Vec3) => Math.max(Math.hypot(right[0] - pelvis[0], right[1] - pelvis[1]), Math.hypot(left[0] - pelvis[0], left[1] - pelvis[1]));
+  const reach = shape.reach * LEG_REACH;
+  let [near, far] = [0, reach];
+  for (let i = 0; i < 40; i++) {
+    const length = (near + far) / 2;
+    if (furthest(pelvisAt(length)) > reach) far = length;
+    else near = length;
+  }
+  return { pelvis: pelvisAt(near), spine: { flex: shape.spine }, neck: { flex: shape.neck } };
+};
+
+const midpointOf = (a: Vec3, b: Vec3): Vec3 => mix3(a, b, 0.5);
+
+/** How far to tip the body forward from upright for the middle of the shoulders to be `reach` from `target`. */
+const iwLean = (body: Pose3, target: Vec3, reach: number): number => {
+  const gap = (lean: number) => {
+    const skeleton = solvePose({ ...body, lean });
+    return distance(midpointOf(skeleton.rightArm[0], skeleton.leftArm[0]), target);
+  };
+  let nearest = -20;
+  for (let tip = -20; tip <= 180; tip += 2) if (gap(tip) < gap(nearest)) nearest = tip;
+  let [upright, tipped] = [-20, nearest];
+  for (let i = 0; i < 40; i++) {
+    const tip = (upright + tipped) / 2;
+    if (gap(tip) > reach) upright = tip;
+    else tipped = tip;
+  }
+  return (upright + tipped) / 2;
+};
+
+/** How far to slide a shoulder blade round the ribs for its shoulder to be `reach` from its hand. */
+const iwProtract = (body: Pose3, side: 1 | -1, hand: Vec3, reach: number): number => {
+  const gap = (protract: number) => {
+    const skeleton = solvePose({ ...body, [side === 1 ? 'rightArm' : 'leftArm']: { protract } });
+    return distance(side === 1 ? skeleton.rightArm[0] : skeleton.leftArm[0], hand);
+  };
+  let [back, forward] = [-35, 35];
+  if (gap(back) < reach) return back;
+  for (let i = 0; i < 40; i++) {
+    const protract = (back + forward) / 2;
+    if (gap(protract) > reach) back = protract;
+    else forward = protract;
+  }
+  return (back + forward) / 2;
+};
+
+/** Where the hands and the tips of the feet are along the room, right then left, and how far each is lifted. */
+type IwContacts = { hands: [number, number]; handsLift: [number, number]; toes: [number, number]; toesLift: [number, number] };
+
+/** How far the hands are ahead of the tips of the feet in the fold, and in the plank, where they're under the shoulders. */
+const IW_FOLD_REACH = 50;
+const IW_PLANK_REACH = (() => {
+  const skeleton = solvePose({ ...iwBody(IW_PLANK, [0, 0]), lean: 90 - IW_PLANK.legs });
+  return midpointOf(skeleton.rightArm[0], skeleton.leftArm[0])[0];
+})();
+/** How far along the room the figure goes, and the camera with it. */
+const IW_TRAVEL = IW_PLANK_REACH - IW_FOLD_REACH;
+
+/**
+ * The whole body over the hands and feet where they are. The legs and back take the shape for how
+ * far the hands are ahead of the feet, the body tips forward until the shoulders are an arm's reach
+ * from the hands, and each shoulder blade slides to put its own shoulder there, so the arm of a hand
+ * a step ahead of the other is straight too.
+ */
+const iwPose = (c: IwContacts): Pose3 => {
+  const ahead = (c.hands[0] + c.hands[1]) / 2 - (c.toes[0] + c.toes[1]) / 2;
+  const shape = iwShapeAt(Math.min(1, Math.max(0, (ahead - IW_FOLD_REACH) / IW_TRAVEL)));
+  const body = iwBody(shape, c.toes, c.toesLift);
+  const right = iwHand(c.hands[0], 1, c.handsLift[0]);
+  const left = iwHand(c.hands[1], -1, c.handsLift[1]);
+  const leaning = { ...body, lean: iwLean(body, midpointOf(right.at, left.at), IW_ARMS) };
+  return {
+    ...leaning,
+    rightArm: { protract: iwProtract(leaning, 1, right.at, IW_ARMS) },
+    leftArm: { protract: iwProtract(leaning, -1, left.at, IW_ARMS) },
+    pins: {
+      rightFoot: iwFoot(c.toes[0], shape.foot, 1, c.toesLift[0]),
+      leftFoot: iwFoot(c.toes[1], shape.foot, -1, c.toesLift[1]),
+      rightHand: right,
+      leftHand: left,
+    },
+  };
+};
+
+const IW_FOLD_CONTACTS: IwContacts = { hands: [IW_FOLD_REACH, IW_FOLD_REACH], handsLift: [0, 0], toes: [0, 0], toesLift: [0, 0] };
+const IW_FOLDED = iwPose(IW_FOLD_CONTACTS);
+
+/** Where a hand hangs straight down from its shoulder, the arm loose, in a body with no pins. */
+const iwHangingWrist = (body: Pose3, side: 1 | -1): Vec3 => {
+  const key = side === 1 ? 'rightArm' : 'leftArm';
+  const arm = (flex: number) => solvePose({ ...body, [key]: { flex, abduct: 5, elbow: 8 } })[key];
+  let [back, forward] = [-40, 160];
+  for (let i = 0; i < 40; i++) {
+    const flex = (back + forward) / 2;
+    const [shoulder, , wrist] = arm(flex);
+    if (wrist[0] > shoulder[0]) forward = flex;
+    else back = flex;
+  }
+  return arm((back + forward) / 2)[2];
+};
+
+/**
+ * Folding from standing (0) until the hands are on the floor (1). The hips go back and the knees
+ * give as the body tips, and the arms hang until the hands come near the floor, then reach ahead to
+ * where they go down.
+ */
+const iwFoldAt = (u: number): Pose3 => {
+  const standing = iwBody(IW_STANDING, [0, 0]);
+  const body: Pose3 = {
+    pelvis: mix3(standing.pelvis, IW_FOLDED.pelvis, u),
+    lean: mix(0, IW_FOLDED.lean ?? 0, u),
+    spine: { flex: mix(0, IW_FOLD.spine, u) },
+    neck: { flex: mix(0, IW_FOLD.neck, u) },
+  };
+  const reaching = smooth(Math.min(1, Math.max(0, (u - 0.5) / 0.5)));
+  const skeleton = solvePose(body);
+  const hand = (side: 1 | -1, down: Pin): Pin => {
+    const at = mix3(iwHangingWrist(body, side), down.at, reaching);
+    return { ...down, at: withinReach(side === 1 ? skeleton.rightArm[0] : skeleton.leftArm[0], [at[0], Math.max(WRIST_Y, at[1]), at[2]], IW_ARMS) };
+  };
+  return {
+    ...body,
+    pins: {
+      rightFoot: iwFoot(0, IW_FLAT, 1),
+      leftFoot: iwFoot(0, IW_FLAT, -1),
+      rightHand: hand(1, IW_FOLDED.pins!.rightHand!),
+      leftHand: hand(-1, IW_FOLDED.pins!.leftHand!),
+    },
+  };
+};
+
+/**
+ * Keyframes taking a step, the body following it. The hand or foot lifts straight up first, moves
+ * ahead, and sets straight down, so it never slides along the floor.
+ */
+const IW_STEP_FRAMES = 6;
+const iwStep = (ms: number, from: IwContacts, limb: 'hands' | 'toes', index: 0 | 1, to: number): { frames: Keyframe3[]; end: IwContacts } => {
+  const frames: Keyframe3[] = [];
+  let contacts = from;
+  for (let j = 1; j <= IW_STEP_FRAMES; j++) {
+    const q = j / IW_STEP_FRAMES;
+    const place: [number, number] = [...from[limb]];
+    place[index] = mix(from[limb][index], to, smooth(Math.min(1, Math.max(0, (q - 1 / IW_STEP_FRAMES) / (1 - 2 / IW_STEP_FRAMES)))));
+    const lift: [number, number] = [0, 0];
+    lift[index] = IW_LIFT[limb] * Math.sin(Math.PI * q);
+    contacts = limb === 'hands' ? { ...from, hands: place, handsLift: lift } : { ...from, toes: place, toesLift: lift };
+    frames.push({ ms: ms / IW_STEP_FRAMES, pose: iwPose(contacts), ease: 'none' });
+  }
+  return { frames, end: contacts };
+};
+
+/** How many times each hand steps on the way out, and each foot on the way in. */
+const IW_HAND_STEPS = 3;
+const IW_FOOT_STEPS = 4;
+const IW_FOLD_STEPS = 16;
+
+const INCHWORM_KEYFRAMES = (() => {
+  const standing = iwFoldAt(0);
+  const keyframes: Keyframe3[] = [
+    { ms: 0, pose: standing },
+    { ms: 600, pose: standing },
+    ...alongArc(1400, IW_FOLD_STEPS, iwFoldAt),
+  ];
+  let contacts = IW_FOLD_CONTACTS;
+  // The hands walk out, the right one leading and the left one coming up beside it.
+  for (let step = 1; step <= IW_HAND_STEPS; step++) {
+    for (const hand of [0, 1] as const) {
+      const { frames, end } = iwStep(520, contacts, 'hands', hand, IW_FOLD_REACH + (IW_TRAVEL * step) / IW_HAND_STEPS);
+      keyframes.push(...frames);
+      contacts = end;
+    }
+  }
+  const plank = keyframes.length - 1;
+  keyframes.push({ ms: 700, pose: keyframes[plank].pose });
+  // Then the feet walk in, the right one leading.
+  for (let step = 1; step <= IW_FOOT_STEPS; step++) {
+    for (const foot of [0, 1] as const) {
+      const { frames, end } = iwStep(440, contacts, 'toes', foot, (IW_TRAVEL * step) / IW_FOOT_STEPS);
+      keyframes.push(...frames);
+      contacts = end;
+    }
+  }
+  // And it stands back up, where the fold started but further along the room.
+  keyframes.push(...alongArc(1400, IW_FOLD_STEPS, (t) => shiftedPose(iwFoldAt(1 - t), IW_TRAVEL)));
+  return { keyframes, plank };
+})();
+
+export const INCHWORM_3D: Clip3D = {
+  view: '3d',
+  // From the right side, a little in front and above, as for downward facing dog: the fold, the V
+  // and the plank are all flat on the screen. The camera goes along with the figure.
+  camera: { yaw: 22, pitch: 14 },
+  follow: true,
+  highlight: ['rightLeg', 'leftLeg'],
+  // The far arm hangs beside its leg standing, and reaches ahead of it from the fold on, never
+  // across it, so it stays behind it rather than swapping places as it swings forward.
+  behind: [['leftArm', 'leftLeg']],
+  // The plank.
+  stillFrame: INCHWORM_KEYFRAMES.plank,
+  keyframes: INCHWORM_KEYFRAMES.keyframes,
 };

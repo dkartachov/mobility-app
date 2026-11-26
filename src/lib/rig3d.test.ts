@@ -29,6 +29,7 @@ import {
   NINETY_TO_NINETY_3D,
   NINETY_TO_NINETY_ROTATIONS_3D,
   NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
+  OPEN_BOOK_3D,
   OVERHEAD_REACH_3D,
   PANCAKE_3D,
   PRAYER_POSE_3D,
@@ -44,6 +45,7 @@ import {
   FROG_ROCKS_3D,
   FROG_STRETCH_3D,
   HORSE_STANCE_3D,
+  INCHWORM_3D,
   KNIGHT_STRETCH_3D,
   KNIGHT_TO_HAMSTRING_3D,
   COUCH_STRETCH_3D,
@@ -85,6 +87,7 @@ import {
   HAND,
   poseAt3,
   project,
+  shiftedPose,
   SKELETON,
   solveJoint3,
   solvePose,
@@ -96,6 +99,7 @@ import {
   thumbPoints,
   traceFigure,
   trailedPart,
+  travelAt3,
   viewOf,
   type Clip3D,
   type Pose3,
@@ -116,6 +120,11 @@ function samples(clip: Clip3D): Pose3[] {
   const poses: Pose3[] = [];
   for (let t = 0; t <= durationOf(clip); t += 50) poses.push(poseAt3(clip, t));
   return poses;
+}
+
+/** The clip's pose at a time where its camera sees it: moved back along the room by however far a camera that follows it has gone. */
+function seenAt(clip: Clip3D, t: number): Pose3 {
+  return shiftedPose(poseAt3(clip, t), -travelAt3(clip, t));
 }
 
 function joints(skeleton: Skeleton): Vec3[] {
@@ -532,6 +541,8 @@ describe('3D clips', () => {
       'cuban-rotation',
       'half-spinal-twist',
       'half-twisted-lizard',
+      'open-book',
+      'inchworm',
       'warmup-marching',
     ]));
   });
@@ -592,8 +603,9 @@ describe('3D clips', () => {
     });
 
     it('ends on the pose it starts on, so it loops', () => {
+      // On screen, that is: a clip the camera follows ends further along the room.
       const first = joints(skeletons[0]);
-      const last = joints(solvePose(poseAt3(clip, durationOf(clip))));
+      const last = joints(solvePose(seenAt(clip, durationOf(clip))));
       first.forEach((joint, i) => expect(distance(joint, last[i])).toBeCloseTo(0));
     });
 
@@ -605,7 +617,8 @@ describe('3D clips', () => {
       const stage = stageClip(clip);
       const [x, y, width, height] = stage.viewBox.split(' ').map(Number);
       expect(width / height).toBeCloseTo(16 / 9, 1);
-      for (const skeleton of skeletons) {
+      for (let t = 0; t <= durationOf(clip); t += 50) {
+        const skeleton = solvePose(seenAt(clip, t));
         for (const joint of framedJoints(skeleton, clip.camera.fit)) {
           const [sx, sy] = project(stage.view, joint);
           expect(sx).toBeGreaterThan(x + SKELETON.head);
@@ -1416,6 +1429,119 @@ describe('3D clips', () => {
     expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightArm rightLeg']));
     const view = viewOf(clip.camera);
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBe(2);
+  });
+
+  it('sweeps the straight top arm over to the floor behind as the chest turns up, the knees and the bottom hand staying down, in open book', () => {
+    const clip = OPEN_BOOK_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    const top = (s: Skeleton) => s.spine[s.spine.length - 1];
+    for (const { spine, rightArm, leftArm, rightLeg, leftLeg } of skeletons) {
+      // The hips and the stacked knees stay where they are, on the side.
+      expect(distance(spine[0], start.spine[0])).toBeCloseTo(0);
+      for (const [leg, first] of [[rightLeg, start.rightLeg], [leftLeg, start.leftLeg]] as const) expect(distance(leg[1], first[1])).toBeCloseTo(0);
+      expect(Math.abs(rightLeg[1][1] - leftLeg[1][1])).toBeLessThan(2 * SKELETON.hip);
+      // The bottom arm stays straight, its hand on the floor, only ever sliding ahead along it.
+      expect(angleAt(leftArm[0], leftArm[1], leftArm[2])).toBeGreaterThan(170);
+      expect(leftArm[2][1]).toBeCloseTo(start.leftArm[2][1]);
+      expect(leftArm[2][2]).toBeCloseTo(start.leftArm[2][2]);
+      expect(leftArm[2][0]).toBeGreaterThanOrEqual(start.leftArm[2][0] - 0.01);
+      expect(leftArm[2][1]).toBeLessThan(SKELETON.shoulder);
+      // The top arm stays straight, out from the shoulder square to the spine.
+      expect(angleAt(rightArm[0], rightArm[1], rightArm[2])).toBeGreaterThan(178);
+      expect(Math.abs(rightArm[2][2] - rightArm[0][2])).toBeLessThan(1);
+    }
+    // Closed, the top hand rests on the bottom one, palms together, both reaching out in front.
+    expect(distance(start.rightArm[2], start.leftArm[2])).toBeLessThan(16);
+    expect(start.rightArm[2][0] - top(start)[0]).toBeGreaterThan(140);
+    // It sweeps up over the body, and open it reaches for the floor behind, the chest turned to the ceiling.
+    expect(Math.max(...skeletons.map((s) => s.rightArm[2][1] - s.rightArm[0][1]))).toBeGreaterThan(140);
+    const open = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(open.rightArm[2][0] - open.rightArm[0][0]).toBeLessThan(-140);
+    expect(open.rightArm[2][1]).toBeLessThan(open.rightArm[0][1]);
+    expect(open.spineFront[open.spineFront.length - 1][1]).toBeGreaterThan(0.9);
+    // The head turns to follow the hand, past the ceiling toward it.
+    expect(open.facing[1]).toBeGreaterThan(0.8);
+    expect(open.facing[0]).toBeLessThan(0);
+    // Nothing ever changes places, the head over the neck, and the head stays a plain circle,
+    // though the face turns up toward the camera.
+    const orders = new Set(drawOrders(clip));
+    expect(orders.size).toBe(1);
+    const [order] = [...orders].map((o) => o.split(' '));
+    expect(order.indexOf('head')).toBeGreaterThan(order.indexOf('torso'));
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '')).toHaveLength(1);
+  });
+
+  it('folds to the floor, walks the hands out to a plank and the feet in after them, and stands up further along, the camera following, in inchworm', () => {
+    const clip = INCHWORM_3D;
+    const total = durationOf(clip);
+    const at = (t: number) => solvePose(poseAt3(clip, t));
+    const start = at(0);
+    // It ends standing as it started, further along the room, and the camera goes with it: the
+    // lines on the mat are back where they started as it loops.
+    const travel = travelAt3(clip, total);
+    expect(travel).toBeGreaterThan(200);
+    const end = at(total);
+    for (const [a, b] of [[start.head, end.head], [start.rightLeg[2], end.rightLeg[2]], [start.leftArm[2], end.leftArm[2]]] as const) {
+      expect(b[0] - a[0]).toBeCloseTo(travel);
+    }
+    expect(start.head[1] - start.spine[0][1]).toBeGreaterThan(SKELETON.torso + SKELETON.neck - 1);
+    const view = viewOf(clip.camera);
+    expect(frameAt(clip, view, 0).floor).not.toBe('');
+    expect(frameAt(clip, view, total).floor).toBe(frameAt(clip, view, 0).floor);
+    expect(frameAt(clip, view, total / 3).floor).not.toBe(frameAt(clip, view, 0).floor);
+
+    // Hands and feet only ever move off the floor: down, they stay put. Each hand goes down at the
+    // end of the fold, steps out three times and comes up to stand; each foot takes four steps in.
+    // Only one of them is ever off the floor at once, once the hands are down.
+    const lifts = { rightArm: 0, leftArm: 0, rightLeg: 0, leftLeg: 0 };
+    let previous = start;
+    const handDown = (s: Skeleton, arm: 'rightArm' | 'leftArm') => s[arm][2][1] < 11.5;
+    const footDown = (s: Skeleton, leg: 'rightLeg' | 'leftLeg') => s[leg][3][1] < 11;
+    for (let t = 10; t <= total; t += 10) {
+      const s = at(t);
+      for (const arm of ['rightArm', 'leftArm'] as const) {
+        if (handDown(s, arm) && handDown(previous, arm)) expect(Math.hypot(s[arm][2][0] - previous[arm][2][0], s[arm][2][2] - previous[arm][2][2])).toBeLessThan(0.01);
+        if (!handDown(s, arm) && handDown(previous, arm)) lifts[arm]++;
+      }
+      for (const leg of ['rightLeg', 'leftLeg'] as const) {
+        if (footDown(s, leg) && footDown(previous, leg)) expect(Math.hypot(s[leg][3][0] - previous[leg][3][0], s[leg][3][2] - previous[leg][3][2])).toBeLessThan(0.01);
+        if (!footDown(s, leg) && footDown(previous, leg)) lifts[leg]++;
+      }
+      const up = [!handDown(s, 'rightArm'), !handDown(s, 'leftArm'), !footDown(s, 'rightLeg'), !footDown(s, 'leftLeg')].filter(Boolean).length;
+      if (handDown(s, 'rightArm') || handDown(s, 'leftArm')) expect(up).toBeLessThanOrEqual(1);
+      // A hand bearing weight has a straight arm.
+      for (const arm of ['rightArm', 'leftArm'] as const) if (handDown(s, arm)) expect(angleAt(s[arm][0], s[arm][1], s[arm][2])).toBeGreaterThan(155);
+      previous = s;
+    }
+    expect(lifts).toEqual({ rightArm: 4, leftArm: 4, rightLeg: 4, leftLeg: 4 });
+
+    // The plank: on the toes, straight from the ankles to the neck, the hands under the shoulders.
+    const plank = solvePose(clip.keyframes[clip.stillFrame].pose);
+    for (const leg of [plank.rightLeg, plank.leftLeg]) {
+      expect(angleAt(leg[0], leg[1], leg[2])).toBeGreaterThan(174);
+      expect(leg[2][1]).toBeGreaterThan(40);
+    }
+    expect(angleAt(plank.rightLeg[2], plank.spine[0], plank.spine[plank.spine.length - 1])).toBeGreaterThan(174);
+    for (const arm of [plank.rightArm, plank.leftArm]) expect(Math.abs(arm[2][0] - arm[0][0])).toBeLessThan(10);
+    // Nothing ever changes places, and the head, side on, never shows a nose.
+    expect(new Set(drawOrders(clip))).toEqual(new Set(['leftArm leftLeg torso head rightLeg rightArm']));
+    for (let t = 0; t <= total; t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBe(2);
+  });
+
+  it('keeps a figure the camera follows where it started on screen, and the mat across the whole frame', () => {
+    const clip = INCHWORM_3D;
+    const view = viewOf(clip.camera);
+    const stage = stageClip(clip);
+    const [x, , width] = stage.viewBox.split(' ').map(Number);
+    const pelvisOnScreen = (t: number) => project(view, solvePose(seenAt(clip, t)).spine[0])[0];
+    for (let t = 0; t <= durationOf(clip); t += 100) expect(pelvisOnScreen(t)).toBeCloseTo(pelvisOnScreen(0));
+    const matXs = stage.mat.match(/-?[\d.]+/g)!.map(Number).filter((_, i) => i % 2 === 0);
+    expect(Math.min(...matXs)).toBeLessThan(x);
+    expect(Math.max(...matXs)).toBeGreaterThan(x + width);
+    // A clip the camera doesn't follow has no lines on its mat.
+    expect(frameAt(CAT_COW_3D, viewOf(CAT_COW_3D.camera), 500).floor).toBe('');
   });
 
   it('sits back from all fours onto the heels, hands, knees and feet planted, forehead to the floor, in prayer pose', () => {

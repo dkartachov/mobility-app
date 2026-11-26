@@ -2730,29 +2730,6 @@ export const SIDE_LYING_EXTERNAL_ROTATION: FigureClip = {
   ],
 };
 
-// --- Lying external rotation stretch: from above, on the back, the bent arm lowers from pointing up to the floor by the head ---
-
-/** The near elbow out on the floor at shoulder height, the far arm resting by the side. */
-const LYING_ER_UP: Pose = {
-  ...ANGEL_BASE,
-  // Pointing at the ceiling, the forearm looks short from above.
-  nearHand: [525, 172, 0],
-  farHand: [445, 300, 180],
-  elbows: [
-    [515, 175],
-    [480, 296],
-  ],
-};
-const LYING_ER_DOWN: Pose = { ...LYING_ER_UP, nearHand: [590, 175, 0] };
-
-export const LYING_EXTERNAL_ROTATION_STRETCH: FigureClip = {
-  view: 'above',
-  widths: { shoulder: 20, hip: 14 },
-  // Running across the body, parallel to the shoulders.
-  dumbbells: { hands: ['nearHand'], angle: 90 },
-  ...intoHold(LYING_ER_UP, [{ ms: 1800, pose: LYING_ER_DOWN }]),
-};
-
 // ===== Active hip internal rotation drills =====
 
 // --- Seated hip internal rotation: the hip rotation test's swing out to the side, repeated against a band around the feet ---

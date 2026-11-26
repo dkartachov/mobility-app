@@ -34,6 +34,8 @@ const OUTLINE = 4.5;
 const DUMBBELL_OUTLINE = 3;
 /** How thick the lines between a hand's fingers are. */
 const FINGER_LINE = 1.8;
+/** How thick the lines across the mat are under a figure the camera follows. */
+const FLOOR_LINE = 4;
 
 /**
  * The clip's phone, if it's on this slot's part right now: under the limb when it's on the far
@@ -208,6 +210,7 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
   const frame = useDerivedValue(() => frameAt(clip, view, time.get()));
   const shadow = useAnimatedProps(() => ({ d: frame.get().shadow }));
   const strap = useAnimatedProps(() => ({ d: frame.get().strap }));
+  const floor = useAnimatedProps(() => ({ d: frame.get().floor }));
 
   return (
     <View
@@ -218,6 +221,8 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
       <Svg width="100%" height="100%" viewBox={stage.viewBox}>
         {/* Outlined in its own color, which rounds its corners and gives it an edge when the camera is level with the floor. */}
         <Path d={stage.mat} fill={COLORS.mat} stroke={COLORS.mat} strokeWidth={10} strokeLinejoin="round" />
+        {/* Under a figure the camera follows, lines across the mat slide by as it goes. */}
+        {clip.follow && <AnimatedPath animatedProps={floor} fill="none" stroke={COLORS.scenery.mid} strokeWidth={FLOOR_LINE} strokeLinecap="round" />}
         <AnimatedPath animatedProps={shadow} fill={COLORS.shadow} opacity={0.14} />
         {/* Outlined in its own color, which closes the hairline gaps between the sides of a block. */}
         {stage.scenery.map((face, i) => (

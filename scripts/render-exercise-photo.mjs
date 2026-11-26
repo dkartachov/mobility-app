@@ -36,6 +36,7 @@ const COLORS = {
 const OUTLINE = 4.5;
 const DUMBBELL_OUTLINE = 3;
 const FINGER_LINE = 1.8;
+const FLOOR_LINE = 4;
 
 const [clipName, output] = process.argv.slice(2);
 if (!clipName || !output) {
@@ -75,6 +76,7 @@ const stage = rig.stageClip(clip);
 const frame = rig.frameAt({ ...clip, highlight: undefined }, stage.view, time);
 let body = `<rect x="-100000" y="-100000" width="200000" height="200000" fill="${COLORS.background}"/>`;
 body += `<path d="${stage.mat}" fill="${COLORS.mat}" stroke="${COLORS.mat}" stroke-width="10" stroke-linejoin="round"/>`;
+if (frame.floor) body += `<path d="${frame.floor}" fill="none" stroke="${COLORS.scenery.mid}" stroke-width="${FLOOR_LINE}" stroke-linecap="round"/>`;
 body += `<path d="${frame.shadow}" fill="${COLORS.shadow}" opacity="0.14"/>`;
 for (const face of stage.scenery) {
   body += `<path d="${face.d}" fill="${COLORS.scenery[face.tone]}" stroke="${COLORS.scenery[face.tone]}" stroke-width="2" stroke-linejoin="round"/>`;
