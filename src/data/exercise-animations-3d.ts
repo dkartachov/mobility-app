@@ -5869,3 +5869,146 @@ export const REVERSE_CLAMSHELLS_3D: Clip3D = {
   // the knee held up, the foot comes back down to rest on the other one, and the knees close.
   keyframes: [{ ms: 0, pose: CLAM_CLOSED }, ...clamRep(), ...clamRep()],
 };
+
+// --- Reverse scorpion: face down in a T, one bent leg at a time swings up and over behind the body toward the other hand, the hips turning with it and the chest staying down ---
+
+/** How far the hips turn over, lifting the working side's hip off the floor. */
+const SCORPION_ROLL = 60;
+/** Where the working foot comes down, beyond the other leg on the far side, reaching toward the other hand: the knee is bent about a right angle there. */
+const SCORPION_FOOT = { x: -60, z: 110 };
+/** How high the working foot lifts on its way over the other leg. */
+const SCORPION_FOOT_LIFT = 60;
+/** The legs lying long, a little apart, the tops of the feet on the floor. */
+const SCORPION_LONG_LEG: LegPose = { flex: 2.6, abduct: 2, ankle: -88 };
+
+/**
+ * The body face down with the head toward +x, the hips turned this far (0 to 1) over onto the side
+ * away from the working leg: `side` 1 lifts the left hip and swings the left leg across toward the
+ * right hand, -1 the other way round. The spine twists back the other way, so the chest stays flat on
+ * the floor.
+ */
+const scorpionBodyAt = (side: 1 | -1, t: number, [flex, bend, dx, dz]: readonly number[]): Pose3 => {
+  const roll = SCORPION_ROLL * t;
+  return {
+    pelvis: [dx, mix(PRONE_PELVIS_Y, BOOK_SPINE_Y, Math.sin(radians(roll))), dz],
+    turn: 90,
+    lean: 90 - side * roll,
+    tilt: 90,
+    spine: { twist: -side * roll, flex, side: side * bend },
+    neck: { flex: -10 },
+  };
+};
+/** The shoulders face down, where the hips turned don't move them: the chest's height, the line across it, and where it is in the room. */
+const scorpionChest = (pose: Pose3): number[] => {
+  const { rightArm, leftArm, spineRight } = solvePose(pose);
+  const right = spineRight[spineRight.length - 1];
+  return [(rightArm[0][1] + leftArm[0][1]) / 2, right[0], (rightArm[0][0] + leftArm[0][0]) / 2, (rightArm[0][2] + leftArm[0][2]) / 2];
+};
+const SCORPION_CHEST = scorpionChest(scorpionBodyAt(1, 0, [0, 0, 0, 0]));
+/** Solves for x with the sum over j of columns[j][i] * x[j] equal to b[i], by Gaussian elimination. */
+const solveLinear = (columns: readonly (readonly number[])[], b: readonly number[]): number[] => {
+  const n = b.length;
+  const rows = b.map((v, i) => [...columns.map((column) => column[i]), v]);
+  for (let col = 0; col < n; col++) {
+    const pivot = rows.slice(col).reduce((best, row, i) => (Math.abs(row[col]) > Math.abs(rows[best][col]) ? col + i : best), col);
+    [rows[col], rows[pivot]] = [rows[pivot], rows[col]];
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const k = rows[r][col] / rows[col][col];
+      for (let c = col; c <= n; c++) rows[r][c] -= k * rows[col][c];
+    }
+  }
+  return rows.map((row, i) => row[n] / row[i]);
+};
+const scorpionBody = (side: 1 | -1, t: number): Pose3 => {
+  // The spine bends down to the floor, and the pelvis moves, to keep the shoulders where they were
+  // with the hips flat: found by Newton's method on the four.
+  let guess = [0, 0, 0, 0];
+  for (let step = 0; step < 12; step++) {
+    const miss = scorpionChest(scorpionBodyAt(side, t, guess)).map((v, i) => v - SCORPION_CHEST[i]);
+    const jacobian = guess.map((_, j) => {
+      const nudged = guess.map((g, k) => (k === j ? g + 0.01 : g));
+      return scorpionChest(scorpionBodyAt(side, t, nudged)).map((v, i) => (v - SCORPION_CHEST[i] - miss[i]) / 0.01);
+    });
+    guess = guess.map((g, j) => g - solveLinear(jacobian, miss)[j]);
+  }
+  return scorpionBodyAt(side, t, guess);
+};
+const SCORPION_FLAT_SKELETON = solvePose(scorpionBody(1, 0));
+/** The hands rest on the floor straight out from the shoulders. */
+const scorpionHand = (shoulder: Vec3, out: 1 | -1): Vec3 => [shoulder[0], WRIST_Y, shoulder[2] + out * Math.sqrt(ARM_REACH ** 2 - (shoulder[1] - WRIST_Y) ** 2)];
+const SCORPION_RIGHT_HAND = scorpionHand(SCORPION_FLAT_SKELETON.rightArm[0], 1);
+const SCORPION_LEFT_HAND = scorpionHand(SCORPION_FLAT_SKELETON.leftArm[0], -1);
+
+/** How far out from the hip each foot lies face down. */
+const SCORPION_FEET_APART = (() => {
+  const { rightLeg } = solvePose({ ...scorpionBody(1, 0), rightLeg: SCORPION_LONG_LEG });
+  return rightLeg[2][2] - rightLeg[0][2];
+})();
+/** A leg lying long on the floor from its hip, its foot this far out to the side. */
+const scorpionLongLeg = (hip: Vec3, out: number): Vec3 => [hip[0] - Math.sqrt(LEG_REACH ** 2 - (hip[1] - ANKLE_Y) ** 2 - out ** 2), ANKLE_Y, hip[2] + out];
+
+/** The move this far through (0 to 1), to the foot down across the other leg. */
+const scorpionAt = (side: 1 | -1, t: number): Pose3 => {
+  const body = scorpionBody(side, t);
+  const skeleton = solvePose(body);
+  const [bottom, top] = side === 1 ? [skeleton.rightLeg, skeleton.leftLeg] : [skeleton.leftLeg, skeleton.rightLeg];
+  // The bottom leg stays long on the floor, rolling with the hips.
+  const bottomAnkle = scorpionLongLeg(bottom[0], side * SCORPION_FEET_APART);
+  // The top foot lifts off the floor as the knee bends, then swings over the bottom leg and down
+  // beyond it, the knee up.
+  const long = scorpionLongLeg(top[0], -side * SCORPION_FEET_APART);
+  const across = smooth(t);
+  const topAnkle: Vec3 = [
+    mix(long[0], SCORPION_FOOT.x, across),
+    ANKLE_Y + SCORPION_FOOT_LIFT * Math.sin(Math.PI * t),
+    mix(long[2], side * SCORPION_FOOT.z, across),
+  ];
+  const lying: Vec3 = [-1, -0.1, 0];
+  // Both knees point up toward the ceiling and back, so the one that bends comes up off the floor,
+  // and lying long the legs are the same either way round.
+  const knees: Vec3 = [-1, 1, 0];
+  const bottomPin: Pin = { at: bottomAnkle, toward: lying, pole: knees };
+  const topPin: Pin = { at: topAnkle, toward: mix3(lying, [-0.6, -0.08, side * 0.8], across), pole: knees };
+  return {
+    ...body,
+    pins: {
+      rightHand: { at: SCORPION_RIGHT_HAND, toward: [0, -0.1, 1], pole: [-0.2, 1, 0] },
+      leftHand: { at: SCORPION_LEFT_HAND, toward: [0, -0.1, -1], pole: [-0.2, 1, 0] },
+      rightFoot: side === 1 ? bottomPin : topPin,
+      leftFoot: side === 1 ? topPin : bottomPin,
+    },
+    // The top leg crosses over the bottom one, so it stays in front of it. The legs swap with the
+    // body flat, where they lie apart.
+    behind: [side === 1 ? ['rightLeg', 'leftLeg'] : ['leftLeg', 'rightLeg']],
+  };
+};
+/** The foot swings on an arc, which straight lines between keyframes would cut across, so each swing takes this many. */
+const SCORPION_STEPS = 16;
+/** One leg over and back, starting from the body flat, ordered for that leg. */
+const scorpionRep = (side: 1 | -1): Keyframe3[] => [
+  { ms: 300, pose: scorpionAt(side, 0) },
+  ...alongArc(1500, SCORPION_STEPS, (t) => scorpionAt(side, t)),
+  { ms: 600, pose: scorpionAt(side, 1) },
+  ...alongArc(1500, SCORPION_STEPS, (t) => scorpionAt(side, 1 - t)),
+];
+
+export const REVERSE_SCORPION_3D: Clip3D = {
+  view: '3d',
+  // From beyond the head and above: the bent leg rises off the floor behind the body, the knee up,
+  // and the foot swings across the screen over the other leg, the same for either leg. From the
+  // feet end the thigh comes straight at the camera and the bent knee hides behind it; from the
+  // side one leg goes over toward the camera and the other away behind the body. The camera tips
+  // on over the top from the feet end (a pitch past 90) rather than standing beyond the head, which
+  // is the same view turned round on the screen, so the head is at the top rather than the bottom.
+  camera: { yaw: -90, pitch: 130 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // Seen from beyond the head the hips are in front of the thighs, even the one lifting off the floor.
+  behind: [
+    ['rightLeg', 'torso'],
+    ['leftLeg', 'torso'],
+  ],
+  // The left foot down across the right leg.
+  stillFrame: 1 + SCORPION_STEPS,
+  keyframes: [{ ms: 0, pose: scorpionAt(1, 0) }, ...scorpionRep(1), ...scorpionRep(-1)],
+};

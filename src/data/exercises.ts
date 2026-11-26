@@ -60,6 +60,7 @@ import {
   PYRAMID_STRETCH_3D,
   RESTING_COSSACK_SQUAT_3D,
   REVERSE_CLAMSHELLS_3D,
+  REVERSE_SCORPION_3D,
   REVERSE_TABLETOP_3D,
   SEATED_PIKE_STRETCH_3D,
   SEATED_SHOULDER_EXTENSION_3D,
@@ -71,7 +72,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  REVERSE_SCORPION,
   SEATED_HIP_INTERNAL_ROTATION,
   SHOULDER_PASS_THROUGHS,
   SIDE_LYING_EXTERNAL_ROTATION,
@@ -362,7 +362,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Bring it back and repeat with the other leg, keeping your chest down, and keep alternating',
     ],
     photo: require('@/assets/images/exercises/reverse-scorpion.png'),
-    animation: REVERSE_SCORPION,
+    animation: REVERSE_SCORPION_3D,
     active: true,
     oneMinuteOnly: true,
   },

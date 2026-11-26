@@ -37,6 +37,7 @@ import {
   PUPPY_POSE_3D,
   RESTING_COSSACK_SQUAT_3D,
   REVERSE_CLAMSHELLS_3D,
+  REVERSE_SCORPION_3D,
   SEATED_PIKE_STRETCH_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
@@ -1591,6 +1592,68 @@ describe('3D clips', () => {
     expect(order.indexOf('leftLeg')).toBeLessThan(order.indexOf('rightLeg'));
     const view = viewOf(clip.camera);
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '')).toHaveLength(1);
+  });
+
+  it('swings one bent leg at a time up and over behind the body toward the other hand, the hips turning with it and the chest staying down, in reverse scorpion', () => {
+    const clip = REVERSE_SCORPION_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightArm, leftArm, spineRight } of skeletons) {
+      // The arms stay straight out in a T, the hands where they started on the floor, and the
+      // chest stays flat, the shoulders level and where they were.
+      for (const [arm, first] of [[rightArm, start.rightArm], [leftArm, start.leftArm]] as const) {
+        expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(170);
+        expect(distance(arm[2], first[2])).toBeCloseTo(0);
+        expect(distance(arm[0], first[0])).toBeLessThan(0.5);
+      }
+      expect(Math.abs(spineRight[spineRight.length - 1][1])).toBeLessThan(0.05);
+    }
+    // Face down in a T to start, both legs long on the floor.
+    expect(start.spineFront[0][1]).toBeLessThan(-0.99);
+    expect(Math.abs(start.rightArm[2][0] - start.rightArm[0][0])).toBeLessThan(1);
+    // Over, the hips turn onto the right side, the left hip well up off the floor, and the left foot
+    // comes down beyond the right leg with the knee bent about a right angle and up off the floor.
+    const over = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(over.leftLeg[0][1] - over.rightLeg[0][1]).toBeGreaterThan(20);
+    expect(over.leftLeg[2][1]).toBeLessThan(15);
+    expect(over.leftLeg[2][2]).toBeGreaterThan(over.rightLeg[1][2] + 2 * SKELETON.hip);
+    expect(angleAt(over.leftLeg[0], over.leftLeg[1], over.leftLeg[2])).toBeGreaterThan(80);
+    expect(angleAt(over.leftLeg[0], over.leftLeg[1], over.leftLeg[2])).toBeLessThan(100);
+    expect(over.leftLeg[1][1]).toBeGreaterThan(over.leftLeg[0][1] + 20);
+    // One leg then the other, once each: whichever is over the other lies long on the floor, and the
+    // top foot goes over the bottom leg rather than through it.
+    let [lefts, rights, crossing] = [0, 0, ''];
+    for (const { rightLeg, leftLeg } of skeletons) {
+      const now = leftLeg[2][2] > 0 ? 'left' : rightLeg[2][2] < 0 ? 'right' : '';
+      if (now === 'left' && crossing !== 'left') lefts++;
+      if (now === 'right' && crossing !== 'right') rights++;
+      crossing = now;
+      const [top, bottom] = rightLeg[2][1] > leftLeg[2][1] + 0.5 || rightLeg[1][1] > leftLeg[1][1] + 10 ? [rightLeg, leftLeg] : [leftLeg, rightLeg];
+      expect(angleAt(bottom[0], bottom[1], bottom[2])).toBeGreaterThan(170);
+      expect(bottom[2][1]).toBeLessThan(15);
+      if (Math.abs(top[2][2] - bottom[2][2]) < 30 && Math.abs(top[2][0] - bottom[2][0]) < 60) expect(top[2][1]).toBeGreaterThan(bottom[2][1] + 20);
+    }
+    expect([lefts, rights]).toEqual([1, 1]);
+    // The legs stay under the hips, the top leg in front of the bottom one, and the head, face down,
+    // stays a plain circle over the body.
+    const view = viewOf(clip.camera);
+    let previous = '';
+    for (let t = 0; t <= durationOf(clip); t += 10) {
+      const order = frameAt(clip, view, t).slots.map((slot) => slot.part);
+      expect(order.indexOf('rightLeg')).toBeLessThan(order.indexOf('torso'));
+      expect(order.indexOf('leftLeg')).toBeLessThan(order.indexOf('torso'));
+      expect(order.indexOf('head')).toBeGreaterThan(order.indexOf('torso'));
+      const { rightLeg, leftLeg } = solvePose(poseAt3(clip, t));
+      const legs = order.indexOf('rightLeg') < order.indexOf('leftLeg') ? 'left over' : 'right over';
+      if (Math.max(rightLeg[2][1], leftLeg[2][1]) > start.rightLeg[2][1] + 1) {
+        expect(legs).toBe(leftLeg[2][1] > rightLeg[2][1] ? 'left over' : 'right over');
+      } else if (previous && legs !== previous) {
+        // The legs only swap lying flat and apart.
+        expect(Math.abs(rightLeg[2][2] - leftLeg[2][2])).toBeGreaterThan(30);
+      }
+      previous = legs;
+      expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '')).toHaveLength(1);
+    }
   });
 
   it('folds to the floor, walks the hands out to a plank and the feet in after them, and stands up further along, the camera following, in inchworm', () => {
