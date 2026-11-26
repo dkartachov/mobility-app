@@ -1338,7 +1338,7 @@ describe('3D clips', () => {
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBe(2);
   });
 
-  it('swings the right arm up over the front knee and back as the chest turns open, then brings the back shin up into the hand, which draws the foot in, and lets go with the arm and the leg coming down together, in the half-twisted lizard', () => {
+  it('swings the right arm up over the front knee and back as the chest turns open, bringing the back shin up into the hand at the same time, which draws the foot in, and lets go with the arm and the leg coming down together, in the half-twisted lizard', () => {
     const clip = HALF_TWISTED_LIZARD_3D;
     const skeletons = samples(clip).map(solvePose);
     const start = skeletons[0];
@@ -1382,9 +1382,9 @@ describe('3D clips', () => {
       expect(between(rightArm, rightLeg)).toBeGreaterThan(30);
       expect(between(rightArm.slice(0, 2), leftLeg)).toBeGreaterThan(50);
       expect(between(rightArm.slice(1), spine)).toBeGreaterThan(38);
-      // Going in, the hand has reached back before the foot leaves the floor, and holds it from where
-      // the shin comes up into it on.
-      if (goingIn && leftLeg[2][1] > 15) expect(rightArm[2][0]).toBeLessThan(spine[0][0] - 40);
+      // Going in, the arm and the leg go up together: the hand leaves the floor as the foot does, and
+      // holds the foot from where the shin comes up into it on.
+      if (goingIn && leftLeg[2][1] > start.leftLeg[2][1] + 1) expect(rightArm[2][1] - start.rightArm[2][1]).toBeGreaterThan((leftLeg[2][1] - start.leftLeg[2][1]) / 2);
       if ((goingIn || i * 50 <= holdTo) && shin(skeleton) > 94) expect(distance(rightArm[2], leftLeg[2])).toBeLessThan(SKELETON.foot);
       // Till then the arm stays long, the elbow only a little bent; drawing the foot in bends it more.
       else if (goingIn) elbowBend = Math.min(elbowBend, angleAt(rightArm[0], rightArm[1], rightArm[2]));
