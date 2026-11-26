@@ -67,6 +67,7 @@ import {
   SEATED_SHOULDER_EXTENSION_3D,
   SEATED_STRADDLE_SIDE_BEND_3D,
   SHOULDER_PASS_THROUGHS_3D,
+  SIDE_LYING_EXTERNAL_ROTATION_3D,
   SQUAT_TO_STAND_3D,
   STANDING_FORWARD_FOLD_3D,
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
@@ -74,7 +75,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  SIDE_LYING_EXTERNAL_ROTATION,
   SLEEPER_STRETCH,
   THE_SAGITTARIUS,
   THREAD_THE_NEEDLE,
@@ -1211,7 +1211,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Lower it back to your belly with control and keep repeating, then switch sides',
     ],
     photo: require('@/assets/images/exercises/side-lying-external-rotation.png'),
-    animation: SIDE_LYING_EXTERNAL_ROTATION,
+    animation: SIDE_LYING_EXTERNAL_ROTATION_3D,
     twoSided: true,
     active: true,
   },

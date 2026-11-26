@@ -1786,8 +1786,15 @@ function dumbbellShape(view: Mat3, arm: readonly Vec3[], palm: Vec3 | undefined)
   // and hand are drawn again over it.
   const upper = [project(view, arm[0]), project(view, arm[1])];
   const farCenter = project(view, add(center, scaled(axis, (a.depth > b.depth ? -1 : 1) * (DUMBBELL.between / 2 + DUMBBELL.weight / 2))));
-  const behindUpper = nearestOnScreen(upper, farCenter);
-  const raised = behindUpper.gap < DUMBBELL.radius + ARM_RADII[0][0] && farCenter[2] > behindUpper.depth;
+  //
+  // That's decided by depth alone, wherever the two are on screen: going over only once the weight
+  // came near the arm on screen put the change where the weight already overlapped it, and its
+  // outline and the arm's jumped from one to the other there (side-lying external rotation, where
+  // the weight is in front of the upper arm the whole way). By depth, it changes only where the
+  // weight is in line with the upper arm, which is never while it's in front of it on screen. Away
+  // from the arm, all that changes is the thin gap the arm's outline leaves between the weight and
+  // the fist (Cuban rotation, as the forearms turn up past level).
+  const raised = farCenter[2] > nearestOnScreen(upper, farCenter).depth;
   // Without an outline: it joins the arm drawn under it, and stands out from the dark weight anyway.
   const cover = raised ? limbShape([project(view, arm[1]), project(view, arm[2]), project(view, arm[3])], ARM_RADII.slice(1)) : '';
   return { under: { handle: far.handle, weight: far.weight }, over: { handle: near.handle, weight: near.weight }, raised, cover };

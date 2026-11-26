@@ -6095,3 +6095,44 @@ export const SHOULDER_PASS_THROUGHS_3D: Clip3D = {
     ...alongArc(1500, PASS_STEPS, (t) => passAt(mix(180, PASS_PAST_DOWN, t))),
   ],
 };
+
+// --- Side-lying external rotation: lying on the left side, the top elbow tucked against the side at 90°, the forearm turns up from the belly toward the ceiling with a light dumbbell ---
+
+/** The top leg lies straight on the bottom one, turned in this far at the hip to rest on it. */
+const SIDE_ER_LEG_REST = -6;
+/** The forearm resting across the belly to start, turned in this far from straight out in front. */
+const SIDE_ER_DOWN = -35;
+/** As far as it turns up: a little short of pointing straight at the ceiling. */
+const SIDE_ER_UP = 80;
+
+const sideLyingRotationAt = (degrees: number): Pose3 => ({
+  pelvis: [0, BOOK_SPINE_Y, 0],
+  tilt: -90,
+  // The bottom arm reaches long along the floor past the head, which rests on it.
+  leftArm: { flex: 170 },
+  rightArm: { elbow: 90, rotate: degrees },
+  rightLeg: { abduct: SIDE_ER_LEG_REST },
+  leftLeg: {},
+});
+const SIDE_ER_IN = sideLyingRotationAt(SIDE_ER_DOWN);
+const SIDE_ER_OUT = sideLyingRotationAt(SIDE_ER_UP);
+
+export const SIDE_LYING_EXTERNAL_ROTATION_3D: Clip3D = {
+  view: '3d',
+  // From in front, toward the feet and above: the forearm swings round the upper arm, which lies
+  // along the body, so from toward the feet its arc from the belly up to the ceiling shows across the
+  // screen, and from in front the elbow shows tucked against the side. Straight from the front the
+  // forearm swung at the camera, and from the feet end the legs hid the body.
+  camera: { yaw: 55, pitch: 30 },
+  highlight: ['rightArm'],
+  dumbbells: ['rightHand'],
+  // Turned up.
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SIDE_ER_IN },
+    { ms: 400, pose: SIDE_ER_IN },
+    { ms: 1600, pose: SIDE_ER_OUT },
+    { ms: 600, pose: SIDE_ER_OUT },
+    { ms: 1800, pose: SIDE_ER_IN },
+  ],
+};

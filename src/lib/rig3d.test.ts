@@ -43,6 +43,7 @@ import {
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
   SHOULDER_PASS_THROUGHS_3D,
+  SIDE_LYING_EXTERNAL_ROTATION_3D,
   SIT_AND_REACH_3D,
   SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
@@ -1305,8 +1306,23 @@ describe('3D clips', () => {
       expect(dumbbell.cover).not.toBe('');
     }
     expect(raised.length).toBeGreaterThan(10);
-    // Hanging and up, the weights are clear of the upper arm, and go under the arm and over it as usual.
-    for (const t of [0, timeOf(row), timeOf(up)]) expect(frameAt(clip, view, t).dumbbells.rightArm.raised).toBe(false);
+    // Hanging, the weight on the inside of the fist is behind the upper arm and goes under it as usual.
+    expect(frameAt(clip, view, 0).dumbbells.rightArm.raised).toBe(false);
+    // It goes from under the arm to over it, and back, only while it's well clear of the upper arm
+    // on screen, so nothing jumps where they overlap.
+    let wasRaised = false;
+    for (let t = 10; t <= durationOf(clip); t += 10) {
+      const isRaised = frameAt(clip, view, t).dumbbells.rightArm.raised;
+      if (isRaised === wasRaised) continue;
+      wasRaised = isRaised;
+      const s = solvePose(poseAt3(clip, t));
+      const { center, axis } = dumbbellPlacement(s.rightArm, s.rightPalmFacing!);
+      const reach = DUMBBELL.between / 2 + DUMBBELL.weight / 2;
+      const ends = [1, -1].map((k) => project(view, [center[0] + k * reach * axis[0], center[1] + k * reach * axis[1], center[2] + k * reach * axis[2]]));
+      const far = ends[0][2] < ends[1][2] ? ends[0] : ends[1];
+      const flat = (p: Vec3): Vec3 => [p[0], p[1], 0];
+      expect(distanceToSegment(flat(far), flat(project(view, s.rightArm[0])), flat(project(view, s.rightArm[1])))).toBeGreaterThan(2 * (DUMBBELL.radius + 12.5));
+    }
     // Nothing ever changes places, and the face, turned to the camera, keeps its nose.
     expect(new Set(drawOrders(clip))).toEqual(new Set(['leftLeg leftArm torso head rightLeg rightArm']));
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').length).toBeGreaterThan(2);
@@ -1773,6 +1789,41 @@ describe('3D clips', () => {
       const nearest = Math.min(...[start.rightArm, start.leftArm].map((arm) => Math.hypot(x - hand(arm)[0], y - hand(arm)[1])));
       expect(nearest).toBeGreaterThan(10);
     }
+  });
+
+  it('turns the top forearm up from the belly toward the ceiling, the elbow tucked against the side at 90°, in side-lying external rotation', () => {
+    const clip = SIDE_LYING_EXTERNAL_ROTATION_3D;
+    expect(clip.dumbbells).toEqual(['rightHand']);
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const s of skeletons) {
+      // Only the forearm moves: the body, the legs, the bottom arm and the top elbow stay put.
+      expect(distance(s.spine[0], start.spine[0])).toBeCloseTo(0);
+      expect(distance(s.head, start.head)).toBeCloseTo(0);
+      for (const [now, first] of [[s.leftArm[2], start.leftArm[2]], [s.rightLeg[2], start.rightLeg[2]], [s.leftLeg[2], start.leftLeg[2]], [s.rightArm[1], start.rightArm[1]]] as const) {
+        expect(distance(now, first)).toBeCloseTo(0);
+      }
+      expect(angleAt(s.rightArm[0], s.rightArm[1], s.rightArm[2])).toBeCloseTo(90, 0);
+    }
+    // Lying on the side, the top elbow tucked in against it, down along the body from the shoulder.
+    const lying = start.spine[start.spine.length - 1];
+    expect(start.rightArm[0][1] - lying[1]).toBeGreaterThan(SKELETON.shoulder - 1);
+    expect(distance(start.rightArm[1], start.spine[0])).toBeLessThan(distance(start.rightArm[0], start.spine[0]));
+    expect(Math.abs(start.rightArm[1][0] - start.spine[0][0])).toBeLessThan(5);
+    // To start, the forearm rests down across the belly, the hand in front of it near the floor.
+    const forearm = (s: Skeleton): Vec3 => [s.rightArm[2][0] - s.rightArm[1][0], s.rightArm[2][1] - s.rightArm[1][1], s.rightArm[2][2] - s.rightArm[1][2]];
+    expect(forearm(start)[1]).toBeLessThan(-0.5 * SKELETON.forearm);
+    expect(forearm(start)[0]).toBeGreaterThan(0.6 * SKELETON.forearm);
+    expect(start.rightArm[2][1]).toBeGreaterThan(10);
+    expect(start.rightArm[2][1]).toBeLessThan(40);
+    // Turned up, it points nearly at the ceiling.
+    const up = solvePose(clip.keyframes[clip.stillFrame!].pose);
+    expect(forearm(up)[1]).toBeGreaterThan(0.95 * SKELETON.forearm);
+    // Nothing changes places, and the weight on the inside of the fist, in front of the upper arm
+    // the whole way, stays over it rather than jumping from under it to over it where they overlap.
+    expect(new Set(drawOrders(clip)).size).toBe(1);
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).dumbbells.rightArm.raised).toBe(true);
   });
 
   it('folds to the floor, walks the hands out to a plank and the feet in after them, and stands up further along, the camera following, in inchworm', () => {
