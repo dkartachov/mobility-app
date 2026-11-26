@@ -76,7 +76,7 @@ import {
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
 } from '@/data/exercise-animations-3d';
 import { FLEXIBILITY_TESTS } from '@/data/mobility-tests';
-import { MARCHING_EXERCISE } from '@/data/test-warmup';
+import { INCHWORM_EXERCISE, LEG_SWINGS_EXERCISE, MARCHING_EXERCISE } from '@/data/test-warmup';
 
 import {
   distance,
@@ -107,7 +107,7 @@ import {
   type Vec3,
 } from './rig3d';
 
-const clips = [...EXERCISES, ...FLEXIBILITY_TESTS, MARCHING_EXERCISE].flatMap((e) =>
+const clips = [...EXERCISES, ...FLEXIBILITY_TESTS, MARCHING_EXERCISE, LEG_SWINGS_EXERCISE, INCHWORM_EXERCISE].flatMap((e) =>
   e.animation?.view === '3d' ? [[e.id, e.animation] as const] : []
 );
 

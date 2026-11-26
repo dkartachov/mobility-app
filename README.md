@@ -138,7 +138,7 @@ Moved to the new engine:
 | Knee to chest | Flexibility test | `KNEE_TO_CHEST_3D` |
 | Straight leg raise | Flexibility test | `STRAIGHT_LEG_RAISE_3D` |
 | Marching | Warm-up | `MARCHING_3D` |
-| Leg swings | Library | `LEG_SWINGS_3D` |
+| Leg swings | Warm-up | `LEG_SWINGS_3D` |
 | 90 to 90 | Library | `NINETY_TO_NINETY_3D` |
 | 90 to 90 rotations | Library | `NINETY_TO_NINETY_ROTATIONS_3D` |
 | 90 to 90 side foot lifts | Library | `NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D` |
@@ -199,7 +199,7 @@ Moved to the new engine:
 | Half spinal twist | Library | `HALF_SPINAL_TWIST_3D` |
 | Half-twisted lizard | Library | `HALF_TWISTED_LIZARD_3D` |
 | Open book | Library | `OPEN_BOOK_3D` |
-| Inchworm | Library, warm-up | `INCHWORM_3D` |
+| Inchworm | Warm-up | `INCHWORM_3D` |
 
 Still on the old engine (clip names in `exercise-animations.ts`). Where a clip needs something the new engine doesn't have yet, it's noted.
 

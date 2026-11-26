@@ -10,7 +10,7 @@
  */
 
 import { getExercise, type Exercise } from '@/data/exercises';
-import { MARCHING_3D } from '@/data/exercise-animations-3d';
+import { INCHWORM_3D, LEG_SWINGS_3D, MARCHING_3D } from '@/data/exercise-animations-3d';
 import type { WorkoutStep } from '@/lib/workout';
 
 /** Get-ready countdown before each move. There's no setup between them, so it's short. */
@@ -38,13 +38,47 @@ export const MARCHING_EXERCISE: Exercise = {
   active: true,
 };
 
+/** Only in the warm-up, not the library: a dynamic swing to warm the hips up rather than stretch them. */
+export const LEG_SWINGS_EXERCISE: Exercise = {
+  id: 'leg-swings',
+  name: 'Leg swings',
+  stimulus: 'Hip flexors, hamstrings and glutes',
+  areas: ['hips', 'hamstrings'],
+  position: 'standing',
+  equipment: ['wall'],
+  instructions: [
+    'Stand tall with one hand on a wall for balance',
+    'Swing the outside leg forward and back from the hip, keeping your torso still',
+    'Let each swing go a little higher, then switch sides',
+  ],
+  animation: LEG_SWINGS_3D,
+  twoSided: true,
+  active: true,
+};
+
+/** Only in the warm-up, not the library. */
+export const INCHWORM_EXERCISE: Exercise = {
+  id: 'inchworm',
+  name: 'Inchworm',
+  stimulus: 'Hamstrings, calves, shoulders and abs',
+  areas: ['hamstrings'],
+  position: 'standing',
+  instructions: [
+    'Stand tall, then fold forward and put your hands on the floor',
+    'Walk your hands out into a plank, keeping your legs as straight as you can',
+    'Walk your feet up to your hands, stand up and keep repeating',
+  ],
+  animation: INCHWORM_3D,
+  active: true,
+};
+
 /** Every move in order, with how long it lasts on each side. */
 const MOVES: { exercise: Exercise | string; seconds: number; instructions?: string[] }[] = [
   { exercise: MARCHING_EXERCISE, seconds: 60 },
   { exercise: 'ankle-mobilization', seconds: 30 },
-  { exercise: 'leg-swings', seconds: 30 },
+  { exercise: LEG_SWINGS_EXERCISE, seconds: 30 },
   { exercise: 'cossack-squat', seconds: 45 },
-  { exercise: 'inchworm', seconds: 45 },
+  { exercise: INCHWORM_EXERCISE, seconds: 45 },
   { exercise: 'worlds-greatest-stretch', seconds: 30 },
   {
     exercise: 'shoulder-pass-throughs',
