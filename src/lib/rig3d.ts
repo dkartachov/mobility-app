@@ -294,6 +294,12 @@ export type Clip3D = {
    * the strap's color, the strand in front over the legs and the one behind under them.
    */
   miniBand?: 'ankles' | 'knees';
+  /**
+   * A band or towel held taut between the hands, from one hand to the other with a short end
+   * showing past each (shoulder pass-throughs). It's drawn in the strap's color, over the figure
+   * while it's in front of the shoulders and under it once it's gone behind them.
+   */
+  handBand?: true;
 };
 
 export type HeldLimb = {
@@ -1445,6 +1451,77 @@ export function miniBandPoints(skeleton: Skeleton, view: Mat3, at: NonNullable<C
   return [half(1), half(-1)];
 }
 
+/**
+ * How far past a hand's edge on screen the part of a band drawn over the figure stops: the
+ * background outline drawn around the hand, and half the width of the band's stroke, whose round
+ * end reaches that far. That's where the band under the hand comes out from under its outline, so
+ * the two meet and the hand looks drawn over the band.
+ */
+const HAND_BAND_CLEARANCE = 4.5 + 3.5;
+
+/** How far along a line on screen from a point inside a hand it leaves the hand, as the figure draws it. */
+function outOfHand(arm: readonly Vec3[], view: Mat3, from: Vec2, toward: Vec2): number {
+  'worklet';
+  const a = project(view, arm[2]);
+  const b = project(view, arm[3]);
+  const [wide, narrow] = ARM_RADII[2];
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const lengthSquared = dx * dx + dy * dy;
+  let along = 0;
+  for (; along < 200; along += 0.5) {
+    const x = from[0] + toward[0] * along;
+    const y = from[1] + toward[1] * along;
+    const t = lengthSquared < 1e-6 ? 0 : Math.min(1, Math.max(0, ((x - a[0]) * dx + (y - a[1]) * dy) / lengthSquared));
+    if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) > lerp(wide, narrow, t) + HAND_BAND_CLEARANCE) break;
+  }
+  return along;
+}
+
+/** Points in the room as a line on screen through them, to stroke. */
+function lineThrough(view: Mat3, points: readonly Vec3[]): string {
+  'worklet';
+  let line = '';
+  for (let i = 0; i < points.length; i++) {
+    const point = project(view, points[i]);
+    line += `${i === 0 ? 'M' : 'L'}${fixed(point[0])} ${fixed(point[1])}`;
+  }
+  return line;
+}
+
+/** How far past the middle of each hand a band held in it shows, sticking out of the fist. */
+const HAND_BAND_END = 24;
+
+/**
+ * A band held taut between the hands, as lines on screen. It runs through the middle of each
+ * fist and out past it, and the part through the hands and past them is always drawn under the
+ * figure, so each hand is drawn closed around it with its end sticking out the other side. While
+ * the band is in front of the shoulders, the part between the hands is drawn again over the figure,
+ * from the edge of one hand to the edge of the other, so it goes over the body but still under the
+ * hands. Behind the shoulders that part is only the one under the figure, and the body hides it.
+ */
+export function handBandLine(skeleton: Skeleton, view: Mat3): { under: string; over: string } {
+  'worklet';
+  const left = lerpVec(skeleton.leftArm[2], skeleton.leftArm[3], 0.5);
+  const right = lerpVec(skeleton.rightArm[2], skeleton.rightArm[3], 0.5);
+  const across = unit(sub(right, left), skeleton.spineRight[0]);
+  const under = lineThrough(view, [add(left, scaled(across, -HAND_BAND_END)), left, right, add(right, scaled(across, HAND_BAND_END))]);
+  const shoulders = lerpVec(skeleton.leftArm[0], skeleton.rightArm[0], 0.5);
+  if (project(view, lerpVec(left, right, 0.5))[2] <= project(view, shoulders)[2]) return { under, over: '' };
+  const from = project(view, left);
+  const to = project(view, right);
+  const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  if (length < 1e-6) return { under, over: '' };
+  const toward: Vec2 = [(to[0] - from[0]) / length, (to[1] - from[1]) / length];
+  const start = outOfHand(skeleton.leftArm, view, [from[0], from[1]], toward);
+  const end = length - outOfHand(skeleton.rightArm, view, [to[0], to[1]], [-toward[0], -toward[1]]);
+  if (end <= start) return { under, over: '' };
+  return {
+    under,
+    over: `M${fixed(from[0] + toward[0] * start)} ${fixed(from[1] + toward[1] * start)}L${fixed(from[0] + toward[0] * end)} ${fixed(from[1] + toward[1] * end)}`,
+  };
+}
+
 /** A phone's size: about 15 by 7 by 1 cm, with a shin of 100 at about 40 cm. */
 export const PHONE = { length: 37, width: 18, depth: 3 };
 /** How far in from the phone's edge its screen starts. */
@@ -2146,17 +2223,6 @@ function floorMarks(view: Mat3, travel: number, journey: number): string {
   return path;
 }
 
-/** Points in the room as a line on screen through them, to stroke. */
-function lineThrough(view: Mat3, points: readonly Vec3[]): string {
-  'worklet';
-  let line = '';
-  for (let i = 0; i < points.length; i++) {
-    const point = project(view, points[i]);
-    line += `${i === 0 ? 'M' : 'L'}${fixed(point[0])} ${fixed(point[1])}`;
-  }
-  return line;
-}
-
 /** The clip at a moment, drawn. */
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
@@ -2169,6 +2235,11 @@ export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
     const [front, back] = miniBandPoints(skeleton, view, clip.miniBand);
     frame.strap += lineThrough(view, front);
     frame.bandBehind = lineThrough(view, back);
+  }
+  if (clip.handBand) {
+    const band = handBandLine(skeleton, view);
+    frame.bandBehind += band.under;
+    frame.strap += band.over;
   }
   if (clip.follow) frame.floor = floorMarks(view, travel, travelOf(clip, clip.keyframes[clip.keyframes.length - 1].pose));
   return frame;

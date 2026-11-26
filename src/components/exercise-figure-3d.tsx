@@ -236,11 +236,11 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
           </>
         )}
         {/* The back of a mini band, under the legs, so it shows only between them. */}
-        {clip.miniBand && <AnimatedPath animatedProps={bandBehind} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
+        {(clip.miniBand || clip.handBand) && <AnimatedPath animatedProps={bandBehind} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
         {slots.map((index) => (
           <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} phone={clip.phone !== undefined} dumbbells={clip.dumbbells !== undefined} />
         ))}
-        {(clip.strap || clip.miniBand) && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
+        {(clip.strap || clip.miniBand || clip.handBand) && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
       </Svg>
       {clip.partner && <PartnerBadge />}
     </View>

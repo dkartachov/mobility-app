@@ -42,6 +42,7 @@ import {
   SEATED_PIKE_STRETCH_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
+  SHOULDER_PASS_THROUGHS_3D,
   SIT_AND_REACH_3D,
   SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
@@ -1711,6 +1712,67 @@ describe('3D clips', () => {
     const frame = frameAt(KNEE_TO_CHEST_3D, viewOf(KNEE_TO_CHEST_3D.camera), 0);
     expect(frame.bandBehind).toBe('');
     expect(frame.strap).toBe('');
+  });
+
+  it('sweeps both straight arms from in front of the hips up overhead and down behind the back on a wide grip, and back, in shoulder pass-throughs', () => {
+    const clip = SHOULDER_PASS_THROUGHS_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    const grip = distance(start.rightArm[2], start.leftArm[2]);
+    for (const { rightArm, leftArm, rightLeg, leftLeg, spine } of skeletons) {
+      // Standing still, the arms straight the whole way and the hands the same distance apart, as
+      // holding a towel or band, and level with each other.
+      expect(distance(spine[0], start.spine[0])).toBeCloseTo(0);
+      for (const [leg, first] of [[rightLeg, start.rightLeg], [leftLeg, start.leftLeg]] as const) expect(distance(leg[2], first[2])).toBeCloseTo(0);
+      for (const arm of [rightArm, leftArm]) expect(angleAt(arm[0], arm[1], arm[2])).toBeGreaterThan(170);
+      expect(distance(rightArm[2], leftArm[2])).toBeCloseTo(grip);
+      expect(rightArm[2][1]).toBeCloseTo(leftArm[2][1]);
+    }
+    // A wide grip: the hands well over twice as far apart as the shoulders.
+    expect(grip).toBeGreaterThan(3 * SKELETON.shoulder * 2);
+    // In front of the hips to start, up over the head, and down behind the back.
+    expect(start.rightArm[2][0]).toBeGreaterThan(start.spine[0][0] + 20);
+    expect(start.rightArm[2][1]).toBeLessThan(start.spine[0][1] + 40);
+    const top = skeletons.reduce((best, s) => (s.rightArm[2][1] > best.rightArm[2][1] ? s : best));
+    expect(top.rightArm[2][1]).toBeGreaterThan(top.head[1] + 60);
+    const behind = solvePose(clip.keyframes[1 + 2 * 24 + 1].pose);
+    expect(behind.rightArm[2][0]).toBeLessThan(behind.spine[0][0] - 20);
+    expect(behind.rightArm[2][1]).toBeLessThan(behind.spine[0][1] + 40);
+    // The shoulders rise as the arms go overhead.
+    expect(top.rightArm[0][1]).toBeGreaterThan(start.rightArm[0][1] + 3);
+    // The near arm stays over the body and the far one behind it the whole way.
+    for (const order of new Set(drawOrders(clip))) {
+      const parts = order.split(' ');
+      expect(parts[parts.length - 1]).toBe('rightArm');
+      expect(parts.indexOf('leftArm')).toBeLessThan(parts.indexOf('torso'));
+    }
+    // The band runs through both fists and out past them, under the figure so the hands close over
+    // it. The part between the hands is drawn again over the figure while it's in front of the
+    // body, and goes from one side to the other only while it's up over the head, clear of the body.
+    const view = viewOf(clip.camera);
+    const total = durationOf(clip);
+    let sides = '';
+    for (let t = 0; t <= total; t += 10) {
+      const frame = frameAt(clip, view, t);
+      expect(frame.bandBehind).toMatch(/^M[-\d. ]+(L[-\d. ]+){3}$/);
+      const front = frame.strap !== '';
+      if (front) expect(frame.strap).toMatch(/^M[-\d. ]+L[-\d. ]+$/);
+      const side = front ? 'F' : 'B';
+      if (!sides.endsWith(side)) {
+        const first = sides === '';
+        sides += side;
+        const s = solvePose(poseAt3(clip, t));
+        if (!first) expect(s.rightArm[2][1]).toBeGreaterThan(s.head[1] + 40);
+      }
+    }
+    expect(sides).toBe('FBF');
+    // Over the figure it stops at the edge of each hand rather than covering them.
+    const [, x0, y0, x1, y1] = frameAt(clip, view, 0).strap.match(/^M([-\d.]+) ([-\d.]+)L([-\d.]+) ([-\d.]+)$/)!.map(Number);
+    const hand = (arm: readonly Vec3[]) => project(view, [(arm[2][0] + arm[3][0]) / 2, (arm[2][1] + arm[3][1]) / 2, (arm[2][2] + arm[3][2]) / 2]);
+    for (const [x, y] of [[x0, y0], [x1, y1]]) {
+      const nearest = Math.min(...[start.rightArm, start.leftArm].map((arm) => Math.hypot(x - hand(arm)[0], y - hand(arm)[1])));
+      expect(nearest).toBeGreaterThan(10);
+    }
   });
 
   it('folds to the floor, walks the hands out to a plank and the feet in after them, and stands up further along, the camera following, in inchworm', () => {

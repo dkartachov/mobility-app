@@ -66,6 +66,7 @@ import {
   SEATED_PIKE_STRETCH_3D,
   SEATED_SHOULDER_EXTENSION_3D,
   SEATED_STRADDLE_SIDE_BEND_3D,
+  SHOULDER_PASS_THROUGHS_3D,
   SQUAT_TO_STAND_3D,
   STANDING_FORWARD_FOLD_3D,
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
@@ -73,7 +74,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  SHOULDER_PASS_THROUGHS,
   SIDE_LYING_EXTERNAL_ROTATION,
   SLEEPER_STRETCH,
   THE_SAGITTARIUS,
@@ -827,7 +827,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Bring it back to the front and keep repeating, narrowing your grip as it gets easier',
     ],
     photo: require('@/assets/images/exercises/shoulder-pass-throughs.png'),
-    animation: SHOULDER_PASS_THROUGHS,
+    animation: SHOULDER_PASS_THROUGHS_3D,
     active: true,
     oneMinuteOnly: true,
   },

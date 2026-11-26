@@ -6038,3 +6038,60 @@ export const SEATED_HIP_INTERNAL_ROTATION_3D: Clip3D = {
     { ms: 1200, pose: SEATED_IR_IN },
   ],
 };
+
+// --- Shoulder pass-throughs: standing tall with a wide grip, both straight arms sweep from in front of the hips up overhead and down behind the back, and back ---
+
+/** How far out to each side the hands are, holding the towel or band with a wide grip. */
+const PASS_HAND_OUT = 115;
+/** How far past straight down the hands are in front of the hips, and behind the back. */
+const PASS_PAST_DOWN = 20;
+/** How far the shoulders rise toward the ears with the arms overhead. */
+const PASS_SHRUG = 18;
+
+/**
+ * The arms this far round from straight down (0), forward and up: 180 is overhead and 360 straight
+ * down behind. With the grip wide and the arms straight, each hand stays the same distance out to
+ * its side, so it goes round its shoulder on a circle, and the shoulders rise as the arms go up.
+ */
+const passAt = (degrees: number): Pose3 => {
+  const shrug = PASS_SHRUG * Math.sin(radians(degrees / 2)) ** 2;
+  const body: Pose3 = { ...STANDING, rightArm: { shrug }, leftArm: { shrug } };
+  const skeleton = solvePose(body);
+  const hand = (shoulder: Vec3, side: 1 | -1): Vec3 => {
+    const reach = Math.sqrt(ARM_REACH ** 2 - (side * PASS_HAND_OUT - shoulder[2]) ** 2);
+    return [shoulder[0] + reach * Math.sin(radians(degrees)), shoulder[1] - reach * Math.cos(radians(degrees)), side * PASS_HAND_OUT];
+  };
+  return {
+    ...body,
+    pins: {
+      rightHand: { at: hand(skeleton.rightArm[0], 1), pole: [-Math.cos(radians(degrees)), -Math.sin(radians(degrees)), 0.3] },
+      leftHand: { at: hand(skeleton.leftArm[0], -1), pole: [-Math.cos(radians(degrees)), -Math.sin(radians(degrees)), -0.3] },
+    },
+  };
+};
+const PASS_FRONT = passAt(PASS_PAST_DOWN);
+const PASS_BEHIND = passAt(360 - PASS_PAST_DOWN);
+/** Pinned hands go straight between keyframes, cutting across their circles, so each half of the sweep takes this many. */
+const PASS_STEPS = 24;
+
+export const SHOULDER_PASS_THROUGHS_3D: Clip3D = {
+  view: '3d',
+  // From the front and a little to the right, close on the upper body: the arms rise wide apart in
+  // a Y overhead and go down behind the back on either side of it, and the arm going over the far
+  // shoulder shows its sweep forward and back. From the side the two arms lie one over the other;
+  // straight from the front the sweep forward and back comes at the camera.
+  camera: { yaw: 55, pitch: 12, fit: 'upper' },
+  highlight: ['rightArm', 'leftArm'],
+  handBand: true,
+  // Overhead.
+  stillFrame: 1 + PASS_STEPS,
+  keyframes: [
+    { ms: 0, pose: PASS_FRONT },
+    { ms: 300, pose: PASS_FRONT },
+    ...alongArc(1500, PASS_STEPS, (t) => passAt(mix(PASS_PAST_DOWN, 180, t))),
+    ...alongArc(1500, PASS_STEPS, (t) => passAt(mix(180, 360 - PASS_PAST_DOWN, t))),
+    { ms: 300, pose: PASS_BEHIND },
+    ...alongArc(1500, PASS_STEPS, (t) => passAt(mix(360 - PASS_PAST_DOWN, 180, t))),
+    ...alongArc(1500, PASS_STEPS, (t) => passAt(mix(180, PASS_PAST_DOWN, t))),
+  ],
+};
