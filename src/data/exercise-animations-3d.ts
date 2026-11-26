@@ -6136,3 +6136,76 @@ export const SIDE_LYING_EXTERNAL_ROTATION_3D: Clip3D = {
     { ms: 1800, pose: SIDE_ER_IN },
   ],
 };
+
+// --- Sleeper stretch: lying on the left side, the bottom arm out in front at shoulder height with the elbow at 90° and the forearm up, the top hand presses the forearm down toward the floor ---
+
+/** How far the top hand presses the bottom forearm down from pointing at the ceiling, toward the feet. */
+const SLEEPER_PRESS = 55;
+/** How far along the bottom forearm from the elbow the top hand presses: at the wrist. */
+const SLEEPER_ALONG = 1;
+/** How far the middle of the top hand is from the middle of the bottom forearm: the forearm's half thickness and the hand's. */
+const SLEEPER_HAND_OFF = 15;
+/** How far from the wrist the middle of the hand is. */
+const SLEEPER_HAND_MIDDLE = 13;
+
+const sleeperBody = (press: number): Pose3 => ({
+  pelvis: [0, BOOK_SPINE_Y, 0],
+  tilt: -90,
+  // The bottom arm lies on the floor straight out in front at shoulder height, the forearm up at
+  // the ceiling to start and pressed down toward the feet, turning around the upper arm.
+  leftArm: { flex: 90, elbow: 90, rotate: -90 - press },
+  // Knees bent a little and stacked, the top one resting on the bottom one.
+  rightLeg: { flex: 40, knee: 50, abduct: -8 },
+  leftLeg: { flex: 40, knee: 50 },
+});
+
+/**
+ * The bottom forearm pressed this far (0 to 1) down toward the feet by the top hand. The hand lies
+ * across the forearm near the wrist, on the side toward the head, palm against it and fingers
+ * pointing away from the body, and goes round with it.
+ */
+const sleeperAt = (t: number): Pose3 => {
+  const body = sleeperBody(SLEEPER_PRESS * t);
+  const [, elbow, wrist] = solvePose(body).leftArm;
+  const forearm = unit3(sub3(wrist, elbow));
+  // Square to the forearm, in the way it turns: toward the feet as it's pressed down.
+  const pushing = unit3(cross3([1, 0, 0], forearm));
+  const contact = along3(along3(elbow, forearm, SLEEPER_ALONG * SKELETON.forearm), pushing, -SLEEPER_HAND_OFF);
+  return {
+    ...body,
+    pins: { rightHand: { at: along3(contact, [-1, 0, 0], SLEEPER_HAND_MIDDLE), toward: [1, 0, 0], pole: [-0.3, 1, 0.5] } },
+  };
+};
+const SLEEPER_UP = sleeperAt(0);
+const SLEEPER_PRESSED = sleeperAt(1);
+/**
+ * The pressing hand goes round with the forearm, so the press takes this many steps rather than one
+ * straight move. Each step goes at an even speed, so it takes this many for the press to ease in and
+ * out smoothly: with 8, the top arm jerked from one speed to the next at each step.
+ */
+const SLEEPER_STEPS = 24;
+
+export const SLEEPER_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From in front and a little toward the head, above: the forearm turns around the upper arm, which
+  // points out in front of the body, so from in front its swing from the ceiling down toward the feet
+  // is across the screen, and from a little toward the head the upper arm shows its length too,
+  // coming out from the shoulder. Straight from the front it pointed at the camera and was lost, and
+  // the arm looked like a stick standing on the floor.
+  camera: { yaw: 115, pitch: 30 },
+  highlight: ['leftArm'],
+  // The top hand stays on the bottom wrist.
+  holds: [{ hand: 'rightHand', limb: 'leftArm' }],
+  // The bottom forearm stands out in front, nearer the camera than the top arm reaching to it, but
+  // the two are near the same depth and swapped partway through the press.
+  behind: [['rightArm', 'leftArm']],
+  // Pressed down.
+  stillFrame: 1 + SLEEPER_STEPS,
+  keyframes: [
+    { ms: 0, pose: SLEEPER_UP },
+    { ms: 600, pose: SLEEPER_UP },
+    ...alongArc(1800, SLEEPER_STEPS, sleeperAt),
+    { ms: 3500, pose: SLEEPER_PRESSED },
+    ...alongArc(1800, SLEEPER_STEPS, (t) => sleeperAt(1 - t)),
+  ],
+};

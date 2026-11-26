@@ -44,6 +44,7 @@ import {
   SHOULDER_EXTERNAL_ROTATION_3D,
   SHOULDER_PASS_THROUGHS_3D,
   SIDE_LYING_EXTERNAL_ROTATION_3D,
+  SLEEPER_STRETCH_3D,
   SIT_AND_REACH_3D,
   SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
@@ -1789,6 +1790,40 @@ describe('3D clips', () => {
       const nearest = Math.min(...[start.rightArm, start.leftArm].map((arm) => Math.hypot(x - hand(arm)[0], y - hand(arm)[1])));
       expect(nearest).toBeGreaterThan(10);
     }
+  });
+
+  it('presses the bottom forearm down from the ceiling toward the feet with the top hand, the arm out in front at shoulder height and the elbow at 90°, in the sleeper stretch', () => {
+    const clip = SLEEPER_STRETCH_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const s of skeletons) {
+      // Only the arms move: the body and legs stay put, and the bottom upper arm lies still on the
+      // floor straight out in front at shoulder height, the elbow at 90°.
+      expect(distance(s.spine[0], start.spine[0])).toBeCloseTo(0);
+      expect(distance(s.head, start.head)).toBeCloseTo(0);
+      for (const [now, first] of [[s.rightLeg[2], start.rightLeg[2]], [s.leftLeg[2], start.leftLeg[2]], [s.leftArm[1], start.leftArm[1]]] as const) {
+        expect(distance(now, first)).toBeCloseTo(0);
+      }
+      const [shoulder, elbow, wrist, hand] = s.leftArm;
+      expect(elbow[1]).toBeCloseTo(shoulder[1]);
+      expect(elbow[0] - shoulder[0]).toBeCloseTo(SKELETON.upperArm, 0);
+      expect(angleAt(shoulder, elbow, wrist)).toBeCloseTo(90, 0);
+      // The top hand stays on the bottom wrist, pressing from the head's side, and never goes into it.
+      const top = s.rightArm;
+      const middle: Vec3 = [(top[2][0] + top[3][0]) / 2, (top[2][1] + top[3][1]) / 2, (top[2][2] + top[3][2]) / 2];
+      expect(distance(middle, wrist)).toBeLessThan(20);
+      expect(distanceToSegment(middle, elbow, hand)).toBeGreaterThan(12);
+      expect(middle[2]).toBeLessThan(wrist[2]);
+    }
+    // To start the forearm points at the ceiling, and pressed it's well down toward the feet.
+    const fromUp = (s: Skeleton) => angleAt([s.leftArm[1][0], s.leftArm[1][1] + 1, s.leftArm[1][2]], s.leftArm[1], s.leftArm[2]);
+    expect(fromUp(start)).toBeLessThan(1);
+    const pressed = solvePose(clip.keyframes[clip.stillFrame!].pose);
+    expect(fromUp(pressed)).toBeGreaterThan(45);
+    expect(pressed.leftArm[2][2]).toBeGreaterThan(pressed.leftArm[1][2] + 40);
+    expect(pressed.leftArm[2][1]).toBeGreaterThan(pressed.leftArm[1][1]);
+    // The bottom arm stays in front of the top one reaching to it, its hand drawn over it.
+    expect(new Set(drawOrders(clip)).size).toBe(1);
   });
 
   it('turns the top forearm up from the belly toward the ceiling, the elbow tucked against the side at 90°, in side-lying external rotation', () => {

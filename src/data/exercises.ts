@@ -68,6 +68,7 @@ import {
   SEATED_STRADDLE_SIDE_BEND_3D,
   SHOULDER_PASS_THROUGHS_3D,
   SIDE_LYING_EXTERNAL_ROTATION_3D,
+  SLEEPER_STRETCH_3D,
   SQUAT_TO_STAND_3D,
   STANDING_FORWARD_FOLD_3D,
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
@@ -75,7 +76,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  SLEEPER_STRETCH,
   THE_SAGITTARIUS,
   THREAD_THE_NEEDLE,
   WINDSHIELD_WIPERS_WITH_KNEE_LIFT,
@@ -667,7 +667,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold without forcing it, then switch sides',
     ],
     photo: require('@/assets/images/exercises/sleeper-stretch.png'),
-    animation: SLEEPER_STRETCH,
+    animation: SLEEPER_STRETCH_3D,
     twoSided: true,
   },
   {
