@@ -32,9 +32,11 @@ import {
   OPEN_BOOK_3D,
   OVERHEAD_REACH_3D,
   PANCAKE_3D,
+  PEC_STRETCH_ON_THE_GROUND_3D,
   PRAYER_POSE_3D,
   PUPPY_POSE_3D,
   RESTING_COSSACK_SQUAT_3D,
+  REVERSE_CLAMSHELLS_3D,
   SEATED_PIKE_STRETCH_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
@@ -542,6 +544,8 @@ describe('3D clips', () => {
       'half-spinal-twist',
       'half-twisted-lizard',
       'open-book',
+      'pec-stretch-on-the-ground',
+      'reverse-clamshells',
       'inchworm',
       'warmup-marching',
     ]));
@@ -1469,6 +1473,122 @@ describe('3D clips', () => {
     expect(orders.size).toBe(1);
     const [order] = [...orders].map((o) => o.split(' '));
     expect(order.indexOf('head')).toBeGreaterThan(order.indexOf('torso'));
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '')).toHaveLength(1);
+  });
+
+  it('rolls the body over onto its side away from the floor, the straight arm staying out on the floor behind it and the top foot stepping over, in pec stretch on the ground', () => {
+    const clip = PEC_STRETCH_ON_THE_GROUND_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightArm, leftArm, rightLeg } of skeletons) {
+      // The outstretched arm stays all but straight, its hand down on the floor where it started, and the
+      // pushing hand stays planted too.
+      expect(angleAt(rightArm[0], rightArm[1], rightArm[2])).toBeGreaterThan(170);
+      expect(distance(rightArm[2], start.rightArm[2])).toBeCloseTo(0);
+      expect(rightArm[2][1]).toBeLessThan(15);
+      expect(distance(leftArm[2], start.leftArm[2])).toBeCloseTo(0);
+      // The bottom leg lies long on the floor.
+      expect(angleAt(rightLeg[0], rightLeg[1], rightLeg[2])).toBeGreaterThan(170);
+      expect(rightLeg[2][1]).toBeLessThan(15);
+    }
+    // Face down to start, the arm straight out to the side, square to the body.
+    expect(start.spineFront[0][1]).toBeLessThan(-0.99);
+    expect(Math.abs(start.rightArm[2][0] - start.rightArm[0][0])).toBeLessThan(1);
+    // Rolled, the right side is down and the chest turned away from the arm, so the arm reaches
+    // out behind the chest: the stretch.
+    const rolled = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const chest = rolled.spineFront[rolled.spineFront.length - 1];
+    expect(rolled.spineRight[0][1]).toBeLessThan(-0.95);
+    const reach = rolled.rightArm[2].map((v, i) => v - rolled.rightArm[0][i]);
+    expect(reach[0] * chest[0] + reach[1] * chest[1] + reach[2] * chest[2]).toBeLessThan(-0.9 * SKELETON.upperArm);
+    // The pushing arm straightens as it pushes the body over.
+    expect(angleAt(rolled.leftArm[0], rolled.leftArm[1], rolled.leftArm[2])).toBeGreaterThan(angleAt(start.leftArm[0], start.leftArm[1], start.leftArm[2]) + 30);
+    // The top foot is planted behind the bottom leg, its knee up, and goes over the bottom leg
+    // rather than through it.
+    expect(rolled.leftLeg[2][1]).toBeLessThan(15);
+    expect(rolled.leftLeg[2][2]).toBeGreaterThan(rolled.rightLeg[1][2] + SKELETON.hip);
+    expect(rolled.leftLeg[1][1]).toBeGreaterThan(rolled.leftLeg[0][1] + 40);
+    for (const { leftLeg, rightLeg } of skeletons) {
+      if (Math.abs(leftLeg[2][2] - rightLeg[2][2]) < 30) expect(leftLeg[2][1]).toBeGreaterThan(rightLeg[2][1] - 1);
+    }
+    // The head turns away from the arm, looking up.
+    expect(rolled.facing[1]).toBeGreaterThan(start.facing[1] + 0.5);
+    // Nothing ever changes places: the outstretched arm under the body, the top leg over the
+    // bottom one.
+    const orders = new Set(drawOrders(clip));
+    expect(orders.size).toBe(1);
+    const [order] = [...orders].map((o) => o.split(' '));
+    expect(order.indexOf('rightArm')).toBeLessThan(order.indexOf('torso'));
+    expect(order.indexOf('rightLeg')).toBeLessThan(order.indexOf('leftLeg'));
+    // The nose comes once as the face turns toward the camera and goes once on the way back down,
+    // never flickering: a plain head face down, and the nose on the face turned up toward the camera.
+    const view = viewOf(clip.camera);
+    const noses: boolean[] = [];
+    for (let t = 0; t <= durationOf(clip); t += 10) noses.push(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '').length > 1);
+    expect(noses[0]).toBe(false);
+    expect(noses.filter((nose, i) => i > 0 && nose !== noses[i - 1])).toHaveLength(2);
+    let still = 0;
+    for (let i = 1; i <= clip.stillFrame; i++) still += clip.keyframes[i].ms;
+    expect(noses[Math.round(still / 10)]).toBe(true);
+    // It draws itself in down the bridge as the face turns, rather than appearing whole.
+    const noseAt = (t: number) => frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '')[1] ?? '';
+    const appears = noses.indexOf(true) * 10;
+    const corners = (piece: string) => piece.split('L').length;
+    expect(corners(noseAt(appears))).toBeLessThan(corners(noseAt(still)));
+    expect(corners(noseAt(appears))).toBeLessThan(corners(noseAt(appears + 150)));
+  });
+
+  it('opens the top knee with the feet together, lifts the top foot with the knee kept where it is, lowers it back onto the other foot and closes the knees, twice, in reverse clamshells', () => {
+    const clip = REVERSE_CLAMSHELLS_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { spine, rightLeg, leftLeg } of skeletons) {
+      // Lying still on the side, the bottom leg too, both knees at 90° and the hips bent.
+      expect(distance(spine[0], start.spine[0])).toBeCloseTo(0);
+      leftLeg.forEach((joint, i) => expect(distance(joint, start.leftLeg[i])).toBeCloseTo(0));
+      for (const leg of [rightLeg, leftLeg]) expect(angleAt(leg[0], leg[1], leg[2])).toBeCloseTo(90, 0);
+      const up: Vec3 = [leftLeg[0][0] + spine[1][0] - spine[0][0], leftLeg[0][1] + spine[1][1] - spine[0][1], leftLeg[0][2] + spine[1][2] - spine[0][2]];
+      expect(angleAt(up, leftLeg[0], leftLeg[1])).toBeCloseTo(180 - 45, 0);
+    }
+    // The feet touch, the top one resting on the bottom one, whenever the knee isn't all the way
+    // open: through the knee opening, and from the foot coming back down to the knees closing.
+    const LEG_RADIUS_AT_ANKLE = 10.5;
+    const touching = (leg: Skeleton['rightLeg']) => distance(leg[2], start.leftLeg[2]) < 2 * LEG_RADIUS_AT_ANKLE + 1;
+    expect(touching(start.rightLeg)).toBe(true);
+    expect(start.rightLeg[1][1] - start.leftLeg[1][1]).toBeLessThan(2 * SKELETON.hip + 4);
+    // While the knee opens the top foot stays exactly where it started.
+    const footStill = skeletons.filter((s) => distance(s.rightLeg[2], start.rightLeg[2]) < 0.01);
+    const opened = footStill.reduce((best, s) => (s.rightLeg[1][1] > best.rightLeg[1][1] ? s : best));
+    expect(opened.rightLeg[1][1] - start.rightLeg[1][1]).toBeGreaterThan(40);
+    // Then the foot lifts away from the other one, up past the knee, with the knee kept where it
+    // opened to.
+    const lifted = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(distance(lifted.rightLeg[1], opened.rightLeg[1])).toBeCloseTo(0);
+    expect(lifted.rightLeg[2][1]).toBeGreaterThan(lifted.rightLeg[1][1]);
+    // The foot only leaves the other one with the knee all the way open, and the whole movement
+    // goes round twice, the knees closing between.
+    let lifts = 0;
+    let closes = 0;
+    let [up, closed] = [false, true];
+    for (const { rightLeg } of skeletons) {
+      const kneeOpen = distance(rightLeg[1], opened.rightLeg[1]) < 0.5;
+      if (!kneeOpen) expect(touching(rightLeg)).toBe(true);
+      if (!touching(rightLeg)) expect(kneeOpen).toBe(true);
+      const footUp = !touching(rightLeg);
+      if (footUp && !up) lifts++;
+      up = footUp;
+      const kneesClosed = distance(rightLeg[1], start.rightLeg[1]) < 1;
+      if (kneesClosed && !closed) closes++;
+      closed = kneesClosed;
+    }
+    expect(lifts).toBe(2);
+    expect(closes).toBe(2);
+    // Nothing ever changes places: the bottom leg under the top one, and the head a plain circle.
+    const orders = new Set(drawOrders(clip));
+    expect(orders.size).toBe(1);
+    const [order] = [...orders].map((o) => o.split(' '));
+    expect(order.indexOf('leftLeg')).toBeLessThan(order.indexOf('rightLeg'));
     const view = viewOf(clip.camera);
     for (let t = 0; t <= durationOf(clip); t += 10) expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '')).toHaveLength(1);
   });

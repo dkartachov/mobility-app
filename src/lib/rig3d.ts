@@ -281,9 +281,13 @@ export type Clip3D = {
   /**
    * `false` leaves the head a plain circle all the way through, even where the face turns toward
    * the camera, for a clip where a nose that comes partway through only distracts (open book, where
-   * the face turns up as the chest opens).
+   * the face turns up as the chest opens). `'drawIn'` draws the nose in down the bridge as a face
+   * turning from profile toward the camera brings it in past the head's outline, rather than all at
+   * once (pec stretch on the ground, where the face turns up as the body rolls over). Only for a face
+   * that turns: one held near the edge, like a face tipped down toward the camera, would keep a
+   * nose cut short.
    */
-  nose?: false;
+  nose?: false | 'drawIn';
 };
 
 export type HeldLimb = {
@@ -1054,6 +1058,12 @@ const NOSE_LINE = 2.4;
 const NOSE_LINE_INSET = 1.5;
 /** How far past the head's outline the nose can reach and still be drawn. Any further, and the head is near enough to profile to leave plain. */
 const NOSE_STICKS_OUT = 2;
+/**
+ * For a clip that draws the nose in (`Clip3D.nose`), how much further into the face the nose has to
+ * come from there to be drawn whole. On the way it's drawn from between the brows down only part of
+ * the way, so a face turning toward the camera shows its nose drawing itself in.
+ */
+const NOSE_REVEAL = 12;
 /** The wings of the nostrils, either side of the base of the nose: how far along, up, and to the side. */
 const NOSE_WING = { f: 30, u: -6.5, side: 6.5 };
 /** How far along the bridge, and along the way to the nostril, the line starts and ends its turn around the tip. */
@@ -1115,6 +1125,28 @@ function noseLine(view: Mat3, skeleton: Skeleton, head: Vec3): Vec2[] {
   }
   points.push(wing);
   return spacedOut(points);
+}
+
+/** The start of a run of points, this far along its length (0 to 1), kept at least two points long so it can still be drawn. */
+function partOfLine(points: readonly Vec2[], fraction: number): Vec2[] {
+  'worklet';
+  if (fraction >= 1 || points.length < 2) return points.slice();
+  let total = 0;
+  for (let i = 1; i < points.length; i++) total += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  // A sliver of it at the least, so the nose comes and goes on the same frames as it would whole.
+  let left = Math.max(fraction * total, 0.6);
+  const part: Vec2[] = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const length = Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+    if (length >= left) {
+      const t = left / Math.max(length, 1e-6);
+      part.push([points[i - 1][0] + (points[i][0] - points[i - 1][0]) * t, points[i - 1][1] + (points[i][1] - points[i - 1][1]) * t]);
+      return part;
+    }
+    part.push(points[i]);
+    left -= length;
+  }
+  return part;
 }
 
 /** The nose's outline on screen, from between the brows to above the lip, which shows how far it would stick out past the head. */
@@ -1184,16 +1216,20 @@ function lineHole(points: readonly Vec2[], halfWidth: number): string {
  * past the head's outline, the rest of the body already shows which way the figure faces, so the
  * head is left plain. So is the back of the head.
  */
-function headShape(view: Mat3, skeleton: Skeleton, head: Vec3, withNose: boolean): string {
+/** How a face turned toward the camera gets its nose: always whole, drawn in as it turns (see `Clip3D.nose`), or not at all. */
+type NoseStyle = true | NonNullable<Clip3D['nose']>;
+
+function headShape(view: Mat3, skeleton: Skeleton, head: Vec3, nose: NoseStyle): string {
   'worklet';
   const outline = disc(head, SKELETON.head, SKELETON.head);
-  if (!withNose || turned(view, skeleton.facing)[2] <= 0) return outline;
-  const nose = noseOutline(view, skeleton);
+  if (nose === false || turned(view, skeleton.facing)[2] <= 0) return outline;
+  const noseEdge = noseOutline(view, skeleton);
   let sticksOut = -Infinity;
-  for (let i = 0; i < nose.length; i++) sticksOut = Math.max(sticksOut, Math.hypot(nose[i][0] - head[0], nose[i][1] - head[1]) - SKELETON.head);
+  for (let i = 0; i < noseEdge.length; i++) sticksOut = Math.max(sticksOut, Math.hypot(noseEdge[i][0] - head[0], noseEdge[i][1] - head[1]) - SKELETON.head);
   if (sticksOut > NOSE_STICKS_OUT) return outline;
 
-  const line = noseLine(view, skeleton, head);
+  const whole = noseLine(view, skeleton, head);
+  const line = nose === 'drawIn' ? partOfLine(whole, Math.min(1, (NOSE_STICKS_OUT - sticksOut) / NOSE_REVEAL)) : whole;
   if (line.length < 2) return outline;
   let reach = 0;
   for (let i = 0; i < line.length; i++) reach = Math.max(reach, Math.hypot(line[i][0] - head[0], line[i][1] - head[1]));
@@ -1675,8 +1711,8 @@ export function traceFigure(
   handsOnBody?: Clip3D['handsOnBody'],
   /** Hands holding a dumbbell, see `Clip3D.dumbbells`. */
   dumbbells?: Clip3D['dumbbells'],
-  /** Whether a face turned toward the camera gets its nose, see `Clip3D.nose`. */
-  withNose = true
+  /** Whether, and how, a face turned toward the camera gets its nose, see `Clip3D.nose`. */
+  nose: NoseStyle = true
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -1825,7 +1861,7 @@ export function traceFigure(
     else if (firstInFront === parts.length) firstInFront = i;
   }
   const at = lastBehind < firstInFront ? lastBehind + 1 : byDepth;
-  parts.splice(at, 0, { part: 'head', d: headShape(view, skeleton, head, withNose), depth: headDepth, points: [head], layer: 1 });
+  parts.splice(at, 0, { part: 'head', d: headShape(view, skeleton, head, nose), depth: headDepth, points: [head], layer: 1 });
 
   const slots: FigureSlot[] = [];
   for (let i = 0; i < parts.length; i++) {
@@ -2061,7 +2097,7 @@ export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   const travel = travelOf(clip, pose);
   const skeleton = solvePose(clip.follow ? shiftedPose(pose, -travel) : pose);
   const behind = pose.behind ? (clip.behind ? [...clip.behind, ...pose.behind] : pose.behind) : clip.behind;
-  const frame = traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells, clip.nose !== false);
+  const frame = traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells, clip.nose ?? true);
   if (clip.follow) frame.floor = floorMarks(view, travel, travelOf(clip, clip.keyframes[clip.keyframes.length - 1].pose));
   return frame;
 }

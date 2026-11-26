@@ -53,11 +53,13 @@ import {
   NINETY_TO_NINETY_SIDE_FOOT_LIFTS_3D,
   OPEN_BOOK_3D,
   PANCAKE_3D,
+  PEC_STRETCH_ON_THE_GROUND_3D,
   PIGEON_STRETCH_3D,
   PRAYER_POSE_3D,
   PUPPY_POSE_3D,
   PYRAMID_STRETCH_3D,
   RESTING_COSSACK_SQUAT_3D,
+  REVERSE_CLAMSHELLS_3D,
   REVERSE_TABLETOP_3D,
   SEATED_PIKE_STRETCH_3D,
   SEATED_SHOULDER_EXTENSION_3D,
@@ -69,8 +71,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  PEC_STRETCH_ON_THE_GROUND,
-  REVERSE_CLAMSHELLS,
   REVERSE_SCORPION,
   SEATED_HIP_INTERNAL_ROTATION,
   SHOULDER_PASS_THROUGHS,
@@ -252,7 +252,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Hold, then switch arms',
     ],
     photo: require('@/assets/images/exercises/pec-stretch-on-the-ground.png'),
-    animation: PEC_STRETCH_ON_THE_GROUND,
+    animation: PEC_STRETCH_ON_THE_GROUND_3D,
     twoSided: true,
   },
   {
@@ -1280,7 +1280,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Keeping that knee where it is, lift the top foot up toward the ceiling, then lower it and keep repeating. Switch sides',
     ],
     photo: require('@/assets/images/exercises/reverse-clamshells.png'),
-    animation: REVERSE_CLAMSHELLS,
+    animation: REVERSE_CLAMSHELLS_3D,
     twoSided: true,
     active: true,
   },

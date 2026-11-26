@@ -5663,3 +5663,209 @@ export const INCHWORM_3D: Clip3D = {
   stillFrame: INCHWORM_KEYFRAMES.plank,
   keyframes: INCHWORM_KEYFRAMES.keyframes,
 };
+
+// --- Pec stretch on the ground: face down with the right arm straight out to the side, the left hand pushes the body over onto its right side, the top foot stepping over behind ---
+
+/** How far the body rolls over toward the outstretched arm. */
+const PEC_ROLL = 80;
+/** Where the left hand pushes on the floor, beside the chest. */
+const PEC_PUSH_HAND: Vec3 = [125, WRIST_Y, -80];
+/** Where the top foot is planted behind, the knee up. */
+const PEC_STEP_FOOT: Vec3 = [-85, ANKLE_Y, 82];
+/** How far the head turns to its left, away from the arm, by the time the body is over. */
+const PEC_HEAD_TURN = 45;
+/** How high the top foot lifts on its way over the bottom leg. */
+const PEC_STEP_LIFT = 70;
+
+/**
+ * The body this far over (0 to 1), its spine along x with the head toward +x. It rolls about its
+ * own length: rising to lie on the side as it goes, and moving over toward the arm so the right
+ * shoulder stays an arm's length from the hand on the floor.
+ */
+const pecBody = (t: number, z: number): Pose3 => {
+  const roll = PEC_ROLL * t;
+  return {
+    pelvis: [0, mix(PRONE_PELVIS_Y, BOOK_SPINE_Y, Math.sin(radians(roll))), z],
+    // Turned to lie along x, then leaning from lying on the right side (0) to face down (90).
+    turn: 90,
+    lean: 90 - roll,
+    tilt: 90,
+    // The head turns away from the arm as the body goes over, looking up, which turns the face
+    // toward the camera.
+    neck: { flex: -10, twist: PEC_HEAD_TURN * t },
+  };
+};
+const PEC_FLAT_SHOULDER = solvePose(pecBody(0, 0)).rightArm[0];
+/** The right hand rests on the floor straight out from the shoulder, palm down. */
+const PEC_ARM_HAND: Vec3 = [
+  PEC_FLAT_SHOULDER[0],
+  WRIST_Y,
+  PEC_FLAT_SHOULDER[2] + Math.sqrt(ARM_REACH ** 2 - (PEC_FLAT_SHOULDER[1] - WRIST_Y) ** 2),
+];
+/** Where the pelvis has to be, across the room, to keep the right shoulder an arm's length from its hand. */
+const pecPelvisZ = (t: number): number => {
+  let [near, far] = [-60, 60];
+  for (let i = 0; i < 40; i++) {
+    const z = (near + far) / 2;
+    if (distance(solvePose(pecBody(t, z)).rightArm[0], PEC_ARM_HAND) > ARM_REACH) near = z;
+    else far = z;
+  }
+  return (near + far) / 2;
+};
+/** How far out from the hip each foot lies face down, the legs long and a little apart. */
+const PEC_FEET_APART = (() => {
+  const { rightLeg } = solvePose({ ...pecBody(0, 0), rightLeg: { flex: 2.6, abduct: 2 } });
+  return rightLeg[2][2] - rightLeg[0][2];
+})();
+/** A leg lying long on the floor from its hip, its foot this far out to the side. */
+const pecLongLeg = (hip: Vec3, side: number): Vec3 => [hip[0] - Math.sqrt(LEG_REACH ** 2 - (hip[1] - ANKLE_Y) ** 2 - side ** 2), ANKLE_Y, hip[2] + side];
+
+const pecAt = (t: number): Pose3 => {
+  const body = pecBody(t, pecPelvisZ(t));
+  const skeleton = solvePose(body);
+  const front = skeleton.spineFront[0];
+  // The legs stay long on the floor, rolling with the hips, the bottom foot coming in under its
+  // hip as the body goes over onto that side.
+  const rightAnkle = pecLongLeg(skeleton.rightLeg[0], mix(PEC_FEET_APART, 0, t));
+  // The top foot lifts off the floor, over the bottom leg and down behind it, the knee up.
+  const step = smooth(Math.min(1, Math.max(0, (t - 0.15) / 0.85)));
+  const leftLong = pecLongLeg(skeleton.leftLeg[0], -PEC_FEET_APART);
+  // It comes up before it goes across, so the shin clears the bottom leg.
+  const across = smooth(step);
+  const leftAnkle: Vec3 = [
+    mix(leftLong[0], PEC_STEP_FOOT[0], across),
+    ANKLE_Y + PEC_STEP_LIFT * Math.sin(Math.PI * step),
+    mix(leftLong[2], PEC_STEP_FOOT[2], across),
+  ];
+  return {
+    ...body,
+    pins: {
+      rightHand: { at: PEC_ARM_HAND, toward: [0, -0.1, 1], pole: [0, 1, 0] },
+      leftHand: { at: PEC_PUSH_HAND, toward: [1, 0, -0.2], pole: [-0.4, 0.6, -0.7] },
+      rightFoot: { at: rightAnkle, toward: [-1, -0.1, 0], pole: front },
+      leftFoot: { at: leftAnkle, toward: mix3([-1, -0.1, 0], [-0.4, 0, 0.9], across), pole: [0.3, 1, -0.2] },
+    },
+  };
+};
+const PEC_FLAT = pecAt(0);
+const PEC_ROLLED = pecAt(1);
+const PEC_STEPS = 16;
+
+export const PEC_STRETCH_ON_THE_GROUND_3D: Clip3D = {
+  view: '3d',
+  // From the left, a little toward the feet and above: the chest turns over toward the camera as
+  // the outstretched arm stays down on the floor beyond it, the top foot steps over the bottom leg
+  // toward the arm, and the pushing hand is in front. From the head end the roll shows as the
+  // shoulders tipping, but the head covers the chest.
+  camera: { yaw: 195, pitch: 40 },
+  highlight: ['rightArm', 'torso'],
+  // The pushing hand is up by the chest and the top leg down by the hips. They never meet on
+  // screen, and by depth they swapped as the foot went over.
+  behind: [['leftLeg', 'leftArm']],
+  // The face turns from facing the floor to up toward the camera as the body goes over, and the
+  // nose draws itself in down the bridge rather than appearing all at once.
+  nose: 'drawIn',
+  stillFrame: 1 + PEC_STEPS,
+  keyframes: [
+    { ms: 0, pose: PEC_FLAT },
+    { ms: 500, pose: PEC_FLAT },
+    ...alongArc(2000, PEC_STEPS, pecAt),
+    { ms: 3000, pose: PEC_ROLLED },
+    ...alongArc(1800, PEC_STEPS, (t) => pecAt(1 - t)),
+  ],
+};
+
+// --- Reverse clamshells: lying on the left side with the hips and knees bent, the top knee opens up toward the ceiling, then the top foot lifts with the knee kept where it is ---
+
+/** The hips bent this far and the knees to 90°, the feet together in line with the back. */
+const CLAM_HIP = 45;
+/** The top knee rests on the bottom one to start. */
+const CLAM_RESTING = -8;
+/** How far the top knee opens, swinging round the line from the hip to the foot, which stays on the other foot. */
+const CLAM_OPEN = 60;
+/** How far the top thigh then turns in around its own length, lifting the foot with the knee kept where it is. */
+const CLAM_TURN_IN = 50;
+/** Where the top hand rests on the floor in front of the chest. */
+const CLAM_HAND: Vec3 = [60, WRIST_Y, -105];
+
+const CLAM_BODY: Pose3 = {
+  pelvis: [0, BOOK_SPINE_Y, 0],
+  tilt: -90,
+  // The bottom arm reaches long along the floor past the head, which rests on it.
+  leftArm: { flex: 170 },
+  rightLeg: { flex: CLAM_HIP, knee: 90, abduct: CLAM_RESTING },
+  leftLeg: { flex: CLAM_HIP, knee: 90 },
+};
+/** The top leg closed, its knee resting on the bottom one and its foot on the bottom foot. */
+const CLAM_REST_LEG = solvePose(CLAM_BODY).rightLeg;
+
+/** A point turned this many degrees around the line through `origin` along `axis`. */
+const turnedAbout = (point: Vec3, origin: Vec3, axis: Vec3, degrees: number): Vec3 => {
+  const k = unit3(axis);
+  const v = sub3(point, origin);
+  const [c, s] = [Math.cos(radians(degrees)), Math.sin(radians(degrees))];
+  const kv = cross3(k, v);
+  const along = (k[0] * v[0] + k[1] * v[1] + k[2] * v[2]) * (1 - c);
+  return [0, 1, 2].map((i) => origin[i] + v[i] * c + kv[i] * s + k[i] * along) as unknown as Vec3;
+};
+/** Which way round to turn a point about an axis so that it rises. */
+const risingWay = (point: Vec3, origin: Vec3, axis: Vec3): 1 | -1 => (turnedAbout(point, origin, axis, 1)[1] > point[1] ? 1 : -1);
+const [CLAM_HIP_JOINT, CLAM_REST_KNEE, CLAM_REST_ANKLE, CLAM_REST_TOES] = CLAM_REST_LEG;
+const CLAM_OPEN_AXIS = sub3(CLAM_REST_ANKLE, CLAM_HIP_JOINT);
+const CLAM_OPEN_WAY = risingWay(CLAM_REST_KNEE, CLAM_HIP_JOINT, CLAM_OPEN_AXIS);
+
+/**
+ * The top knee opened (0 to 1), and then the foot lifted (0 to 1). The knee opens by the leg
+ * swinging round the line from the hip to the foot, so the foot stays where it is, resting on the
+ * other one. The foot then lifts by the thigh turning in around its own length, so the knee stays
+ * where it opened to. The foot is pinned to where those put it, the knee out toward where they put
+ * it, which it lands on.
+ */
+const clamAt = (open: number, lift: number): Pose3 => {
+  const opening = CLAM_OPEN_WAY * CLAM_OPEN * open;
+  const knee = turnedAbout(CLAM_REST_KNEE, CLAM_HIP_JOINT, CLAM_OPEN_AXIS, opening);
+  const toes = turnedAbout(CLAM_REST_TOES, CLAM_HIP_JOINT, CLAM_OPEN_AXIS, opening);
+  const thigh = sub3(knee, CLAM_HIP_JOINT);
+  const turn = risingWay(CLAM_REST_ANKLE, CLAM_HIP_JOINT, thigh) * CLAM_TURN_IN * lift;
+  const ankle = turnedAbout(CLAM_REST_ANKLE, CLAM_HIP_JOINT, thigh, turn);
+  return {
+    ...CLAM_BODY,
+    pins: {
+      rightHand: { at: CLAM_HAND, toward: [0.5, 0, -1], pole: [-0.4, 1, 0.3] },
+      rightFoot: pinVia(CLAM_HIP_JOINT, knee, ankle, sub3(turnedAbout(toes, CLAM_HIP_JOINT, thigh, turn), ankle)),
+    },
+  };
+};
+const CLAM_CLOSED = clamAt(0, 0);
+const CLAM_FOOT_UP = clamAt(1, 1);
+/** Pinned feet go straight between keyframes, cutting across the arc the foot or knee swings on, so each swing takes this many. */
+const CLAM_STEPS = 8;
+/** Once through: open the knee with the feet touching, lift the foot, lower it back onto the other foot, close the knees. */
+const clamRep = (): Keyframe3[] => [
+  { ms: 400, pose: CLAM_CLOSED },
+  ...alongArc(1000, CLAM_STEPS, (t) => clamAt(t, 0)),
+  ...alongArc(900, CLAM_STEPS, (t) => clamAt(1, t)),
+  { ms: 400, pose: CLAM_FOOT_UP },
+  ...alongArc(900, CLAM_STEPS, (t) => clamAt(1, 1 - t)),
+  ...alongArc(1000, CLAM_STEPS, (t) => clamAt(1 - t, 0)),
+];
+
+export const REVERSE_CLAMSHELLS_3D: Clip3D = {
+  view: '3d',
+  // From in front and low: the top knee rises up the screen off the bottom one, the two legs opening
+  // apart like a clam, and the foot then swings up above the knee with the bend in the knee still
+  // showing. From higher up the knee rises toward the camera and the leg folds into a line; from
+  // the feet end the thigh comes straight at it.
+  camera: { yaw: 105, pitch: 30 },
+  highlight: ['rightLeg'],
+  // The top hand is on the floor in front of the chest, the top knee well down the body from it.
+  // They never meet on screen, and by depth they swapped as the knee opened.
+  behind: [['rightArm', 'rightLeg']],
+  // The face looks at the camera side on, and a nose on it, turned sideways, only distracts.
+  nose: false,
+  // The foot up.
+  stillFrame: 1 + 2 * CLAM_STEPS,
+  // Twice through the whole movement: the knee opens with the feet touching, the foot lifts with
+  // the knee held up, the foot comes back down to rest on the other one, and the knees close.
+  keyframes: [{ ms: 0, pose: CLAM_CLOSED }, ...clamRep(), ...clamRep()],
+};
