@@ -38,6 +38,7 @@ import {
   RESTING_COSSACK_SQUAT_3D,
   REVERSE_CLAMSHELLS_3D,
   REVERSE_SCORPION_3D,
+  SEATED_HIP_INTERNAL_ROTATION_3D,
   SEATED_PIKE_STRETCH_3D,
   SHOULDER_ABDUCTION_3D,
   SHOULDER_EXTERNAL_ROTATION_3D,
@@ -88,6 +89,7 @@ import {
   frameAt,
   framedJoints,
   HAND,
+  miniBandPoints,
   poseAt3,
   project,
   shiftedPose,
@@ -158,6 +160,13 @@ function angleAt(a: Vec3, b: Vec3, c: Vec3): number {
   const v = [c[0] - b[0], c[1] - b[1], c[2] - b[2]];
   const cos = (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / (Math.hypot(...u) * Math.hypot(...v));
   return (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI;
+}
+
+/** How far a point is from the nearest point on the line from `a` to `b`. */
+function distanceToSegment(point: Vec3, a: Vec3, b: Vec3): number {
+  const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * ab[0] + (point[1] - a[1]) * ab[1] + (point[2] - a[2]) * ab[2]) / (ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2)));
+  return distance(point, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t]);
 }
 
 /** How far a limb from `root` to `end` is turned from pointing straight down, in degrees. */
@@ -1654,6 +1663,54 @@ describe('3D clips', () => {
       previous = legs;
       expect(frameAt(clip, view, t).slots.find((slot) => slot.part === 'head')!.d.split('Z').filter((piece) => piece !== '')).toHaveLength(1);
     }
+  });
+
+  it('swings the right foot out to the side against a mini band round the ankles, the thigh turning in and the knee staying put, in seated hip internal rotation', () => {
+    const clip = SEATED_HIP_INTERNAL_ROTATION_3D;
+    expect(clip.miniBand).toBe('ankles');
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const { rightLeg, leftLeg, spine } of skeletons) {
+      // Sitting still, the left leg too, and the right knee stays where it is at 90°.
+      expect(distance(spine[0], start.spine[0])).toBeCloseTo(0);
+      leftLeg.forEach((joint, i) => expect(distance(joint, start.leftLeg[i])).toBeCloseTo(0));
+      expect(distance(rightLeg[1], start.rightLeg[1])).toBeCloseTo(0);
+      expect(angleAt(rightLeg[0], rightLeg[1], rightLeg[2])).toBeCloseTo(90, 0);
+    }
+    // Out, the right foot has swung away from the left one, out to the side, stretching the band.
+    const out = solvePose(clip.keyframes[clip.stillFrame].pose);
+    expect(out.rightLeg[2][2] - start.rightLeg[2][2]).toBeGreaterThan(40);
+    expect(distance(out.rightLeg[2], out.leftLeg[2])).toBeGreaterThan(distance(start.rightLeg[2], start.leftLeg[2]) + 40);
+    // Nothing changes places.
+    expect(new Set(drawOrders(clip)).size).toBe(1);
+  });
+
+  it('draws a mini band round both ankles: the half in front over the legs, the half behind under them, clear of the legs', () => {
+    const clip = SEATED_HIP_INTERNAL_ROTATION_3D;
+    const view = viewOf(clip.camera);
+    for (let t = 0; t <= durationOf(clip); t += 100) {
+      const skeleton = solvePose(poseAt3(clip, t));
+      const [front, back] = miniBandPoints(skeleton, view, 'ankles');
+      // The front half is nearer the camera than the back one.
+      const depth = (points: Vec3[]) => points.reduce((sum, point) => sum + project(view, point)[2], 0) / points.length;
+      expect(depth(front)).toBeGreaterThan(depth(back));
+      // Each half goes from the outside of the left leg round to the outside of the right one, and
+      // the two meet there, so the loop is closed.
+      expect(distance(front[0], back[0])).toBeCloseTo(0);
+      expect(distance(front[front.length - 1], back[back.length - 1])).toBeCloseTo(0);
+      // Every point stands clear of the shin it's round, past the shin's thickness at the ankle.
+      for (const point of [...front, ...back]) {
+        const nearest = Math.min(...[skeleton.rightLeg, skeleton.leftLeg].map((leg) => distanceToSegment(point, leg[1], leg[2])));
+        expect(nearest).toBeGreaterThan(10.5);
+      }
+      const frame = frameAt(clip, view, t);
+      expect(frame.strap).toMatch(/^M[-\d. ]+(L[-\d. ]+)+$/);
+      expect(frame.bandBehind).toMatch(/^M[-\d. ]+(L[-\d. ]+)+$/);
+    }
+    // A clip without one has neither.
+    const frame = frameAt(KNEE_TO_CHEST_3D, viewOf(KNEE_TO_CHEST_3D.camera), 0);
+    expect(frame.bandBehind).toBe('');
+    expect(frame.strap).toBe('');
   });
 
   it('folds to the floor, walks the hands out to a plank and the feet in after them, and stands up further along, the camera following, in inchworm', () => {

@@ -210,6 +210,7 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
   const frame = useDerivedValue(() => frameAt(clip, view, time.get()));
   const shadow = useAnimatedProps(() => ({ d: frame.get().shadow }));
   const strap = useAnimatedProps(() => ({ d: frame.get().strap }));
+  const bandBehind = useAnimatedProps(() => ({ d: frame.get().bandBehind }));
   const floor = useAnimatedProps(() => ({ d: frame.get().floor }));
 
   return (
@@ -234,10 +235,12 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
             <Path d={stage.tape.marks} stroke={COLORS.tape.marks} strokeWidth={1.5} />
           </>
         )}
+        {/* The back of a mini band, under the legs, so it shows only between them. */}
+        {clip.miniBand && <AnimatedPath animatedProps={bandBehind} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
         {slots.map((index) => (
           <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} phone={clip.phone !== undefined} dumbbells={clip.dumbbells !== undefined} />
         ))}
-        {clip.strap && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
+        {(clip.strap || clip.miniBand) && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
       </Svg>
       {clip.partner && <PartnerBadge />}
     </View>

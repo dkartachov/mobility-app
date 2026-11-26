@@ -62,6 +62,7 @@ import {
   REVERSE_CLAMSHELLS_3D,
   REVERSE_SCORPION_3D,
   REVERSE_TABLETOP_3D,
+  SEATED_HIP_INTERNAL_ROTATION_3D,
   SEATED_PIKE_STRETCH_3D,
   SEATED_SHOULDER_EXTENSION_3D,
   SEATED_STRADDLE_SIDE_BEND_3D,
@@ -72,7 +73,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  SEATED_HIP_INTERNAL_ROTATION,
   SHOULDER_PASS_THROUGHS,
   SIDE_LYING_EXTERNAL_ROTATION,
   SLEEPER_STRETCH,
@@ -1246,7 +1246,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Bring it back and keep repeating, then switch sides. Take the band off to make it easier',
     ],
     photo: require('@/assets/images/exercises/seated-hip-internal-rotation.png'),
-    animation: SEATED_HIP_INTERNAL_ROTATION,
+    animation: SEATED_HIP_INTERNAL_ROTATION_3D,
     twoSided: true,
     active: true,
   },

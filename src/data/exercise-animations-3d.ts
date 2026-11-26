@@ -6012,3 +6012,29 @@ export const REVERSE_SCORPION_3D: Clip3D = {
   stillFrame: 1 + SCORPION_STEPS,
   keyframes: [{ ms: 0, pose: scorpionAt(1, 0) }, ...scorpionRep(1), ...scorpionRep(-1)],
 };
+
+// --- Seated hip internal rotation: on the edge of a table with a mini band around the ankles, one foot swings out to the side against it, the thigh turning in and the knee staying put ---
+
+/** The right foot out, the thigh turned in about as far as adults can (Hallaçeli 2014). */
+const SEATED_IR_OUT = seatedRotationAt(-HIP_ROTATION, 90);
+const SEATED_IR_IN = seatedRotationAt(0, 90);
+
+export const SEATED_HIP_INTERNAL_ROTATION_3D: Clip3D = {
+  view: '3d',
+  // From the front, where the shin's swing out to the side is flat on the screen and the band
+  // stretches across it, turned a little toward the moving leg and raised enough to see the table
+  // top the thighs rest on (as the hip rotation test).
+  camera: { yaw: 70, pitch: 14 },
+  highlight: ['rightLeg'],
+  scenery: TABLE,
+  miniBand: 'ankles',
+  // The foot out, the band stretched.
+  stillFrame: 2,
+  keyframes: [
+    { ms: 0, pose: SEATED_IR_IN },
+    { ms: 300, pose: SEATED_IR_IN },
+    { ms: 1200, pose: SEATED_IR_OUT },
+    { ms: 400, pose: SEATED_IR_OUT },
+    { ms: 1200, pose: SEATED_IR_IN },
+  ],
+};

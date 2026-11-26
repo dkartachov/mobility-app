@@ -288,6 +288,12 @@ export type Clip3D = {
    * nose cut short.
    */
   nose?: false | 'drawIn';
+  /**
+   * A mini loop band around both ankles, or both knees, pulled tight between them: a loop around the
+   * outside of each leg and two strands across the gap (seated hip internal rotation). It's drawn in
+   * the strap's color, the strand in front over the legs and the one behind under them.
+   */
+  miniBand?: 'ankles' | 'knees';
 };
 
 export type HeldLimb = {
@@ -384,8 +390,10 @@ export type FigureFrame = {
   /** The body's parts, furthest from the camera first, which is the order to draw them in. */
   slots: FigureSlot[];
   shadow: string;
-  /** The clip's strap as a line to stroke, drawn over the figure. Empty without one. */
+  /** The clip's strap, and the front of its mini band, as a line to stroke, drawn over the figure. Empty without one. */
   strap: string;
+  /** The back of the clip's mini band, as a line to stroke, drawn under the figure. Empty without one. */
+  bandBehind: string;
   /** The clip's phone, drawn with the limb it's on. Empty paths without one. */
   phone: PhoneFrame;
   /** The dumbbell in each hand, drawn with its arm. Empty paths for a hand without one. */
@@ -1390,6 +1398,53 @@ export function strapPoints(skeleton: Skeleton, strap: NonNullable<Clip3D['strap
   ];
 }
 
+/** How far up the shin from the ankle a mini band around the ankles sits, and down the thigh from the knee one around the knees. */
+const MINI_BAND_ALONG = 10;
+/**
+ * How far a mini band keeps from the middle of each leg: past the leg's edge by half the band's own
+ * width, so it's drawn around the leg and not over it.
+ */
+const MINI_BAND_RADIUS = 14;
+/** How many straight pieces each half circle around a leg is drawn in. */
+const MINI_BAND_STEPS = 8;
+
+/**
+ * Where a mini loop band around both ankles or both knees runs in the room, as its two halves: each
+ * runs from the outside of one leg, around the side of it the camera sees or the side away, across
+ * the gap and around the other leg to its outside. The loop lies square to the legs, as near as one
+ * plane square to both can be, and stands clear of them, so it goes around them rather than across.
+ * The first half is the one nearer the camera.
+ */
+export function miniBandPoints(skeleton: Skeleton, view: Mat3, at: NonNullable<Clip3D['miniBand']>): [front: Vec3[], back: Vec3[]] {
+  'worklet';
+  const joint = at === 'ankles' ? 2 : 1;
+  const toward = at === 'ankles' ? 1 : 0;
+  const ring = (leg: readonly Vec3[]) => {
+    const up = unit(sub(leg[toward], leg[joint]), [0, 1, 0]);
+    return { middle: add(leg[joint], scaled(up, MINI_BAND_ALONG)), up };
+  };
+  const right = ring(skeleton.rightLeg);
+  const left = ring(skeleton.leftLeg);
+  // Across from the left leg to the right, and round the legs square to that and to the legs.
+  const across = unit(sub(right.middle, left.middle), skeleton.spineRight[0]);
+  let side = unit(cross(across, add(right.up, left.up)), skeleton.spineFront[0]);
+  // `side` faces the camera, so the first half is the near one.
+  if (project(view, side)[2] < 0) side = scaled(side, -1);
+  const half = (sign: number): Vec3[] => {
+    const points: Vec3[] = [];
+    for (let step = 0; step <= MINI_BAND_STEPS; step++) {
+      const angle = (step / MINI_BAND_STEPS) * (Math.PI / 2);
+      points.push(add(left.middle, add(scaled(across, -MINI_BAND_RADIUS * Math.cos(angle)), scaled(side, sign * MINI_BAND_RADIUS * Math.sin(angle)))));
+    }
+    for (let step = MINI_BAND_STEPS; step >= 0; step--) {
+      const angle = (step / MINI_BAND_STEPS) * (Math.PI / 2);
+      points.push(add(right.middle, add(scaled(across, MINI_BAND_RADIUS * Math.cos(angle)), scaled(side, sign * MINI_BAND_RADIUS * Math.sin(angle)))));
+    }
+    return points;
+  };
+  return [half(1), half(-1)];
+}
+
 /** A phone's size: about 15 by 7 by 1 cm, with a shin of 100 at about 40 cm. */
 export const PHONE = { length: 37, width: 18, depth: 3 };
 /** How far in from the phone's edge its screen starts. */
@@ -2011,6 +2066,7 @@ export function traceFigure(
     slots,
     shadow,
     strap: strapLine,
+    bandBehind: '',
     floor: '',
     phone: phoneShape(skeleton, view, phone, reading),
     dumbbells: {
@@ -2090,6 +2146,17 @@ function floorMarks(view: Mat3, travel: number, journey: number): string {
   return path;
 }
 
+/** Points in the room as a line on screen through them, to stroke. */
+function lineThrough(view: Mat3, points: readonly Vec3[]): string {
+  'worklet';
+  let line = '';
+  for (let i = 0; i < points.length; i++) {
+    const point = project(view, points[i]);
+    line += `${i === 0 ? 'M' : 'L'}${fixed(point[0])} ${fixed(point[1])}`;
+  }
+  return line;
+}
+
 /** The clip at a moment, drawn. */
 export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   'worklet';
@@ -2098,6 +2165,11 @@ export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   const skeleton = solvePose(clip.follow ? shiftedPose(pose, -travel) : pose);
   const behind = pose.behind ? (clip.behind ? [...clip.behind, ...pose.behind] : pose.behind) : clip.behind;
   const frame = traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells, clip.nose ?? true);
+  if (clip.miniBand) {
+    const [front, back] = miniBandPoints(skeleton, view, clip.miniBand);
+    frame.strap += lineThrough(view, front);
+    frame.bandBehind = lineThrough(view, back);
+  }
   if (clip.follow) frame.floor = floorMarks(view, travel, travelOf(clip, clip.keyframes[clip.keyframes.length - 1].pose));
   return frame;
 }
