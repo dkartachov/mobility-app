@@ -11,7 +11,10 @@
 import type { FigureClip } from '@/lib/figure-rig';
 import type { Clip3D } from '@/lib/rig3d';
 
-import {
+import { CLIPS_3D } from './clips-3d';
+import type { ScoreArea } from './mobility-score';
+
+const {
   HIP_ABDUCTION_3D,
   HIP_EXTERNAL_ROTATION_3D,
   HIP_INTERNAL_ROTATION_3D,
@@ -22,8 +25,7 @@ import {
   SHOULDER_EXTERNAL_ROTATION_3D,
   SIT_AND_REACH_3D,
   STRAIGHT_LEG_RAISE_3D,
-} from './exercise-animations-3d';
-import type { ScoreArea } from './mobility-score';
+} = CLIPS_3D;
 
 export type Side = 'left' | 'right';
 

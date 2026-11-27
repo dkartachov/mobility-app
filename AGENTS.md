@@ -34,6 +34,7 @@ Run lint and typecheck before declaring any task done.
 The animation engine is being reworked. A new 3D engine (`src/lib/rig3d.ts`, clips in `src/data/exercise-animations-3d.ts`, drawn by `src/components/exercise-figure-3d.tsx`) runs alongside the old one (`src/lib/figure-rig.ts`, `src/data/exercise-animations.ts`), and exercises move over one at a time. Read the "Exercise animations" section of `README.md` before touching either; it has how the engine works, how to migrate a clip, and the migration status.
 
 - Write every new or reworked clip for the new engine. Don't add clips to the old one.
+- After changing a clip, or `rig3d.ts` code the clips are worked out with, run `node scripts/build-clips.mjs` and commit `src/data/exercise-animations-3d.json` with it. The app ships that JSON, never the clips file itself (see README).
 - Joint angles stay true to the exercise instructions (90° means 90°). If it doesn't read on screen, change the camera, not the angle.
 - Pick the camera that makes the movement readable, highlight the working body part, and add a `trail` for sweeps and rotations.
 - No eyes on the figure. The nose is drawn only on a face turned toward the camera, as a line on the face; in profile and from behind the head is a plain circle.

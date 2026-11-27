@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { EXERCISES } from '@/data/exercises';
 import {
   ACTIVE_PANCAKE_3D,
@@ -118,6 +121,7 @@ import {
   type Skeleton,
   type Vec3,
 } from './rig3d';
+import { clipsToJson } from './clip-json';
 
 const clips = [...EXERCISES, ...FLEXIBILITY_TESTS, MARCHING_EXERCISE, LEG_SWINGS_EXERCISE, INCHWORM_EXERCISE].flatMap((e) =>
   e.animation?.view === '3d' ? [[e.id, e.animation] as const] : []
@@ -513,6 +517,14 @@ describe('thumbPoints', () => {
 });
 
 describe('3D clips', () => {
+  it('ships every clip as it is written: run `node scripts/build-clips.mjs` after changing one', () => {
+    // Every clip the module exports, not only the ones imported above, so a new clip is caught too.
+    const source = jest.requireActual<Record<string, unknown>>('@/data/exercise-animations-3d');
+    // Git may check the file out with CRLF line endings on Windows.
+    const shipped = readFileSync(join(__dirname, '../data/exercise-animations-3d.json'), 'utf8').replace(/\r\n/g, '\n');
+    expect(shipped).toBe(clipsToJson(source));
+  });
+
   it('covers the clips that have moved over', () => {
     expect(clips.map(([id]) => id)).toEqual(expect.arrayContaining([
       'cat-cow',

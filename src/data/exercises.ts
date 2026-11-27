@@ -4,7 +4,9 @@ import type { ExerciseAnimation } from '@/lib/figure-rig';
 
 import type { ScoreArea } from './mobility-score';
 
-import {
+import { CLIPS_3D } from './clips-3d';
+
+const {
   ACTIVE_PANCAKE_3D,
   ACTIVE_STRAIGHT_LEG_RAISE_3D,
   ANKLE_MOBILIZATION_3D,
@@ -77,7 +79,7 @@ import {
   WINDSHIELD_WIPERS_WITH_KNEE_LIFT_3D,
   WORLDS_GREATEST_STRETCH_3D,
   WRIST_ROCKS_3D,
-} from './exercise-animations-3d';
+} = CLIPS_3D;
 
 export const POSITIONS = ['standing', 'seated'] as const;
 export type Position = (typeof POSITIONS)[number];

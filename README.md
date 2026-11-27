@@ -54,11 +54,13 @@ Exercises are demonstrated by a looping animated figure. The animation engine is
 | | Old engine | New engine |
 |---|---|---|
 | Rig | `src/lib/figure-rig.ts` | `src/lib/rig3d.ts` |
-| Clips | `src/data/exercise-animations.ts` | `src/data/exercise-animations-3d.ts` |
+| Clips | `src/data/exercise-animations.ts` | `src/data/exercise-animations-3d.ts`, shipped as `exercise-animations-3d.json` |
 | Drawing | `src/components/exercise-figure.tsx` | `src/components/exercise-figure-3d.tsx` |
 | Tests | `src/lib/figure-rig.test.ts` | `src/lib/rig3d.test.ts` |
 
 **Every new clip goes in the new engine.** The old engine stays only until its clips have moved over.
+
+**The app ships the clips worked out ahead of time.** Solving every clip's poses takes the solver hundreds of thousands of runs, which took seconds at every launch, so the app never imports `exercise-animations-3d.ts`. `node scripts/build-clips.mjs` works the clips out and writes `src/data/exercise-animations-3d.json`, and the app takes them from `CLIPS_3D` in `src/data/clips-3d.ts`. Run the script after any change to a clip, or to anything in `rig3d.ts` the clips are worked out with, and commit the JSON with it. `rig3d.test.ts` fails while the JSON is out of date. Tests and `render-exercise-photo.mjs` still import the clips from the TypeScript.
 
 ### Why a new engine
 
@@ -99,8 +101,8 @@ The old engine poses a flat figure in screen coordinates. Anything moving toward
 
 ### Moving an exercise to the new engine
 
-1. Write the clip in `src/data/exercise-animations-3d.ts`, named after the old one with a `_3D` suffix.
-2. Point the exercise's `animation` at it (in `src/data/exercises.ts`, `mobility-tests.ts` or `test-warmup.ts`). Leave the old clip in `exercise-animations.ts` until the new one has been checked on a device, so switching back is a one-line change. Delete the old clip after that.
+1. Write the clip in `src/data/exercise-animations-3d.ts`, named after the old one with a `_3D` suffix, and run `node scripts/build-clips.mjs`.
+2. Point the exercise's `animation` at it (in `src/data/exercises.ts`, `mobility-tests.ts` or `test-warmup.ts`, which take clips from `CLIPS_3D`, not from the clips file). Leave the old clip in `exercise-animations.ts` until the new one has been checked on a device, so switching back is a one-line change. Delete the old clip after that.
 3. If it's a library exercise, redraw its photo, the still image on its tile in the library, from the new clip, so the tile matches the animation:
 
    ```bash

@@ -10,8 +10,10 @@
  */
 
 import { getExercise, type Exercise } from '@/data/exercises';
-import { INCHWORM_3D, LEG_SWINGS_3D, MARCHING_3D } from '@/data/exercise-animations-3d';
+import { CLIPS_3D } from '@/data/clips-3d';
 import type { WorkoutStep } from '@/lib/workout';
+
+const { INCHWORM_3D, LEG_SWINGS_3D, MARCHING_3D } = CLIPS_3D;
 
 /** Get-ready countdown before each move. There's no setup between them, so it's short. */
 export const WARMUP_BUFFER_SECONDS = 5;
