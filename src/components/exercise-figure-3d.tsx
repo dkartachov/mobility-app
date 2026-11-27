@@ -1,12 +1,58 @@
 import { SymbolView } from 'expo-symbols';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedProps, useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedProps,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+import { scheduleOnUI } from 'react-native-worklets';
 import Svg, { Path } from 'react-native-svg';
 
 import { figureSlotCount, frameAt, stageClip, trailedPart, type Clip3D, type FigureFrame, type Part } from '@/lib/rig3d';
 
-import { useClipTime } from './exercise-figure';
+/** The time at which a clip arrives at its nth keyframe. Its whole length, for the last one. */
+function keyframeTime(clip: Clip3D, index: number): number {
+  let total = 0;
+  for (let i = 1; i <= index; i++) total += clip.keyframes[i].ms;
+  return total;
+}
+
+/**
+ * Loops a clip's time for as long as it's on screen, or holds its key pose if reduced motion is on.
+ * While not `playing` it waits on its first frame, and starts from the beginning once it is.
+ * While `paused` it freezes where it is, and carries on from that frame once it isn't.
+ */
+function useClipTime(clip: Clip3D, playing: boolean, paused: boolean) {
+  const reducedMotion = useReducedMotion();
+  const time = useSharedValue(keyframeTime(clip, clip.stillFrame));
+
+  useEffect(() => {
+    time.set(reducedMotion ? keyframeTime(clip, clip.stillFrame) : 0);
+  }, [clip, playing, reducedMotion, time]);
+
+  useEffect(() => {
+    if (reducedMotion || !playing || paused) return;
+    const duration = keyframeTime(clip, clip.keyframes.length - 1);
+    const easing = Easing.linear;
+    // Runs on the UI thread, after the reset above, so it reads the frame a pause stopped on.
+    scheduleOnUI(() => {
+      const from = time.get() % duration;
+      const loop = withRepeat(withSequence(withTiming(0, { duration: 0 }), withTiming(duration, { duration, easing })), -1, false);
+      time.set(from === 0 ? loop : withSequence(withTiming(duration, { duration: duration - from, easing }), loop));
+    });
+    return () => cancelAnimation(time);
+  }, [clip, playing, paused, reducedMotion, time]);
+
+  return time;
+}
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -205,8 +251,7 @@ function PartnerBadge() {
 }
 
 /**
- * A clip for the 3D engine, drawn from its camera. Plays, pauses and holds still for reduced motion
- * exactly as `ExerciseFigure` does.
+ * A clip drawn from its camera. Plays, pauses and holds still for reduced motion as `useClipTime` says.
  */
 export function ExerciseFigure3D({ clip, playing = true, paused = false }: { clip: Clip3D; playing?: boolean; paused?: boolean }) {
   const time = useClipTime(clip, playing, paused);

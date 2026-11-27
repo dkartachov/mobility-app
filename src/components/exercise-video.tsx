@@ -1,9 +1,8 @@
 import { Image, type ImageSource } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
-import type { ExerciseAnimation } from '@/lib/figure-rig';
+import type { Clip3D } from '@/lib/rig3d';
 
-import { ExerciseFigure, ExerciseHand } from './exercise-figure';
 import { ExerciseFigure3D } from './exercise-figure-3d';
 import { Icon } from './icon';
 import { ThemedText } from './themed-text';
@@ -24,20 +23,14 @@ export function ExerciseVideo({
   /** Written over the photo, when it's shown. */
   caption?: string;
   photo?: ImageSource;
-  animation?: ExerciseAnimation;
+  animation?: Clip3D;
   playing?: boolean;
   paused?: boolean;
 }) {
   if (animation) {
     return (
       <View style={styles.video}>
-        {animation.view === '3d' ? (
-          <ExerciseFigure3D clip={animation} playing={playing} paused={paused} />
-        ) : animation.view === 'hand' ? (
-          <ExerciseHand clip={animation} playing={playing} paused={paused} />
-        ) : (
-          <ExerciseFigure clip={animation} playing={playing} paused={paused} />
-        )}
+        <ExerciseFigure3D clip={animation} playing={playing} paused={paused} />
       </View>
     );
   }

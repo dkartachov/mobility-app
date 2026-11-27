@@ -8,7 +8,6 @@
  * down with as few setup changes as possible.
  */
 
-import type { FigureClip } from '@/lib/figure-rig';
 import type { Clip3D } from '@/lib/rig3d';
 
 import { CLIPS_3D } from './clips-3d';
@@ -137,7 +136,7 @@ export type FlexibilityTest = {
   /** Tested once per side when true. */
   twoSided: boolean;
   /** Shows the start position and the move into the measurement, above the instructions. */
-  animation: FigureClip | Clip3D;
+  animation: Clip3D;
   /** Steps to follow, one sentence each, shown as a numbered list like an exercise's. */
   instructions: string[];
   /** What the number means. */

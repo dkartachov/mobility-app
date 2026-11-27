@@ -31,16 +31,15 @@ Run lint and typecheck before declaring any task done.
 
 ## Exercise animations
 
-The animation engine is being reworked. A new 3D engine (`src/lib/rig3d.ts`, clips in `src/data/exercise-animations-3d.ts`, drawn by `src/components/exercise-figure-3d.tsx`) runs alongside the old one (`src/lib/figure-rig.ts`, `src/data/exercise-animations.ts`), and exercises move over one at a time. Read the "Exercise animations" section of `README.md` before touching either; it has how the engine works, how to migrate a clip, and the migration status.
+Exercises are animated by the 3D engine: `src/lib/rig3d.ts`, clips in `src/data/exercise-animations-3d.ts`, drawn by `src/components/exercise-figure-3d.tsx`. Read the "Exercise animations" section of `README.md` before touching it; it has how the engine works and how to add a clip.
 
-- Write every new or reworked clip for the new engine. Don't add clips to the old one.
 - After changing a clip, or `rig3d.ts` code the clips are worked out with, run `node scripts/build-clips.mjs` and commit `src/data/exercise-animations-3d.json` with it. The app ships that JSON, never the clips file itself (see README).
 - Joint angles stay true to the exercise instructions (90° means 90°). If it doesn't read on screen, change the camera, not the angle.
 - Pick the camera that makes the movement readable, highlight the working body part, and add a `trail` for sweeps and rotations.
 - No eyes on the figure. The nose is drawn only on a face turned toward the camera, as a line on the face; in profile and from behind the head is a plain circle.
 - Review every new or changed animation for clipping and fix all of it before handing it over: no body part drawn over one that is really in front of it (an elbow over the knee it's behind, a far shoulder over the chest, a hand under the foot it holds), no two parts swapping places partway through, even for a frame, and no nose that comes and goes. Check the whole clip, not only stills: print the draw order every 10ms and look at frames around each change. The "No clipping" rule in `README.md` has how to fix it.
-- When you move an exercise over, keep the old clip until it's been checked on a device, add a test for what matters in that exercise to `src/lib/rig3d.test.ts`, and update the migration list in `README.md`.
-- A library exercise's photo (its tile in the library, `assets/images/exercises/`) is its clip's still frame, drawn without the highlight. Redraw it whenever the exercise moves to the new engine or its clip's still frame or camera changes: `node scripts/render-exercise-photo.mjs <CLIP_NAME_3D> assets/images/exercises/<file>.png`. Keep the file name.
+- When you add a clip for an exercise, add a test for what matters in that exercise to `src/lib/rig3d.test.ts`.
+- A library exercise's photo (its tile in the library, `assets/images/exercises/`) is its clip's still frame, drawn without the highlight. Redraw it whenever the exercise gets a new clip or its clip's still frame or camera changes: `node scripts/render-exercise-photo.mjs <CLIP_NAME_3D> assets/images/exercises/<file>.png`. Keep the file name.
 
 ## Building with EAS
 

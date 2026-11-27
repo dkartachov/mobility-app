@@ -1,6 +1,6 @@
 import type { ImageSource } from 'expo-image';
 
-import type { ExerciseAnimation } from '@/lib/figure-rig';
+import type { Clip3D } from '@/lib/rig3d';
 
 import type { ScoreArea } from './mobility-score';
 
@@ -133,7 +133,7 @@ export type Exercise = {
    */
   easterEgg?: { photo: ImageSource; caption: string };
   /** Shown in place of the photo on the exercise and workout screens. */
-  animation?: ExerciseAnimation;
+  animation?: Clip3D;
   /** Always held for 1 minute in generated workouts, never 2. */
   oneMinuteOnly?: boolean;
   /** Done on each side in turn: 1 minute per side, 2 minutes in total. */
