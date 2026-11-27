@@ -45,6 +45,7 @@ import {
   SHOULDER_PASS_THROUGHS_3D,
   SIDE_LYING_EXTERNAL_ROTATION_3D,
   SLEEPER_STRETCH_3D,
+  THE_SAGITTARIUS_3D,
   SIT_AND_REACH_3D,
   SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
@@ -1790,6 +1791,45 @@ describe('3D clips', () => {
       const nearest = Math.min(...[start.rightArm, start.leftArm].map((arm) => Math.hypot(x - hand(arm)[0], y - hand(arm)[1])));
       expect(nearest).toBeGreaterThan(10);
     }
+  });
+
+  it('holds the top knee down at 90° with the bottom hand while the chest turns open and the top arm lies back on the floor behind, and back, in the Sagittarius', () => {
+    const clip = THE_SAGITTARIUS_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const start = skeletons[0];
+    for (const s of skeletons) {
+      // Lying on the side, the hips still and the bottom leg straight, in line with the torso.
+      expect(distance(s.spine[0], start.spine[0])).toBeCloseTo(0);
+      expect(distance(s.leftLeg[2], start.leftLeg[2])).toBeCloseTo(0);
+      expect(angleAt(s.leftLeg[0], s.leftLeg[1], s.leftLeg[2])).toBeGreaterThan(178);
+      expect(angleAt(s.spine[s.spine.length - 1], s.spine[0], s.leftLeg[2])).toBeGreaterThan(170);
+      // The top hip and knee at 90° the whole way, the knee down in front and staying put.
+      const [hip, knee, ankle] = s.rightLeg;
+      expect(distance(knee, start.rightLeg[1])).toBeCloseTo(0);
+      expect(angleAt(s.spine[s.spine.length - 1], s.spine[0], knee)).toBeCloseTo(90, -1);
+      expect(angleAt(hip, knee, ankle)).toBeCloseTo(90, 0);
+      expect(knee[1]).toBeLessThan(hip[1]);
+      // The bottom hand stays on top of the knee, holding it, never sinking into the leg, the wrist
+      // near straight, carrying on from the forearm.
+      const hand = s.leftArm;
+      const middle: Vec3 = [(hand[2][0] + hand[3][0]) / 2, (hand[2][1] + hand[3][1]) / 2, (hand[2][2] + hand[3][2]) / 2];
+      expect(distance(middle, knee)).toBeLessThan(20);
+      expect(middle[1]).toBeGreaterThan(knee[1]);
+      for (const point of [hand[2], hand[3], middle]) {
+        expect(Math.min(distanceToSegment(point, hip, knee), distanceToSegment(point, knee, ankle))).toBeGreaterThan(15);
+      }
+      expect(angleAt(hand[1], hand[2], hand[3])).toBeGreaterThan(140);
+    }
+    // Closed, the top hand rests on the floor in front of the chest.
+    expect(start.rightArm[2][0]).toBeGreaterThan(start.spine[0][0] + 120);
+    expect(start.rightArm[3][1]).toBeLessThan(12);
+    // Open, the chest has turned up toward the ceiling and the top arm lies back on the floor behind.
+    const open = solvePose(clip.keyframes[clip.stillFrame!].pose);
+    expect(open.rightArm[0][0]).toBeLessThan(start.rightArm[0][0] - 20);
+    expect(open.rightArm[2][0]).toBeLessThan(open.spine[0][0] - 120);
+    expect(open.rightArm[3][1]).toBeLessThan(12);
+    // Nothing changes places, and the bottom hand stays on top of the knee it holds.
+    expect(new Set(drawOrders(clip)).size).toBe(1);
   });
 
   it('presses the bottom forearm down from the ceiling toward the feet with the top hand, the arm out in front at shoulder height and the elbow at 90°, in the sleeper stretch', () => {

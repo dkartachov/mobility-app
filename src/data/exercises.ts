@@ -69,6 +69,7 @@ import {
   SHOULDER_PASS_THROUGHS_3D,
   SIDE_LYING_EXTERNAL_ROTATION_3D,
   SLEEPER_STRETCH_3D,
+  THE_SAGITTARIUS_3D,
   SQUAT_TO_STAND_3D,
   STANDING_FORWARD_FOLD_3D,
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
@@ -76,7 +77,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  THE_SAGITTARIUS,
   THREAD_THE_NEEDLE,
   WINDSHIELD_WIPERS_WITH_KNEE_LIFT,
   WORLDS_GREATEST_STRETCH,
@@ -220,7 +220,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Relax your opposite arm, and place the back of your hand on the ground',
     ],
     photo: require('@/assets/images/exercises/the-sagittarius.png'),
-    animation: THE_SAGITTARIUS,
+    animation: THE_SAGITTARIUS_3D,
     twoSided: true,
   },
   {

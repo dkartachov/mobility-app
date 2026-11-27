@@ -6209,3 +6209,110 @@ export const SLEEPER_STRETCH_3D: Clip3D = {
     ...alongArc(1800, SLEEPER_STEPS, (t) => sleeperAt(1 - t)),
   ],
 };
+
+// --- The Sagittarius: lying on the left side with the top hip and knee at 90°, the bottom hand holding the knee down, the chest turns open and the top arm lies back on the floor behind ---
+
+/**
+ * The top hip and knee at 90°, the thigh turned in this far at the hip to bring the knee down
+ * toward the floor in front, and the toes pointed a little, as a relaxed foot lies. Further down,
+ * the foot, square to the shin, tipped its toes into the floor.
+ */
+const SAG_KNEE_DOWN = -20;
+const SAG_TOES = -25;
+/** How far the bottom hand's middle rests above the middle of the top knee: on top of it, holding it down. */
+const SAG_HAND_ON_KNEE = 17;
+/** How far from the wrist the middle of the hand is. */
+const SAG_HAND_MIDDLE = 13;
+/**
+ * How much the bottom hand tips down over the knee from the line of the arm: the palm over the top of
+ * the knee and the fingers curling down its far side.
+ */
+const SAG_HAND_TIP = 0.25;
+/** How high the fingertips of a hand lying on the floor are: half the fingers' thickness. */
+const SAG_FINGERTIPS_Y = 9;
+
+/**
+ * The chest this far turned open, the top arm swinging round with it from `closed`, resting on the
+ * floor in front of the chest, to `arm`, on the floor behind.
+ */
+const sagittariusBody = (open: number, arm = SAG_OPEN_ARM, closed = SAG_CLOSED_ARM): Pose3 => ({
+  pelvis: [0, BOOK_SPINE_Y, 0],
+  tilt: -90,
+  spine: { twist: BOOK_OPEN.twist * open },
+  neck: { twist: BOOK_OPEN.neck * open },
+  rightArm: { flex: 90, abduct: mix(closed, arm, open), shrug: BOOK_SHRUG },
+  leftArm: { shrug: BOOK_SHRUG },
+  rightLeg: { flex: 90, knee: 90, abduct: SAG_KNEE_DOWN, ankle: SAG_TOES },
+  leftLeg: {},
+});
+/** How far the top arm comes down across the chest, closed, for the fingertips to rest on the floor in front of it. */
+const SAG_CLOSED_ARM = (() => {
+  let [short, past] = [0, -90];
+  for (let i = 0; i < 40; i++) {
+    const arm = (short + past) / 2;
+    if (solvePose(sagittariusBody(0, BOOK_OPEN.arm, arm)).rightArm[3][1] > SAG_FINGERTIPS_Y) short = arm;
+    else past = arm;
+  }
+  return (short + past) / 2;
+})();
+/**
+ * How far out the top arm opens: as the chest turns open it swings round behind, and it goes as far
+ * as it takes for the hand to lie on the floor behind, relaxed, the back of it down, the fingertips touching.
+ */
+const SAG_OPEN_ARM = (() => {
+  let [short, past] = [BOOK_OPEN.arm, 180];
+  for (let i = 0; i < 40; i++) {
+    const arm = (short + past) / 2;
+    if (solvePose(sagittariusBody(1, arm, 0)).rightArm[3][1] > SAG_FINGERTIPS_Y) short = arm;
+    else past = arm;
+  }
+  return (short + past) / 2;
+})();
+/** The top knee, down on the floor in front, which stays there. */
+const SAG_KNEE = solvePose(sagittariusBody(0)).rightLeg[1];
+/** Where the middle of the bottom hand is, holding the knee: on top of it. */
+const SAG_ON_KNEE: Vec3 = [SAG_KNEE[0], SAG_KNEE[1] + SAG_HAND_ON_KNEE, SAG_KNEE[2]];
+
+/**
+ * The chest this far open, the bottom hand on top of the knee holding it down. The hand points on
+ * from the arm, from the bottom shoulder to the knee, tipped down over the knee, so the wrist stays
+ * near straight as the shoulder lifts with the chest turning.
+ */
+const sagittariusAt = (open: number): Pose3 => {
+  const body = sagittariusBody(open);
+  const along = unit3(sub3(SAG_ON_KNEE, solvePose(body).leftArm[0]));
+  const onKnee = unit3([along[0], along[1] - SAG_HAND_TIP, along[2]]);
+  return {
+    ...body,
+    pins: { leftHand: { at: along3(SAG_ON_KNEE, onKnee, -SAG_HAND_MIDDLE), toward: onKnee, pole: [1, 0.3, 0] } },
+  };
+};
+const SAG_CLOSED = sagittariusAt(0);
+const SAG_OPEN = sagittariusAt(1);
+const SAG_STEPS = 16;
+
+export const THE_SAGITTARIUS_3D: Clip3D = {
+  view: '3d',
+  // As in open book, from the feet end, a little behind the back and well above: the arm sweeps round
+  // over the body in a half circle across the screen as the chest turns up toward the camera, the top
+  // knee is in front, down on the floor, and the bottom leg reaches long down the screen.
+  camera: OPEN_BOOK_3D.camera,
+  highlight: ['torso', 'rightArm'],
+  // The bottom hand holds the top knee down, on top of it.
+  holds: [{ hand: 'leftHand', limb: 'rightLeg' }],
+  // As in open book: the top knee is nearer the camera than the top arm, well apart from it on
+  // screen, and by depth they swapped as the arm went overhead.
+  behind: [['rightArm', 'rightLeg']],
+  // The face turns up toward the camera as the chest opens, and a nose appearing partway through
+  // only distracts from the arm.
+  nose: false,
+  // Open.
+  stillFrame: 1 + SAG_STEPS,
+  keyframes: [
+    { ms: 0, pose: SAG_CLOSED },
+    { ms: 600, pose: SAG_CLOSED },
+    ...alongArc(2200, SAG_STEPS, sagittariusAt),
+    { ms: 3500, pose: SAG_OPEN },
+    ...alongArc(2200, SAG_STEPS, (t) => sagittariusAt(1 - t)),
+  ],
+};
