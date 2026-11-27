@@ -70,6 +70,7 @@ import {
   SIDE_LYING_EXTERNAL_ROTATION_3D,
   SLEEPER_STRETCH_3D,
   THE_SAGITTARIUS_3D,
+  THREAD_THE_NEEDLE_3D,
   SQUAT_TO_STAND_3D,
   STANDING_FORWARD_FOLD_3D,
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
@@ -77,7 +78,6 @@ import {
 } from './exercise-animations-3d';
 
 import {
-  THREAD_THE_NEEDLE,
   WINDSHIELD_WIPERS_WITH_KNEE_LIFT,
   WORLDS_GREATEST_STRETCH,
 } from './exercise-animations';
@@ -346,7 +346,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Sweep it down and thread it under your other arm, then repeat and switch sides',
     ],
     photo: require('@/assets/images/exercises/thread-the-needle.png'),
-    animation: THREAD_THE_NEEDLE,
+    animation: THREAD_THE_NEEDLE_3D,
     twoSided: true,
     active: true,
   },

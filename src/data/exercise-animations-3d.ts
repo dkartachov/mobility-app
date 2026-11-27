@@ -1,4 +1,4 @@
-import { distance, shiftedPose, SKELETON, solveJoint3, solvePose, strapPoints, type ArmPose, type Block, type Clip3D, type Fingers, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
+import { distance, shiftedPose, SKELETON, solveJoint3, solvePose, strapPoints, type ArmPose, type Bend, type Block, type Clip3D, type Fingers, type Keyframe3, type LegPose, type Pin, type Pose3, type Skeleton, type Vec3 } from '@/lib/rig3d';
 
 /** How high an ankle sits with the foot flat or the shin lying on the floor, and a wrist with the palm down. */
 const ANKLE_Y = 13;
@@ -6314,5 +6314,187 @@ export const THE_SAGITTARIUS_3D: Clip3D = {
     ...alongArc(2200, SAG_STEPS, sagittariusAt),
     { ms: 3500, pose: SAG_OPEN },
     ...alongArc(2200, SAG_STEPS, (t) => sagittariusAt(1 - t)),
+  ],
+};
+
+// --- Thread the needle: on all fours, one arm reaches up to the ceiling as the chest turns open, then sweeps down and threads under the other arm, the shoulder and the side of the head coming down to the mat ---
+
+/** How far the chest turns open, reaching up, and closed, threaded under. */
+const NEEDLE_TWIST = { reach: -55, thread: 50 };
+/**
+ * Threaded, the hips sit back a little toward the heels, swinging round the knees on the thighs, and
+ * the chest drops, the planted elbow bending.
+ */
+const NEEDLE_HIPS_BACK = 22;
+const NEEDLE_PELVIS = { reach: ALL_FOURS.pelvis, thread: [-NEEDLE_HIPS_BACK, ANKLE_Y + Math.sqrt((0.999 * SKELETON.thigh) ** 2 - NEEDLE_HIPS_BACK ** 2), 0] as Vec3 };
+/** Threaded, the chest bends over toward the planted hand, bringing the shoulder in under the middle of the body. */
+const NEEDLE_SIDE = 30;
+/** How high the threaded shoulder rests on the mat. */
+const NEEDLE_SHOULDER_Y = 24;
+/** The planted hand, a little wider than on all fours so the head comes down inside it. */
+const NEEDLE_LEFT_HAND: Pin = { at: [124, WRIST_Y, -45], toward: [1, 0, 0], pole: [-0.3, 0.8, -1] };
+/** Reaching up, the head turns to follow the hand. */
+const NEEDLE_NECK_UP = { twist: -30, flex: -15, side: 0 };
+/** Threaded, the side of the head rests on the mat ahead of the neck, turned this far in toward the threaded shoulder. */
+const NEEDLE_HEAD_IN = 25;
+const NEEDLE_NECK_TWIST_DOWN = 15;
+
+/** Down this far, from reaching up (0) to threaded (1), with the body leaning this far and the neck bent so. */
+const needleBody = (t: number, down: number, lean: number, neck: Bend): Pose3 => ({
+  ...ALL_FOURS,
+  pelvis: mix3(NEEDLE_PELVIS.reach, NEEDLE_PELVIS.thread, down),
+  lean,
+  spine: { twist: mix(NEEDLE_TWIST.reach, NEEDLE_TWIST.thread, t), side: -NEEDLE_SIDE * down },
+  neck,
+});
+const NEEDLE_LEAN_UP = onAllFours(0, 0).lean!;
+/** Threaded, the body leans until the threaded shoulder is down on the mat. */
+const NEEDLE_LEAN_DOWN = (() => {
+  let [high, low] = [NEEDLE_LEAN_UP, 170];
+  for (let i = 0; i < 40; i++) {
+    const lean = (high + low) / 2;
+    if (solvePose(needleBody(1, 1, lean, {})).rightArm[0][1] > NEEDLE_SHOULDER_Y) high = lean;
+    else low = lean;
+  }
+  return (high + low) / 2;
+})();
+/** Threaded, the neck bent to rest the middle of the head a head's height up off the mat, ahead of the neck. */
+const NEEDLE_NECK_DOWN = ((): Bend => {
+  const pose = (flex: number, side: number) => needleBody(1, 1, NEEDLE_LEAN_DOWN, { twist: NEEDLE_NECK_TWIST_DOWN, flex, side });
+  const base = solvePose(pose(0, 0)).spine[6];
+  const y = SKELETON.head + 1;
+  const flat = Math.sqrt(SKELETON.neck ** 2 - (base[1] - y) ** 2);
+  const target: Vec3 = [base[0] + flat * Math.cos(radians(NEEDLE_HEAD_IN)), y, base[2] + flat * Math.sin(radians(NEEDLE_HEAD_IN))];
+  let best = { flex: 0, side: 0, gap: Infinity };
+  for (const step of [10, 2, 0.4, 0.08]) {
+    const around = best;
+    for (let i = -6; i <= 6; i++) {
+      for (let j = -6; j <= 6; j++) {
+        const [flex, side] = [around.flex + i * step, around.side + j * step];
+        const gap = distance(solvePose(pose(flex, side)).head, target);
+        if (gap < best.gap) best = { flex, side, gap };
+      }
+    }
+  }
+  return { twist: NEEDLE_NECK_TWIST_DOWN, flex: best.flex, side: best.side };
+})();
+
+/** The right arm's direction from its shoulder: up at the ceiling, then down at the floor, then along it out under the left arm. */
+const NEEDLE_AIM = { up: unitOf([0, 1, 0.35]), down: unitOf([-0.35, -1, 0]), across: unitOf([-0.12, 0, -1]) };
+
+/**
+ * Bent on its way down to the floor, the right elbow points out to the right side, clear of the chest
+ * above it and the knees behind.
+ */
+const NEEDLE_ELBOW: Vec3 = [-0.3, 0.3, 1];
+/** How far down the arm is straight along the floor, out under the planted arm, and how far either side of that it eases in. */
+const NEEDLE_ACROSS_BY = 0.8;
+const NEEDLE_ACROSS_EASE = 0.15;
+/**
+ * From here on the right arm is under the chest, behind the torso, with the top of it drawn over the
+ * shoulder it hangs from (`upperArmsOver`). It changes sides as it hangs down below the shoulder with
+ * the hand near the floor.
+ */
+const NEEDLE_UNDER = 0.5;
+
+/** The pose this far along the move's own way, from reaching up (0) to threaded under (1), before it's timed. */
+const needleAlong = (t: number): Pose3 => {
+  const down = phase(t, 0.3, 1);
+  const neck = { twist: mix(NEEDLE_NECK_UP.twist, NEEDLE_NECK_DOWN.twist!, t), flex: mix(NEEDLE_NECK_UP.flex, NEEDLE_NECK_DOWN.flex!, down), side: mix(NEEDLE_NECK_UP.side, NEEDLE_NECK_DOWN.side!, down) };
+  const body = needleBody(t, down, mix(NEEDLE_LEAN_UP, NEEDLE_LEAN_DOWN, down), neck);
+  const shoulder = solvePose(body).rightArm[0];
+  // Across, the hand lies on the floor an arm's length out.
+  const flat = Math.sqrt(Math.max(0, ARM_REACH ** 2 - (shoulder[1] - WRIST_Y) ** 2));
+  const across = unit3([NEEDLE_AIM.across[0] * flat, WRIST_Y - shoulder[1], NEEDLE_AIM.across[2] * flat]);
+  // The arm gets there, straight along the floor, before the shoulder comes down, which then slides
+  // the hand on out. It eases into it over a short way rather than stopping turning all at once,
+  // which snapped the bent elbow straight.
+  const toward = t / NEEDLE_ACROSS_BY;
+  const along = toward < 1 - NEEDLE_ACROSS_EASE ? toward : toward > 1 + NEEDLE_ACROSS_EASE ? 1 : toward - (toward - 1 + NEEDLE_ACROSS_EASE) ** 2 / (4 * NEEDLE_ACROSS_EASE);
+  const aim = unit3(curve(NEEDLE_AIM.up, NEEDLE_AIM.down, across, along));
+  const toFloor = aim[1] < -1e-3 ? (shoulder[1] - WRIST_Y) / -aim[1] : Infinity;
+  const at = along3(shoulder, aim, Math.min(ARM_REACH, toFloor));
+  // The hand carries on from the arm, but never tips its fingers into the floor: once down there it
+  // lies flat along it, pointing the way the arm goes.
+  const lowest = -(at[1] - 10) / SKELETON.hand;
+  const pointingY = Math.max(aim[1], lowest);
+  const level = unit3([aim[0] + 0.3 * NEEDLE_AIM.across[0], 0, aim[2] + 0.3 * NEEDLE_AIM.across[2]]);
+  const sideways = Math.sqrt(1 - pointingY ** 2);
+  return {
+    ...body,
+    pins: {
+      ...ALL_FOURS.pins,
+      leftHand: NEEDLE_LEFT_HAND,
+      rightHand: { at, toward: [level[0] * sideways, pointingY, level[2] * sideways], pole: NEEDLE_ELBOW },
+    },
+    ...(t >= NEEDLE_UNDER ? { behind: [['rightArm', 'torso']] as const } : {}),
+  };
+};
+/**
+ * How far the hand and the shoulder have gone together by each of these many even steps along the
+ * move's way. The hand swings a long way from the ceiling to the floor in the middle of it, and taken
+ * at an even rate along its way it whipped through there and crawled at either end. Timed by how far
+ * they go, nothing hurries or lags, and the move as a whole eases in and out.
+ */
+const NEEDLE_TIMING_STEPS = 120;
+const NEEDLE_TRAVELLED = (() => {
+  const points = (t: number): [Vec3, Vec3] => {
+    const pose = needleAlong(t);
+    return [pose.pins!.rightHand!.at, solvePose(pose).rightArm[0]];
+  };
+  const travelled = [0];
+  let [hand, shoulder] = points(0);
+  for (let i = 1; i <= NEEDLE_TIMING_STEPS; i++) {
+    const [nextHand, nextShoulder] = points(i / NEEDLE_TIMING_STEPS);
+    travelled.push(travelled[i - 1] + distance(hand, nextHand) + distance(shoulder, nextShoulder));
+    [hand, shoulder] = [nextHand, nextShoulder];
+  }
+  return travelled;
+})();
+
+/** From reaching up (0) to threaded under (1), this share of the way the hand and the shoulder go. */
+const needleAt = (share: number): Pose3 => {
+  const goal = share * NEEDLE_TRAVELLED[NEEDLE_TIMING_STEPS];
+  let i = 1;
+  while (i < NEEDLE_TIMING_STEPS && NEEDLE_TRAVELLED[i] < goal) i++;
+  const [before, after] = [NEEDLE_TRAVELLED[i - 1], NEEDLE_TRAVELLED[i]];
+  return needleAlong((i - 1 + (after > before ? (goal - before) / (after - before) : 0)) / NEEDLE_TIMING_STEPS);
+};
+const NEEDLE_REACH = needleAt(0);
+const NEEDLE_THREAD = needleAt(1);
+const NEEDLE_STEPS = 48;
+
+export const THREAD_THE_NEEDLE_3D: Clip3D = {
+  view: '3d',
+  // From in front and to the reaching arm's side, a little above, where the whole body shows, the
+  // back and hips as well as the arms. The arm reaching up opens the chest toward the camera, and
+  // threaded it comes out along the floor past the planted arm. Further round to the side the chest
+  // and the planted arm covered it; from the planted arm's side that arm covered the head.
+  camera: { yaw: 60, pitch: 25 },
+  highlight: ['torso', 'rightArm'],
+  // The face turns from the floor up toward the hand and back, and a nose coming and going only
+  // distracts from the arm.
+  nose: false,
+  // The planted arm is in front of the chest the whole way: by where they overlap it changed sides
+  // as the chest came down beside it.
+  over: ['leftArm'],
+  // The thighs are behind the chest, which slopes down toward the camera; the near one came over
+  // it as the chest came down. The head is in front of the reaching arm's shoulder from here, and
+  // the top of the arm swapped places with it where they touch as the arm came down.
+  behind: [
+    ['rightLeg', 'torso'],
+    ['rightArm', 'head'],
+  ],
+  // The arm threading under the chest goes behind the torso as it hangs down from the shoulder, but
+  // the top of it stays in front of the shoulder it hangs from.
+  upperArmsOver: ['rightArm'],
+  // Threaded.
+  stillFrame: 1 + NEEDLE_STEPS,
+  keyframes: [
+    { ms: 0, pose: NEEDLE_REACH },
+    { ms: 250, pose: NEEDLE_REACH },
+    ...alongArc(1900, NEEDLE_STEPS, needleAt),
+    { ms: 250, pose: NEEDLE_THREAD },
+    ...alongArc(1900, NEEDLE_STEPS, (t) => needleAt(1 - t)),
   ],
 };

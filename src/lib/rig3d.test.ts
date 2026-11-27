@@ -46,6 +46,7 @@ import {
   SIDE_LYING_EXTERNAL_ROTATION_3D,
   SLEEPER_STRETCH_3D,
   THE_SAGITTARIUS_3D,
+  THREAD_THE_NEEDLE_3D,
   SIT_AND_REACH_3D,
   SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
@@ -1791,6 +1792,58 @@ describe('3D clips', () => {
       const nearest = Math.min(...[start.rightArm, start.leftArm].map((arm) => Math.hypot(x - hand(arm)[0], y - hand(arm)[1])));
       expect(nearest).toBeGreaterThan(10);
     }
+  });
+
+  it('reaches one arm up to the ceiling as the chest turns open, then threads it under the planted arm along the floor, the shoulder and the side of the head down on the mat, in thread the needle', () => {
+    const clip = THREAD_THE_NEEDLE_3D;
+    const skeletons = samples(clip).map(solvePose);
+    const reach = skeletons[0];
+    const threaded = solvePose(clip.keyframes[clip.stillFrame].pose);
+    for (const s of skeletons) {
+      // The knees and the planted left hand stay where they are.
+      expect(distance(s.rightLeg[1], reach.rightLeg[1])).toBeLessThan(12);
+      expect(distance(s.leftLeg[1], reach.leftLeg[1])).toBeLessThan(12);
+      expect(distance(s.leftArm[2], reach.leftArm[2])).toBeCloseTo(0);
+      // The threading arm never goes through the planted one, or the head.
+      for (let i = 1; i < 4; i++) {
+        for (let j = 1; j < 4; j++) {
+          for (let k = 0; k <= 10; k++) {
+            const point: Vec3 = [
+              s.rightArm[i - 1][0] + ((s.rightArm[i][0] - s.rightArm[i - 1][0]) * k) / 10,
+              s.rightArm[i - 1][1] + ((s.rightArm[i][1] - s.rightArm[i - 1][1]) * k) / 10,
+              s.rightArm[i - 1][2] + ((s.rightArm[i][2] - s.rightArm[i - 1][2]) * k) / 10,
+            ];
+            expect(distanceToSegment(point, s.leftArm[j - 1], s.leftArm[j])).toBeGreaterThan(18);
+          }
+        }
+        expect(distanceToSegment(s.head, s.rightArm[i - 1], s.rightArm[i])).toBeGreaterThan(SKELETON.head + 10);
+      }
+    }
+    // Reaching up: the chest turned open, the right shoulder above the left, and the straight arm up at the ceiling.
+    expect(reach.rightArm[0][1]).toBeGreaterThan(reach.leftArm[0][1] + 30);
+    expect(angleAt(reach.rightArm[0], reach.rightArm[1], reach.rightArm[2])).toBeGreaterThan(170);
+    expect(unitBetween(reach.rightArm[0], reach.rightArm[2])[1]).toBeGreaterThan(0.9);
+    // Threaded: the right shoulder and the side of the head down on the mat, and the straight arm
+    // lying along the floor out past the planted hand, under the planted arm.
+    expect(threaded.rightArm[0][1]).toBeLessThan(30);
+    expect(threaded.head[1]).toBeLessThan(SKELETON.head + 3);
+    expect(angleAt(threaded.rightArm[0], threaded.rightArm[1], threaded.rightArm[2])).toBeGreaterThan(170);
+    expect(threaded.rightArm[2][1]).toBeLessThan(15);
+    expect(threaded.rightArm[2][2]).toBeLessThan(threaded.leftArm[2][2] - 80);
+    expect(threaded.rightArm[1][0]).toBeLessThan(threaded.leftArm[1][0]);
+    // Threaded, the arm is under the chest, behind the torso, and behind the planted arm it passes under,
+    // with its upper arm drawn again just over the torso, still under the planted arm and the head.
+    const orders = drawOrders(clip);
+    const order = orders[Math.round(durationOf(clip) / 2 / 10)].split(' ').filter((word) => word !== 'hand');
+    expect(order).toEqual(['leftLeg', 'rightLeg', 'rightArm', 'torso', 'rightArm', 'leftArm', 'head']);
+    // Whenever the arm is behind the torso, the top of it is drawn again straight over the torso, so it
+    // stays in front of the shoulder it hangs from as it goes in under the chest.
+    for (const o of orders) {
+      if (o.indexOf('rightArm ') > o.indexOf('torso')) continue;
+      expect(o).toContain('torso rightArm hand');
+    }
+    // The planted arm stays over the torso the whole way.
+    for (const o of orders) expect(o.split(' ').indexOf('leftArm')).toBeGreaterThan(o.split(' ').indexOf('torso'));
   });
 
   it('holds the top knee down at 90° with the bottom hand while the chest turns open and the top arm lies back on the floor behind, and back, in the Sagittarius', () => {

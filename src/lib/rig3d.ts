@@ -253,6 +253,15 @@ export type Clip3D = {
    * drawn over the shoulder blade it's behind, and jump back behind it when the hand lifts off.
    */
   handsOnBody?: readonly ('rightHand' | 'leftHand')[];
+  /**
+   * Arms that thread in under the chest, like the arm in thread the needle that sweeps down and
+   * slides along the floor under the other one. While such an arm is behind the torso, its upper arm
+   * is drawn again over the torso, as its forearm is for `handsOnBody`: the shoulder end stays in
+   * front of the shoulder it hangs from, though the forearm and hand have gone in under the chest.
+   * Ordered whole, the round of the shoulder covered the top of the arm the moment it went behind.
+   * The arm still goes under the head, the legs and the other arm.
+   */
+  upperArmsOver?: readonly ('rightArm' | 'leftArm')[];
   scenery?: readonly Block[];
   /**
    * A strap looped around the ball of this foot, with an end held in each hand. With a `hand`, that
@@ -382,7 +391,8 @@ export type FigureSlot = {
   outline: string;
   /**
    * A hand drawn on its own over a limb it holds (see `Clip3D.holds`), after its arm's own slot, or
-   * a forearm and hand over the torso (see `Clip3D.handsOnBody`).
+   * a forearm and hand over the torso (see `Clip3D.handsOnBody`), or an upper arm over it (see
+   * `Clip3D.upperArmsOver`).
    */
   hand: boolean;
   /** From 0, furthest from the camera, to 1, nearest. */
@@ -966,13 +976,13 @@ function handShape(view: Mat3, wrist: Vec3, fingers: FingerJoints): string {
 
 /**
  * How many shapes `traceFigure` makes for a clip: one for each of the six parts of the body, one
- * for each hand it draws again on its own, and one for each thumb, which needs its own shape to go
+ * for each hand or upper arm it draws again on its own, and one for each thumb, which needs its own shape to go
  * over its hand with an outline.
  */
 export function figureSlotCount(clip: Clip3D): number {
   const pins = clip.keyframes[0].pose.pins;
   const thumbs = (pins?.rightHand?.palm ? 1 : 0) + (pins?.leftHand?.palm ? 1 : 0);
-  return 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) + thumbs;
+  return 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) + (clip.upperArmsOver?.length ?? 0) + thumbs;
 }
 
 /** The torso's cross-section along the spine from the hips: how far along, then half its width and half its depth there. */
@@ -1804,6 +1814,8 @@ function dumbbellShape(view: Mat3, arm: readonly Vec3[], palm: Vec3 | undefined)
 const HELD_HAND_OUTLINE_FROM = 0.6;
 /** How far along the forearm from the elbow the outline of a forearm drawn on its own over the torso starts. */
 const RESTING_FOREARM_OUTLINE_FROM = 0.4;
+/** How far along the upper arm from the shoulder the outline of an upper arm drawn on its own over the torso stops, which keeps the outline off the elbow. */
+const THREADED_UPPER_ARM_OUTLINE_TO = 0.6;
 
 /** How close on screen two limbs' bones have to come for one to be drawn over the other: about a limb's thickness each. */
 const LIMB_OVERLAP = 2 * LIMB_RADIUS;
@@ -1851,7 +1863,9 @@ export function traceFigure(
   /** Hands holding a dumbbell, see `Clip3D.dumbbells`. */
   dumbbells?: Clip3D['dumbbells'],
   /** Whether, and how, a face turned toward the camera gets its nose, see `Clip3D.nose`. */
-  nose: NoseStyle = true
+  nose: NoseStyle = true,
+  /** Arms whose upper arm is drawn again over the torso while they're behind it, see `Clip3D.upperArmsOver`. */
+  upperArmsOver?: Clip3D['upperArmsOver']
 ): FigureFrame {
   'worklet';
   const flat = (points: readonly Vec3[]): Vec3[] => {
@@ -2049,6 +2063,35 @@ export function traceFigure(
     }
   }
 
+  // An arm threaded in under the chest has its upper arm drawn again just over the torso, under
+  // everything else that's over it. Its outline stops partway along, so it draws no line across the
+  // elbow where the forearm carries on underneath. While the arm is over the torso anyway, the
+  // shape goes straight after the arm's own, where it changes nothing.
+  if (upperArmsOver) {
+    for (let i = 0; i < upperArmsOver.length; i++) {
+      const armPart = upperArmsOver[i];
+      const arm = armPart === 'rightArm' ? rightArm : leftArm;
+      let own = -1;
+      let torsoAt = -1;
+      for (let k = 0; k < slots.length; k++) {
+        if (slots[k].hand) continue;
+        if (slots[k].part === armPart) own = k;
+        if (slots[k].part === 'torso') torsoAt = k;
+      }
+      if (own < 0) continue;
+      const [wide, narrow] = ARM_RADII[0];
+      slots.splice(Math.max(own, torsoAt) + 1, 0, {
+        part: armPart,
+        d: capsule(arm[0], wide, arm[1], narrow),
+        outline: capsule(arm[0], wide, lerpVec(arm[0], arm[1], THREADED_UPPER_ARM_OUTLINE_TO), lerp(wide, narrow, THREADED_UPPER_ARM_OUTLINE_TO)),
+        hand: true,
+        shade: slots[own].shade,
+        accent: slots[own].accent,
+        fingers: '',
+      });
+    }
+  }
+
   // A hand holding a limb goes over it, wherever its arm is. Its outline starts partway along the
   // hand, so it's kept apart from what it holds without a line across its own wrist.
   if (holds) {
@@ -2237,7 +2280,7 @@ export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
   const travel = travelOf(clip, pose);
   const skeleton = solvePose(clip.follow ? shiftedPose(pose, -travel) : pose);
   const behind = pose.behind ? (clip.behind ? [...clip.behind, ...pose.behind] : pose.behind) : clip.behind;
-  const frame = traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells, clip.nose ?? true);
+  const frame = traceFigure(skeleton, view, clip.highlight, clip.strap, clip.phone, clip.phone ? phoneReading(clip, skeleton) : undefined, clip.over, behind, clip.holds, clip.handsOnBody, clip.dumbbells, clip.nose ?? true, clip.upperArmsOver);
   if (clip.miniBand) {
     const [front, back] = miniBandPoints(skeleton, view, clip.miniBand);
     frame.strap += lineThrough(view, front);
