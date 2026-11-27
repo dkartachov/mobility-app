@@ -230,7 +230,9 @@ describe('exercise animations', () => {
     expect(EXERCISES.filter((e) => !e.animation).map((e) => e.id)).toEqual([]);
   });
 
-  describe.each(animated.map((e) => [e.id, e.animation] as const))('%s', (_, clip) => {
+  // Every exercise is on the 3D engine now, which `each` can't take an empty table for. The old
+  // engine's clips are kept until the new ones have been checked on a device.
+  (animated.length > 0 ? describe.each(animated.map((e) => [e.id, e.animation] as const)) : describe.skip.each([['none', undefined as never]]))('%s', (_, clip) => {
     it('never stretches a bone', () => {
       for (const pose of samples(clip)) {
         const paths = solveFigure(pose, clip);

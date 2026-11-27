@@ -408,8 +408,14 @@ export type FigureFrame = {
   shadow: string;
   /** The clip's strap, and the front of its mini band, as a line to stroke, drawn over the figure. Empty without one. */
   strap: string;
-  /** The back of the clip's mini band, as a line to stroke, drawn under the figure. Empty without one. */
+  /** The back of the clip's mini band, or of its band between the hands, as a line to stroke, drawn under the figure. Empty without one. */
   bandBehind: string;
+  /**
+   * The slot `bandBehind` is drawn just under. A mini band goes under the legs it's round, and no
+   * further: it's in front of the body and arms behind them, and drawn under the whole figure it went
+   * under a torso or forearm wherever it rose past them on screen (a knee lifted against it).
+   */
+  bandSlot: number;
   /** The clip's phone, drawn with the limb it's on. Empty paths without one. */
   phone: PhoneFrame;
   /** The dumbbell in each hand, drawn with its arm. Empty paths for a hand without one. */
@@ -2194,6 +2200,7 @@ export function traceFigure(
     shadow,
     strap: strapLine,
     bandBehind: '',
+    bandSlot: 0,
     floor: '',
     phone: phoneShape(skeleton, view, phone, reading),
     dumbbells: {
@@ -2285,6 +2292,7 @@ export function frameAt(clip: Clip3D, view: Mat3, timeMs: number): FigureFrame {
     const [front, back] = miniBandPoints(skeleton, view, clip.miniBand);
     frame.strap += lineThrough(view, front);
     frame.bandBehind = lineThrough(view, back);
+    frame.bandSlot = Math.max(0, frame.slots.findIndex((slot) => !slot.hand && (slot.part === 'rightLeg' || slot.part === 'leftLeg')));
   }
   if (clip.handBand) {
     const band = handBandLine(skeleton, view);

@@ -74,13 +74,10 @@ import {
   SQUAT_TO_STAND_3D,
   STANDING_FORWARD_FOLD_3D,
   THREE_LEGGED_DOWNWARD_FACING_DOG_3D,
+  WINDSHIELD_WIPERS_WITH_KNEE_LIFT_3D,
+  WORLDS_GREATEST_STRETCH_3D,
   WRIST_ROCKS_3D,
 } from './exercise-animations-3d';
-
-import {
-  WINDSHIELD_WIPERS_WITH_KNEE_LIFT,
-  WORLDS_GREATEST_STRETCH,
-} from './exercise-animations';
 
 export const POSITIONS = ['standing', 'seated'] as const;
 export type Position = (typeof POSITIONS)[number];
@@ -969,7 +966,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Bring it back down, straighten the front leg for a moment and repeat, then switch sides',
     ],
     photo: require('@/assets/images/exercises/worlds-greatest-stretch.png'),
-    animation: WORLDS_GREATEST_STRETCH,
+    animation: WORLDS_GREATEST_STRETCH_3D,
     twoSided: true,
     active: true,
   },
@@ -1297,7 +1294,7 @@ const ALL_EXERCISES: Exercise[] = [
       'Tip both knees over to the other side, lift the top knee again, and keep alternating. Take the band off to make it easier',
     ],
     photo: require('@/assets/images/exercises/windshield-wipers-with-knee-lift.png'),
-    animation: WINDSHIELD_WIPERS_WITH_KNEE_LIFT,
+    animation: WINDSHIELD_WIPERS_WITH_KNEE_LIFT_3D,
     active: true,
     oneMinuteOnly: true,
   },

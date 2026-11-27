@@ -96,11 +96,12 @@ const phoneSvg =
 const dumbbellSvg = (half) =>
   `<path d="${half.handle}" fill="${COLORS.dumbbell.handle}" stroke="${COLORS.background}" stroke-width="${DUMBBELL_OUTLINE}"/>` +
   `<path d="${half.weight}" fill="${COLORS.dumbbell.weight}" stroke="${COLORS.background}" stroke-width="${DUMBBELL_OUTLINE}" stroke-linejoin="round"/>`;
-// The back of a mini band goes under the legs, so it shows only between them.
-if (frame.bandBehind) {
-  body += `<path d="${frame.bandBehind}" fill="none" stroke="${COLORS.strap}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>`;
-}
-for (const slot of frame.slots) {
+for (const [index, slot] of frame.slots.entries()) {
+  // The back of a band goes under the slot the frame says: a mini band just under the legs, so it
+  // shows only between them and stays over the body and arms behind them.
+  if (frame.bandBehind && index === frame.bandSlot) {
+    body += `<path d="${frame.bandBehind}" fill="none" stroke="${COLORS.strap}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
   const dumbbell = !slot.hand && (slot.part === 'rightArm' || slot.part === 'leftArm') ? frame.dumbbells[slot.part] : null;
   if (stage.trail && slot.part === trailed && !slot.hand) {
     body += `<path d="${stage.trail}" fill="none" stroke="${COLORS.accent}" stroke-width="5" stroke-dasharray="2 12" stroke-linecap="round" opacity="0.8"/>`;

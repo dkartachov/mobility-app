@@ -47,6 +47,8 @@ import {
   SLEEPER_STRETCH_3D,
   THE_SAGITTARIUS_3D,
   THREAD_THE_NEEDLE_3D,
+  WINDSHIELD_WIPERS_WITH_KNEE_LIFT_3D,
+  WORLDS_GREATEST_STRETCH_3D,
   SIT_AND_REACH_3D,
   SQUAT_TO_STAND_3D,
   STRAIGHT_LEG_RAISE_3D,
@@ -562,6 +564,8 @@ describe('3D clips', () => {
       'pec-stretch-on-the-ground',
       'reverse-clamshells',
       'inchworm',
+      'windshield-wipers-with-knee-lift',
+      'worlds-greatest-stretch',
       'warmup-marching',
     ]));
   });
@@ -602,11 +606,12 @@ describe('3D clips', () => {
 
     it('draws as many parts as the figure component makes room for', () => {
       // `exercise-figure-3d.tsx` sets up one shape for each of the six parts of the body, and one more
-      // for each hand a clip draws on its own and each thumb. A part beyond that would never be drawn.
+      // for each hand a clip draws on its own, each upper arm it draws again and each thumb. A part
+      // beyond that would never be drawn.
       const view = viewOf(clip.camera);
       const pins = clip.keyframes[0].pose.pins;
       const thumbs = (pins?.rightHand?.palm ? 1 : 0) + (pins?.leftHand?.palm ? 1 : 0);
-      const expected = 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) + thumbs;
+      const expected = 6 + (clip.holds?.length ?? 0) + (clip.handsOnBody?.length ?? 0) + (clip.upperArmsOver?.length ?? 0) + thumbs;
       for (let t = 0; t <= durationOf(clip); t += 100) {
         const { slots } = frameAt(clip, view, t);
         expect(slots).toHaveLength(expected);
@@ -1844,6 +1849,117 @@ describe('3D clips', () => {
     }
     // The planted arm stays over the torso the whole way.
     for (const o of orders) expect(o.split(' ').indexOf('leftArm')).toBeGreaterThan(o.split(' ').indexOf('torso'));
+  });
+
+  it('tips both knees to one side and then the other, hovering, and lifts the top knee against the band with its foot coming up, in windshield wipers with knee lift', () => {
+    const clip = WINDSHIELD_WIPERS_WITH_KNEE_LIFT_3D;
+    const timeOf = (index: number) => clip.keyframes.slice(1, index + 1).reduce((total, frame) => total + frame.ms, 0);
+    const steps = (clip.stillFrame - 2) / 2;
+    // Each side: over to it, then the top knee lifting, held, and lowering.
+    const left = { tipped: steps + 1, lifted: 2 * steps + 2, top: 'rightLeg', bottom: 'leftLeg', toward: -1 } as const;
+    const right = { tipped: 4 * steps + 3, lifted: 5 * steps + 4, top: 'leftLeg', bottom: 'rightLeg', toward: 1 } as const;
+    const first = solvePose(clip.keyframes[0].pose);
+    for (const s of samples(clip).map(solvePose)) {
+      // The knees hover off the floor the whole way, and the bottom knee never moves off its circle around the planted foot.
+      expect(s.rightLeg[1][1]).toBeGreaterThan(40);
+      expect(s.leftLeg[1][1]).toBeGreaterThan(40);
+      // Leaning back on straight-ish arms, the hands behind.
+      expect(s.rightArm[2][0]).toBeLessThan(s.spine[0][0] - 80);
+      expect(distance(s.leftArm[2], first.leftArm[2])).toBeCloseTo(0);
+    }
+    const orders = drawOrders(clip);
+    for (const side of [left, right]) {
+      const tipped = solvePose(clip.keyframes[side.tipped].pose);
+      const lifted = solvePose(clip.keyframes[side.lifted].pose);
+      // Tipped: both knees well over to that side, both feet planted.
+      expect(side.toward * tipped[side.top][1][2]).toBeGreaterThan(20);
+      expect(side.toward * tipped[side.bottom][1][2]).toBeGreaterThan(60);
+      expect(tipped[side.top][2][1]).toBeCloseTo(13);
+      expect(tipped[side.bottom][2][1]).toBeCloseTo(13);
+      // Lifted: the top knee rises and comes away from the bottom one, stretching the band, and its
+      // foot comes up off the floor too. The bottom leg stays where it is.
+      expect(lifted[side.top][1][1]).toBeGreaterThan(tipped[side.top][1][1] + 20);
+      expect(distance(lifted[side.top][1], lifted[side.bottom][1])).toBeGreaterThan(distance(tipped[side.top][1], tipped[side.bottom][1]) + 25);
+      expect(lifted[side.top][2][1]).toBeGreaterThan(30);
+      expect(distance(lifted[side.bottom][1], tipped[side.bottom][1])).toBeCloseTo(0);
+      // The knee stays bent as the leg lifts: the whole leg turns about the hip.
+      expect(angleAt(lifted[side.top][0], lifted[side.top][1], lifted[side.top][2])).toBeCloseTo(angleAt(tipped[side.top][0], tipped[side.top][1], tipped[side.top][2]));
+      // Tipped and lifted, the top leg is drawn over the bottom one.
+      for (const index of [side.tipped, side.lifted]) {
+        const order = orders[Math.round(timeOf(index) / 10)].split(' ');
+        expect(order.indexOf(side.top)).toBeGreaterThan(order.indexOf(side.bottom));
+      }
+    }
+    // The legs change over only once each way, passing upright, where the knees are clear of each other.
+    const view = viewOf(clip.camera);
+    let changes = 0;
+    for (let i = 1; i < orders.length; i++) {
+      const legs = (o: string) => o.split(' ').filter((part) => part.endsWith('Leg')).join(' ');
+      if (legs(orders[i]) === legs(orders[i - 1])) continue;
+      changes++;
+      const s = solvePose(poseAt3(clip, i * 10));
+      expect(onScreen(project(view, s.rightLeg[1]), project(view, s.leftLeg[1]))).toBeGreaterThan(2 * LIMB_CLEAR);
+    }
+    expect(changes).toBe(2);
+    // The back of the band goes just under the legs, not the whole figure: it's in front of the torso
+    // and the arms behind, and rising with the lifted knee it went under them.
+    for (let t = 0; t <= durationOf(clip); t += 10) {
+      const frame = frameAt(clip, view, t);
+      const first = frame.slots.findIndex((slot) => !slot.hand && slot.part.endsWith('Leg'));
+      expect(frame.bandSlot).toBe(first);
+      expect(frame.slots.slice(0, first).map((slot) => slot.part)).toEqual(expect.arrayContaining(['torso', 'rightArm', 'leftArm']));
+    }
+  });
+
+  it('reaches the inside arm straight up to the ceiling from a long lunge as the chest turns open, then straightens the front leg with both hands down, in the world\'s greatest stretch', () => {
+    const clip = WORLDS_GREATEST_STRETCH_3D;
+    const steps = clip.stillFrame - 1;
+    const lunge = solvePose(clip.keyframes[0].pose);
+    const reach = solvePose(clip.keyframes[clip.stillFrame].pose);
+    const straight = solvePose(clip.keyframes[3 * steps + 3].pose);
+    for (const s of samples(clip).map(solvePose)) {
+      // The feet stay planted, the back leg straight on the ball of the foot, and the left hand on the floor.
+      expect(distance(s.rightLeg[2], lunge.rightLeg[2])).toBeCloseTo(0);
+      expect(distance(s.leftLeg[2], lunge.leftLeg[2])).toBeCloseTo(0);
+      expect(s.leftLeg[2][1]).toBeGreaterThan(25);
+      expect(angleAt(s.leftLeg[0], s.leftLeg[1], s.leftLeg[2])).toBeGreaterThan(170);
+      expect(distance(s.leftArm[2], lunge.leftArm[2])).toBeCloseTo(0);
+      // The reaching hand never goes through the front knee.
+      expect(distance(s.rightArm[2], s.rightLeg[1])).toBeGreaterThan(30);
+    }
+    // In the lunge: the front knee bent near a right angle, the back leg long behind, and both hands
+    // on the floor inside the front foot.
+    expect(angleAt(lunge.rightLeg[0], lunge.rightLeg[1], lunge.rightLeg[2])).toBeGreaterThan(80);
+    expect(angleAt(lunge.rightLeg[0], lunge.rightLeg[1], lunge.rightLeg[2])).toBeLessThan(110);
+    expect(lunge.rightLeg[2][0] - lunge.leftLeg[2][0]).toBeGreaterThan(250);
+    for (const hand of [lunge.rightArm[2], lunge.leftArm[2]]) {
+      expect(hand[1]).toBeLessThan(15);
+      expect(hand[2]).toBeLessThan(lunge.rightLeg[2][2] - 30);
+    }
+    // Reaching: the chest turned open, the right shoulder well above the left, and the straight arm
+    // pointing at the ceiling.
+    expect(reach.rightArm[0][1]).toBeGreaterThan(reach.leftArm[0][1] + 40);
+    expect(angleAt(reach.rightArm[0], reach.rightArm[1], reach.rightArm[2])).toBeGreaterThan(170);
+    expect(unitBetween(reach.rightArm[0], reach.rightArm[2])[1]).toBeGreaterThan(0.95);
+    // Straightened: the front leg straight, the hips risen, both hands still down.
+    expect(angleAt(straight.rightLeg[0], straight.rightLeg[1], straight.rightLeg[2])).toBeGreaterThan(170);
+    expect(straight.spine[0][1]).toBeGreaterThan(lunge.spine[0][1] + 25);
+    expect(distance(straight.rightArm[2], lunge.rightArm[2])).toBeCloseTo(0);
+    // The lifting arm's elbow opens and closes smoothly, never snapping straight or bent: it keeps
+    // its bend as the hand leaves the floor and straightens as the arm swings up.
+    // Measured by how fast its speed changes from one 10ms to the next: lifting off, it once went from
+    // still to opening 2.5° every 10ms and back within a few frames.
+    const elbows: number[] = [];
+    for (let t = 0; t <= durationOf(clip); t += 10) {
+      const s = solvePose(poseAt3(clip, t));
+      elbows.push(angleAt(s.rightArm[0], s.rightArm[1], s.rightArm[2]));
+    }
+    for (let i = 2; i < elbows.length; i++) expect(Math.abs(elbows[i] - 2 * elbows[i - 1] + elbows[i - 2])).toBeLessThan(1);
+    // The right arm, inside the front leg, stays behind it the whole way.
+    for (const o of drawOrders(clip)) {
+      const order = o.split(' ');
+      expect(order.indexOf('rightArm')).toBeLessThan(order.indexOf('rightLeg'));
+    }
   });
 
   it('holds the top knee down at 90° with the bottom hand while the chest turns open and the top arm lies back on the floor behind, and back, in the Sagittarius', () => {

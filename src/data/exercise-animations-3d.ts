@@ -6498,3 +6498,257 @@ export const THREAD_THE_NEEDLE_3D: Clip3D = {
     ...alongArc(1900, NEEDLE_STEPS, (t) => needleAt(1 - t)),
   ],
 };
+
+// --- Windshield wipers with knee lift: leaning back on the hands with a mini band round the knees, both knees tip to one side, hovering, and the top knee lifts against the band, its foot coming up too ---
+
+/** The feet planted about hip-width apart, a little less than a right angle at the knees. */
+const WIPERS_ANKLE: Vec3 = [128, ANKLE_Y, 34];
+/** How far round the knees tip from pointing at the ceiling, stopping short of the floor. */
+const WIPERS_TIP = 50;
+/** How far the top leg turns up off the bottom one, the knee and the foot together. */
+const WIPERS_LIFT = 26;
+
+/** `point` turned `degrees` around the line through `origin` along `axis` (a unit vector). */
+const turnAround = (point: Vec3, origin: Vec3, axis: Vec3, degrees: number): Vec3 => {
+  const v = sub3(point, origin);
+  const [c, s] = [Math.cos(radians(degrees)), Math.sin(radians(degrees))];
+  const across = cross3(axis, v);
+  const along = axis[0] * v[0] + axis[1] * v[1] + axis[2] * v[2];
+  const at = (i: number) => origin[i] + v[i] * c + across[i] * s + axis[i] * along * (1 - c);
+  return [at(0), at(1), at(2)];
+};
+
+/**
+ * Both knees tipped `tip` degrees round from upright, toward the figure's right for a positive
+ * number, and the top leg (the one tipping across, toward the other) lifted `lift` degrees off it.
+ * With the feet planted each knee swings on a circle around the line from its hip to its ankle, as
+ * in the lying windshield wiper hold: the leg on the side they tip to turns out, the other turns
+ * in. The lift turns the top leg out of its own plane about its hip, the knee rising up and back
+ * toward its own side against the band and the foot coming up off the floor with it. Leaning back
+ * on the hands, as in the 90 to 90 rotations, the pelvis rolling a little with the knees.
+ */
+const wipersAt = (tip: number, lift = 0): Pose3 => {
+  const side = Math.sign(tip) || 1;
+  const body: Pose3 = {
+    pelvis: [0, NINETY_PELVIS_Y, 0],
+    lean: -25,
+    turn: (-5 * tip) / WIPERS_TIP,
+    spine: { twist: (5 * tip) / WIPERS_TIP },
+    neck: { flex: 20 },
+    pins: {
+      rightHand: { at: [-110, WRIST_Y, 84], toward: [-1, 0, 0.5], pole: [-1, 0, 0.3] },
+      leftHand: { at: [-110, WRIST_Y, -84], toward: [-1, 0, -0.5], pole: [-1, 0, -0.3] },
+    },
+  };
+  const skeleton = solvePose(body);
+  const foot = (leg: 1 | -1): Pin => {
+    const hip = leg === 1 ? skeleton.rightLeg[0] : skeleton.leftLeg[0];
+    const ankle: Vec3 = [WIPERS_ANKLE[0], WIPERS_ANKLE[1], leg * WIPERS_ANKLE[2]];
+    const axis = unit3(sub3(ankle, hip));
+    const middle = mix3(hip, ankle, 0.5);
+    const radius = Math.sqrt(SKELETON.thigh ** 2 - (distance(hip, ankle) / 2) ** 2) * 0.999;
+    const level = axis[1];
+    const up = unit3([-level * axis[0], 1 - level * axis[1], -level * axis[2]]);
+    let across = cross3(axis, up);
+    if (across[2] < 0) across = [-across[0], -across[1], -across[2]];
+    const r = radians(tip);
+    const circle = (i: number) => middle[i] + radius * (up[i] * Math.cos(r) + across[i] * Math.sin(r));
+    const knee: Vec3 = [circle(0), circle(1), circle(2)];
+    if (leg !== -side || lift === 0) return pinVia(hip, knee, ankle, [1, 0, 0]);
+    // Out of the leg's plane, about an axis through the hip in that plane and square to the thigh.
+    const thigh = unit3(sub3(knee, hip));
+    const shin = unit3(sub3(ankle, knee));
+    const dot = thigh[0] * shin[0] + thigh[1] * shin[1] + thigh[2] * shin[2];
+    const turnAxis = unit3([shin[0] - dot * thigh[0], shin[1] - dot * thigh[1], shin[2] - dot * thigh[2]]);
+    // Whichever way round lifts the knee.
+    const turn = turnAround(knee, hip, turnAxis, lift)[1] > knee[1] ? lift : -lift;
+    const raisedKnee = turnAround(knee, hip, turnAxis, turn);
+    const raisedAnkle = turnAround(ankle, hip, turnAxis, turn);
+    const toes = sub3(turnAround(along3(ankle, [1, 0, 0], 1), hip, turnAxis, turn), raisedAnkle);
+    return pinVia(hip, raisedKnee, raisedAnkle, toes);
+  };
+  return { ...body, pins: { ...body.pins, rightFoot: foot(1), leftFoot: foot(-1) } };
+};
+const WIPERS_RIGHT = wipersAt(WIPERS_TIP);
+const WIPERS_STEPS = 12;
+
+/** Over from one side to the other, the knees passing upright, then the top knee lifting and lowering. */
+const wipersSide = (to: 1 | -1): Keyframe3[] => [
+  ...alongArc(1800, WIPERS_STEPS, (t) => wipersAt(to * WIPERS_TIP * (2 * t - 1))),
+  { ms: 150, pose: wipersAt(to * WIPERS_TIP) },
+  ...alongArc(800, WIPERS_STEPS, (t) => wipersAt(to * WIPERS_TIP, WIPERS_LIFT * t)),
+  { ms: 300, pose: wipersAt(to * WIPERS_TIP, WIPERS_LIFT) },
+  ...alongArc(800, WIPERS_STEPS, (t) => wipersAt(to * WIPERS_TIP, WIPERS_LIFT * (1 - t))),
+];
+
+export const WINDSHIELD_WIPERS_WITH_KNEE_LIFT_3D: Clip3D = {
+  view: '3d',
+  // From straight in front and a little above: the knees sweep from side to side across the screen,
+  // and the top knee lifts up it with its foot coming out to the side, the band stretching between
+  // the knees. Higher up and turned to one side (as the 90 to 90 rotations), the lift came toward
+  // the camera and barely showed.
+  camera: { yaw: 90, pitch: 18 },
+  highlight: ['rightLeg', 'leftLeg'],
+  // The thighs come off the front of the hips toward the camera, so the legs stay over them. The
+  // feet are far enough apart that the knees are clear of each other passing upright, which is
+  // where the legs change over: the top leg is in front of the bottom one on each side.
+  over: ['rightLeg', 'leftLeg'],
+  miniBand: 'knees',
+  // Tipped to the left, the top knee lifted.
+  stillFrame: 2 * WIPERS_STEPS + 2,
+  keyframes: [{ ms: 0, pose: WIPERS_RIGHT }, ...wipersSide(-1), ...wipersSide(1)],
+};
+
+// --- World's greatest stretch: a long lunge with both hands on the floor inside the front foot, the inside arm reaches up to the ceiling as the chest turns open, comes back down, and the front leg straightens for a moment ---
+
+/** The front foot is planted flat a little out from the hip, so both hands fit on the floor inside it. */
+const WGS_FRONT_ANKLE: Vec3 = [100, ANKLE_Y, 60];
+/** The front shin tips forward of upright this far, and the thigh is this far above level. */
+const WGS_SHIN = 10;
+const WGS_THIGH = 8;
+/** The back foot is up on the ball of the foot, the leg straight. */
+const WGS_BACK_ANKLE_Y = 32;
+const WGS_BACK_TOES: Vec3 = [0.85, -0.53, 0];
+/** Both hands flat on the floor inside the front foot, shoulder-width apart, level with the toes. */
+const WGS_HANDS = { x: 128, right: 18, left: -42 };
+/** How far the chest turns open toward the front leg, and how much of that the neck turns back. */
+const WGS_TWIST = 75;
+const WGS_NECK_BACK = 20;
+
+const WGS_LUNGE_PELVIS: Vec3 = (() => {
+  const knee: Vec3 = [WGS_FRONT_ANKLE[0] + SKELETON.shin * Math.sin(radians(WGS_SHIN)), ANKLE_Y + SKELETON.shin * Math.cos(radians(WGS_SHIN)), 0];
+  return [knee[0] - SKELETON.thigh * Math.cos(radians(WGS_THIGH)), knee[1] + SKELETON.thigh * Math.sin(radians(WGS_THIGH)), 0];
+})();
+/** The back ankle sits a straight leg's length behind and below the hip in the lunge. */
+const WGS_BACK_ANKLE: Vec3 = [
+  WGS_LUNGE_PELVIS[0] - Math.sqrt(LEG_REACH ** 2 - (WGS_LUNGE_PELVIS[1] - WGS_BACK_ANKLE_Y) ** 2),
+  WGS_BACK_ANKLE_Y,
+  -SKELETON.hip,
+];
+/** How far round the back ankle the hips swing from the lunge, the back leg staying straight. */
+const wgsPelvisAt = (degrees: number): Vec3 => {
+  const [dx, dy] = [WGS_LUNGE_PELVIS[0] - WGS_BACK_ANKLE[0], WGS_LUNGE_PELVIS[1] - WGS_BACK_ANKLE[1]];
+  const [c, s] = [Math.cos(radians(degrees)), Math.sin(radians(degrees))];
+  return [WGS_BACK_ANKLE[0] + dx * c - dy * s, WGS_BACK_ANKLE[1] + dx * s + dy * c, 0];
+};
+/** Swung back and up until the front leg is straight as well: both legs straight, the hips high. */
+const WGS_STRAIGHT_SWING = leanWhere((d) => {
+  const [x, y] = wgsPelvisAt(d);
+  return distance([x, y, SKELETON.hip], WGS_FRONT_ANKLE) - LEG_REACH;
+}, 0, 60);
+
+const WGS_LEGS: NonNullable<Pose3['pins']> = {
+  rightFoot: { at: WGS_FRONT_ANKLE, toward: [1, 0, 0.15], pole: [1, 0.6, 0.5] },
+  leftFoot: { at: WGS_BACK_ANKLE, toward: WGS_BACK_TOES, pole: [1, 0.3, 0] },
+};
+const wgsPlanted = (side: 1 | -1): Pin => ({
+  at: [WGS_HANDS.x, WRIST_Y, side === 1 ? WGS_HANDS.right : WGS_HANDS.left],
+  toward: [1, 0, 0],
+  pole: [-1, 0, side * 0.5],
+});
+
+/**
+ * The body with the hips swung `swing` degrees back and up from the lunge and the chest turned
+ * `open` of the way toward the front leg, leaning over just far enough that the left hand stays
+ * planted with its arm all but straight.
+ */
+const wgsBody = (swing: number, open: number): Pose3 => {
+  const body = (lean: number): Pose3 => ({
+    pelvis: wgsPelvisAt(swing),
+    lean,
+    spine: { flex: 8, twist: -WGS_TWIST * open },
+    neck: { flex: mix(-30, -10, open), twist: WGS_NECK_BACK * open },
+    pins: WGS_LEGS,
+  });
+  const left = wgsPlanted(-1).at;
+  const lean = leanWhere((l) => distance(solvePose(body(l)).leftArm[0], left) - 0.97 * ARM_REACH, 20, 120);
+  return body(lean);
+};
+
+/** A point no lower than `floor`. */
+const atLeast = ([x, y, z]: Vec3, floor: number): Vec3 => [x, Math.max(y, floor), z];
+/** The elbow's angle (radians) for a hand this far from the shoulder. */
+const elbowFor = (reach: number) => 2 * Math.asin(Math.min(1, reach / (SKELETON.upperArm + SKELETON.forearm)));
+/** How bent the right elbow is with the hand planted in the lunge. */
+const WGS_PLANTED_ELBOW = elbowFor(distance(solvePose(wgsBody(0, 0)).rightArm[0], wgsPlanted(1).at));
+/** How far into the move the arm starts swinging out: before that, the hand only lifts off the floor. */
+const WGS_SWING_FROM = 0.12;
+/**
+ * The right arm `up` of the way from flat on the floor to straight up at the ceiling, as the chest
+ * turns open with it: it lifts off the floor up and out to the right, the side the chest turns
+ * toward, passing in front of the face, and on up, straightening as it goes. The left hand stays
+ * planted.
+ */
+const wgsReachAt = (up: number): Pose3 => {
+  const body = wgsBody(0, up);
+  const shoulder = solvePose(body).rightArm[0];
+  const planted = wgsPlanted(1);
+  const from = unit3(sub3(planted.at, shoulder));
+  // Mostly up on the way, so the hand rises clear of the front knee before it swings out.
+  const side = unit3([0.25, 0.9, 0.35]);
+  const ceiling: Vec3 = [0, 1, 0];
+  // The swing waits for the hand to come up off the floor. Swung from hanging straight down, the
+  // hand slid out along the floor before it rose.
+  const swing = phase(up, WGS_SWING_FROM, 1);
+  const way = turnToward(turnToward(from, side, swing), turnToward(side, ceiling, swing), swing);
+  // The elbow keeps the bend it had on the floor, so the hand lifts off with the shoulder as the chest
+  // starts to turn, and straightens with the swing. Its angle moves evenly, not the arm's length: near
+  // straight, a little more length opens the elbow a lot. Measured to the planted hand, the arm was
+  // pulled straight by the rising shoulder before the hand left the floor, and the elbow snapped.
+  const elbow = mix(WGS_PLANTED_ELBOW, elbowFor(ARM_REACH), swing);
+  const length = (SKELETON.upperArm + SKELETON.forearm) * Math.sin(elbow / 2);
+  return {
+    ...body,
+    pins: {
+      ...body.pins,
+      leftHand: wgsPlanted(-1),
+      // Never below where it was flat on the floor, as it sets off.
+      rightHand: { at: atLeast(along3(shoulder, way, length), WRIST_Y), toward: turnToward(planted.toward!, ceiling, up), pole: planted.pole },
+    },
+  };
+};
+/** The hips `t` of the way swung back and up, the front leg straightening, both hands planted. */
+const wgsStraightAt = (t: number): Pose3 => {
+  const body = wgsBody(WGS_STRAIGHT_SWING * t, 0);
+  return { ...body, pins: { ...body.pins, rightHand: wgsPlanted(1), leftHand: wgsPlanted(-1) } };
+};
+const WGS_LUNGE = wgsReachAt(0);
+const WGS_REACH = wgsReachAt(1);
+const WGS_STRAIGHT = wgsStraightAt(1);
+/**
+ * The arm all but straight sweeps through half a turn, so it takes this many keyframes to follow
+ * the arc: going straight from one to the next cuts across it, the arm comes up short and the elbow
+ * pops out between keyframes. With 14 the elbow bobbed on every one, and with 72 it still wobbled
+ * a degree either way at the fastest part of the swing.
+ */
+const WGS_STEPS = 180;
+
+export const WORLDS_GREATEST_STRETCH_3D: Clip3D = {
+  view: '3d',
+  // From the front leg's side, a little in front and just above, as the pyramid stretch: the long
+  // lunge and the front leg straightening are flat on the screen, and the chest turns open toward
+  // the camera with the arm going straight up the screen. From further in front the legs were end
+  // on and the lunge didn't read.
+  camera: { yaw: 20, pitch: 15 },
+  // The face turns from the floor toward the camera as the chest opens, and a nose appearing partway
+  // only distracts from the arm.
+  nose: false,
+  // The hips, the back leg's hip flexor, the front leg's groin and hamstring, and the chest turning.
+  highlight: ['torso', 'rightLeg', 'leftLeg'],
+  // The right hand is planted inside the front foot, behind the leg from here; by depth the two
+  // swapped as the hand lifted off. Once up the arm is clear of the leg on the screen.
+  behind: [['rightArm', 'rightLeg']],
+  // Reaching up, the chest turned open.
+  stillFrame: 1 + WGS_STEPS,
+  keyframes: [
+    { ms: 0, pose: WGS_LUNGE },
+    ...alongArc(1600, WGS_STEPS, wgsReachAt),
+    { ms: 600, pose: WGS_REACH },
+    ...alongArc(1400, WGS_STEPS, (t) => wgsReachAt(1 - t)),
+    { ms: 200, pose: WGS_LUNGE },
+    ...alongArc(1200, WGS_STEPS, wgsStraightAt),
+    { ms: 500, pose: WGS_STRAIGHT },
+    ...alongArc(1200, WGS_STEPS, (t) => wgsStraightAt(1 - t)),
+    { ms: 200, pose: WGS_LUNGE },
+  ],
+};

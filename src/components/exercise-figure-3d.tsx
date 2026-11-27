@@ -133,7 +133,8 @@ function DumbbellLayer({ frame, index, stage }: { frame: SharedValue<FigureFrame
  * by how near the part is, and the accent, which is only drawn for a highlighted part. A hand with
  * a thumb has the lines between its fingers stroked over it, and a hand holding a dumbbell has a
  * half of it either side. The clip's
- * trail goes under whichever slot holds the part it traces, and its phone with the part it's on.
+ * trail goes under whichever slot holds the part it traces, and its phone with the part it's on. The
+ * back of a band goes under the slot the frame says (`bandSlot`): a mini band under the legs it's round.
  */
 function Slot({
   frame,
@@ -142,6 +143,7 @@ function Slot({
   trailed,
   phone,
   dumbbells,
+  bands,
 }: {
   frame: SharedValue<FigureFrame>;
   index: number;
@@ -149,10 +151,15 @@ function Slot({
   trailed?: Part;
   phone: boolean;
   dumbbells: boolean;
+  bands: boolean;
 }) {
   const path = useAnimatedProps(() => {
     const slot = frame.get().slots[index];
     return { d: slot.part === trailed && !slot.hand ? trail : '' };
+  });
+  const band = useAnimatedProps(() => {
+    const f = frame.get();
+    return { d: f.bandSlot === index ? f.bandBehind : '' };
   });
   const outline = useAnimatedProps(() => ({ d: frame.get().slots[index].outline }));
   const far = useAnimatedProps(() => {
@@ -171,6 +178,7 @@ function Slot({
 
   return (
     <>
+      {bands && <AnimatedPath animatedProps={band} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
       <AnimatedPath animatedProps={path} fill="none" stroke={COLORS.accent} strokeWidth={5} strokeDasharray="2 12" strokeLinecap="round" opacity={0.8} />
       {phone && <PhoneLayer frame={frame} index={index} over={false} />}
       {dumbbells && <DumbbellLayer frame={frame} index={index} stage="under" />}
@@ -210,7 +218,6 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
   const frame = useDerivedValue(() => frameAt(clip, view, time.get()));
   const shadow = useAnimatedProps(() => ({ d: frame.get().shadow }));
   const strap = useAnimatedProps(() => ({ d: frame.get().strap }));
-  const bandBehind = useAnimatedProps(() => ({ d: frame.get().bandBehind }));
   const floor = useAnimatedProps(() => ({ d: frame.get().floor }));
 
   return (
@@ -235,10 +242,8 @@ export function ExerciseFigure3D({ clip, playing = true, paused = false }: { cli
             <Path d={stage.tape.marks} stroke={COLORS.tape.marks} strokeWidth={1.5} />
           </>
         )}
-        {/* The back of a mini band, under the legs, so it shows only between them. */}
-        {(clip.miniBand || clip.handBand) && <AnimatedPath animatedProps={bandBehind} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
         {slots.map((index) => (
-          <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} phone={clip.phone !== undefined} dumbbells={clip.dumbbells !== undefined} />
+          <Slot key={index} frame={frame} index={index} trail={stage.trail} trailed={trailedPart(clip.trail)} phone={clip.phone !== undefined} dumbbells={clip.dumbbells !== undefined} bands={clip.miniBand !== undefined || clip.handBand !== undefined} />
         ))}
         {(clip.strap || clip.miniBand || clip.handBand) && <AnimatedPath animatedProps={strap} fill="none" stroke={COLORS.strap} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />}
       </Svg>
